@@ -128,6 +128,40 @@ class DynArmEnv:
     def sample_action(self) -> np.ndarray:
         return self.rng.uniform(*self.action_bound, self.action_dim)
 
+    # ---- candidate peeking (no state mutation) ----------------------------
+    # The analytic parameterized space makes candidate evaluation free: both
+    # the immediate reward and the interval-collision verdict of a candidate
+    # action are pure functions of (current state, action). This is what
+    # APE2's candidate pool exploits (URPlanner) and what the shield needs.
+
+    def peek_reward(self, action: np.ndarray) -> float:
+        """Immediate reward the candidate would receive (excl. terminal
+        collision penalty and goal bonus) — APE2's R_IR, analytically."""
+        dq = np.clip(np.asarray(action, float), *self.action_bound)
+        dq = np.clip(self.q + dq, Q_MIN, Q_MAX) - self.q
+        return float(self._reward(dq))
+
+    def peek_tau_star(
+        self, action: np.ndarray, inflation: float = 0.0
+    ) -> float | None:
+        """First-contact time of the candidate over [0, dt], with obstacle
+        boxes inflated by `inflation` (lemma margin) on top of a_r.
+        None = certified interval-collision-free (under the inflation)."""
+        dq = np.clip(np.asarray(action, float), *self.action_bound)
+        dq = np.clip(self.q + dq, Q_MIN, Q_MAX) - self.q
+        taus = [
+            t
+            for seg in self._moving_segments(dq)
+            for ob in self.scene.obstacles
+            if (
+                t := first_contact_time(
+                    seg, ob.moving_box(self.a_r + inflation), self.dt
+                )
+            )
+            is not None
+        ]
+        return min(taus) if taus else None
+
     # ---- observations ------------------------------------------------------
 
     def grid_history(self) -> np.ndarray:
