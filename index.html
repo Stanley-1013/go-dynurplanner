@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DynURPlanner · 研究時間軸</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);
+    --maxw:900px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header{background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;padding:44px 24px 34px}
+  header .wrap{max-width:var(--maxw);margin:0 auto}
+  header .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core-soft);text-transform:uppercase}
+  header h1{font-family:Lora,serif;font-size:clamp(1.6rem,3vw,2.3rem);margin:.3em 0 .2em}
+  header p{color:#bcd6cb;max-width:700px;font-size:14.5px}
+  main{max-width:var(--maxw);margin:0 auto;padding:32px 24px 80px}
+  .lane{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;margin:36px 0 10px}
+  .item{display:flex;gap:16px;background:var(--paper-2);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);text-decoration:none;color:inherit}
+  .item:hover{border-color:var(--core)}
+  .item .n{font-family:Lora,serif;font-weight:600;color:var(--core);font-size:1.3rem;min-width:28px}
+  .item .t{font-weight:600;color:var(--navy);margin-bottom:2px}
+  @media (prefers-color-scheme: dark){.item .t{color:#dfeee7}}
+  .item .d{font-size:13.5px;color:var(--ink-soft)}
+  .item .meta{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin-top:4px}
+  .src-item{font-size:13.5px;padding:10px 18px}
+  footer{max-width:var(--maxw);margin:0 auto;padding:20px 24px;border-top:1px solid var(--rule);font-size:11.5px;color:var(--ink-soft);font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="kicker">Research Lineage · Not chronological chaos, a loop</div>
+    <h1>DynURPlanner 研究時間軸</h1>
+    <p>題目：Collision-free Motion Planning for Robot Manipulator in Dynamic Environments Based on DRL（督導 fengkang@u.nus.edu）。四輪迴圈，每輪修正上一輪——按下面順序讀，看判斷是怎麼一步步被查證、被推翻、被重新定位的。</p>
+  </div>
+</header>
+<main>
+  <div class="lane">Sources · 前身論文與精讀</div>
+  <a class="item src-item" href="sources/URPlanner_2025_arXiv2505.20175.pdf"><div><div class="t">URPlanner (Ying et al., 2025, arXiv:2505.20175)</div><div class="d">基底論文：靜態結構化環境的通用 DRL 無碰撞運動規劃範式（UOAR + APE2 + ED2）</div></div></a>
+  <a class="item src-item" href="sources/urplanner_annotated.html"><div><div class="t">↳ 雙欄批注精讀</div><div class="d">urplanner_annotated.html</div></div></a>
+  <a class="item src-item" href="sources/ENPIRE_2026_arXiv2606.19980.pdf"><div><div class="t">ENPIRE (Xiao et al., 2026, NVIDIA/CMU/UCB, arXiv:2606.19980)</div><div class="d">靈感來源（非基礎）：agentic 機器人策略自我改進框架</div></div></a>
+  <a class="item src-item" href="sources/enpire_annotated.html"><div><div class="t">↳ 雙欄批注精讀</div><div class="d">enpire_annotated.html</div></div></a>
+
+  <div class="lane">Research Loop · 四輪迴圈（依序讀）</div>
+  <a class="item" href="research-log/01_cross_analysis_extension.html">
+    <div class="n">01</div>
+    <div><div class="t">交叉分析與延伸研究提案</div><div class="d">把 URPlanner × ENPIRE 交叉分析，找出三個裂縫（狀態盲視／反應式無梯度／作者官方鉤子），提出 DynURPlanner：趨勢/預測獎勵 + 時序狀態 + ENPIRE 式自動獎勵設計</div><div class="meta">2026-06-24 · 立場：趨勢獎勵為核心賣點</div></div>
+  </a>
+  <a class="item" href="research-log/02_deep_research_expansion.html">
+    <div class="n">02</div>
+    <div><div class="t">深度研究報告（嚴謹展開版）</div><div class="d">5 路平行檢索、~60 篇來源，把狀態/獎勵/演算法/安全/課程/HRC/ENPIRE融合七面向做嚴謹展開；發現 EAAI 2026 有高度重疊的競品（待查）</div><div class="meta">2026-06-24 · 立場：同上，技術細節更完整</div></div>
+  </a>
+  <a class="item" href="research-log/03_verified_direction_pivot.html">
+    <div class="n">03</div>
+    <div><div class="t">驗證帳本與立身之本重判</div><div class="d">三輪並行查證 ~25 條引用、抓出一個幻覺數字並更正、確認 EAAI 競品為真——把立身之本從「趨勢獎勵」（已被佔）改判為 URPlanner UOAR 的<b>連續時間解析 swept-volume 碰撞推理</b>（無人用過）</div><div class="meta">2026-06-24 · 立場：連續時間 swept-volume 為核心賣點，仍是「訓練一個 RL policy」</div></div>
+  </a>
+  <a class="item" href="research-log/04_macro_positioning_judgment.html">
+    <div class="n">04</div>
+    <div><div class="t">宏觀定位重判</div><div class="d">跳出「RL 論文之間比新穎性」的框架，改問「這個問題此刻誰在解、解得如何」——發現 cuRobo 已用 GPU 優化達成同樣的連續無穿隧避障結果，且領域正把「避障安全」從「訓練新 policy」搬到「給生成式/VLA 策略掛安全濾網」。<b>建議：把同一套解析幾何重新定位成免訓練安全濾網，而非又一個 RL policy</b></div><div class="meta">2026-07-06 · 立場：轉向——安全濾網 > RL policy（本輪起算的新方向）</div></div>
+  </a>
+
+  <a class="item" href="research-log/05_correction_and_grounded_direction.html">
+    <div class="n">05</div>
+    <div><div class="t">更正與扎根方向</div><div class="d">對第四輪的核心主張做全文查證，發現 cuRobo 在真正動態場景成功率其實只有 39.5%／0%（DRP 論文親測）——推翻「已被商品化」的判斷；同時挖出更嚴重的新競品 <b>Deep Reactive Policy (DRP, arXiv:2509.06953)</b>，一個已發表、覆蓋完整基線的學習式反應策略。新方向：不從零打敗 DRP，而是診斷並修補它殘餘的 24.5%／33.3% 失敗中屬於「連續時間穿隧」的部分</div><div class="meta">2026-07-06 · 立場：扎根於真實基準數字，非文獻臆測</div></div>
+  </a>
+
+  <a class="item" href="research-log/06_research_blueprint.html">
+    <div class="n">06</div>
+    <div><div class="t">研究藍圖：GO-DynURPlanner</div><div class="d">整合師兄的 occupancy-grid 指令與前五輪全部積累。批判審計找出四個真實漏洞並逐一修補；拱心石 = <b>佔據預報輔助任務</b>（同時治癒速度盲與部署屏蔽斷層）；定理形狀物 = 保守性引理（弦誤差 Rδθ²/8 + 加速度 + 速度噪聲全收進膨脹盒，換無穿隧保證）；Figure-1 = <b>穿隧率</b>。含完整系統設計、實驗設計、新穎性帳本、里程碑、給師兄的確認問題</div><div class="meta">2026-07-06 · 立場：從文獻判斷轉入可執行藍圖</div></div>
+  </a>
+
+  <a class="item" href="research-log/07_execution_m0_m1.html">
+    <div class="n">07</div>
+    <div><div class="t">執行紀錄：M0 + M1——Figure-1 有真實數據了</div><div class="d"><b>查證</b>：DRP 程式碼+權重已開源 ✓；拱心石（佔據預報輔助任務）確認開放 ✓；EAAI 仍鎖。<b>M0</b>：連續時間真值檢查器上線（code/，pytest 20/20），測試抓到藍圖引理的數學漏洞並修正（ε_lin = ¼(Σ√Rᵢ|δθᵢ|)²）。<b>M1</b>：300 episodes、155 次真實碰撞的稽核——<b>標準離散檢查漏掉 14.8% 的真實碰撞，16 倍子採樣仍漏 2.6%</b>；且數據推翻 H1 的單調性預測：漏檢在 0.1 m/s 準靜態場景也達 29%，因為機械臂自身連桿掃掠就足以穿隧——修正後的主張更強：所有 manipulator RL 基準都在低估碰撞</div><div class="meta">2026-07-06 · 300 eps · 兩次「證據修正理論」· 立場：儀器與現象都是真的</div></div>
+  </a>
+
+  <a class="item" href="research-log/07_execution_m0_m1.html#m1h">
+    <div class="n">08</div>
+    <div><div class="t">M1 加固完成（764 次碰撞、Wilson CI）＋ 第三個反直覺發現</div><div class="d"><b>漏檢率隨障礙速度下降</b>：0.1 m/s 時 45.6%（三倍於 2.0 m/s 的 13.9%，CI 不重疊）——低速碰撞由機械臂自身掃掠的擦掠式接觸主導，端點檢查幾乎必漏；<b>標準協議最不可靠的正是大家以為最安全的準靜態區</b>。厚度直覺同樣翻車：compact 比薄板更容易被漏（擦掠機率 > 薄度）。成本：精確稽核 1.50ms/步 &lt; S=16 離散（1.92ms 且仍漏 0.8%）。另完成 M2a 解析光柵化器（0.074ms）；M2 拱心石 kill test（佔據預報 vs persistence/k=1 對照）訓練中</div><div class="meta">2026-07-07 · 附加於 Loop 7 頁 · DRP 確認為 CoRL 2025</div></div>
+  </a>
+
+  <a class="item" href="research-log/07_execution_m0_m1.html#m2pre">
+    <div class="n">09</div>
+    <div><div class="t">拱心石 kill test：存活（條件式通過）＋ 嚴重度分層完成</div><div class="d"><b>嚴重度</b>：漏掉的碰撞典型較輕（中位 1.4cm vs 10.2cm）但含深接觸尾部（q75 3.6cm、最大 25.1cm）——「missed ≠ mild」成立。<b>拱心石</b>：v1 暴露兩個測試設計錯誤（無 identity 捷徑、50ms 地平線太短——半個體素的位移無運動可學），v2（U-Net + 0.2s 地平線）在 0.5/1.0/2.0 m/s 雙贏對照（1.0 m/s 時 2.5× persistence），k3 > velocity-blind 於全部速度——運動抽取機制兩輪確認。條件：絕對精度仍弱需 GPU 加大訓練；「預報器兼部署屏蔽」雙角色未驗證，退路＝常速外推體素</div><div class="meta">2026-07-07 · 附加於 Loop 7 頁 · M2-full 設計輸入已齊</div></div>
+  </a>
+
+  <a class="item" href="../papper-research/code/README.md" onclick="return false" style="cursor:default">
+    <div class="n">10</div>
+    <div><div class="t">實驗室代碼血統確認 ＋ DynArmEnv 完成（Morvan 介面相容）</div><div class="d">師兄指出代碼源自<b>莫烦Python《机械手臂从零开始》</b>（2017, BV1nW411a7Qg, GitHub: MorvanZhou/train-robot-arm-from-scratch）——手寫解析環境、step(a)→(s,r,done)、關節增量、免模擬器，正是 URPlanner 參數化空間的胚胎。已建 <b>godynur/env.py DynArmEnv</b>：保持 Morvan 介面（師兄的 DDPG/TD3/APE2 棧可直接跑），內部升級為移動障礙＋連續時間精確碰撞記帳（不可穿隧的 env）＋雙獎勵模式（uoar/ct，M3 消融軸）＋柵格觀測 grid_history()。測試 32/32 全綠</div><div class="meta">2026-07-07 · 交接相容性就緒 · 立場：M2-full 的地基完成</div></div>
+  </a>
+
+  <div class="lane">Next</div>
+  <div class="item" style="opacity:.75">
+    <div class="n">11</div>
+    <div><div class="t">見師兄（關鍵路徑）→ M2-full 訓練（待辦）</div><div class="d">帶 Loop 7 數據 + DynArmEnv demo；確認 a_r、柵格語義、特權訓練、資源；回來後在 DynArmEnv 上跑 DDPG/SAC 基線 → 接柵格編碼器＋預報輔助頭（GPU）</div></div>
+  </div>
+</main>
+<footer>research-topic.md 為原始題目敘述 · sources/ 為前身論文 · research-log/NN_*.html 依序為四輪研究迴圈 · 2026-07</footer>
+</body>
+</html>

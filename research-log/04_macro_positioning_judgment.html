@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宏觀定位重判 · DynURPlanner 第四輪迴圈</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;
+    --ur:#2563b8;--field:#b23b9a;--warn:#b5871a;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);
+    --maxw:1100px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1100px 650px at 88% -12%,#fbf8ef11 0%,transparent 55%),var(--paper);
+    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line);box-shadow:0 6px 20px rgba(16,35,31,.3)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;font-weight:500;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px;transition:.18s}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+
+  .hero{max-width:var(--maxw);margin:0 auto;padding:50px 24px 14px;position:relative;z-index:1}
+  .hero .kicker{font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  .hero h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.7rem,3.4vw,2.7rem);line-height:1.16;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){.hero h1{color:#dfeee7}}
+  .hero h1 em{font-style:italic;color:var(--core)}
+  .hero .deck{font-size:15.5px;color:var(--ink-soft);max-width:820px}
+  .hero .deck b{color:var(--ink)}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:18px 24px 90px;position:relative;z-index:1}
+  section{margin-top:52px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.35rem,2.3vw,1.9rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  h3.sub{font-family:Lora,serif;font-size:1.14rem;color:var(--navy-2);font-weight:600;margin:22px 0 7px}
+  @media (prefers-color-scheme: dark){h3.sub{color:#bcd6cb}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body{font-size:15px;line-height:1.8;color:var(--ink);max-width:800px}
+  p.body b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){p.body b{color:#dfeee7}}
+  ul.body,ol.body{max-width:800px;font-size:15px;line-height:1.8}
+  ul.body li,ol.body li{margin-bottom:6px}
+
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.core{border-color:var(--core);background:linear-gradient(180deg,rgba(15,157,119,.08),transparent),var(--paper-2)}
+  .card.warn{border-color:var(--bad)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.bad{background:var(--bad-bg);color:var(--bad)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+
+  code.eq{display:block;background:#0f231fee;color:#dff5ea;font-family:"IBM Plex Mono",monospace;font-size:12.5px;padding:12px 16px;border-radius:8px;overflow-x:auto;margin:10px 0}
+
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+  a{color:var(--ur)}
+  a.src{font-size:12.5px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 4</span>
+    <a href="#summary">摘要</a>
+    <a href="#landscape">領域定位</a>
+    <a href="#gap1">缺口①基準</a>
+    <a href="#gap2">缺口②典範轉移</a>
+    <a href="#assess">評估前三輪</a>
+    <a href="#pivot">建議定位</a>
+    <a href="#fallback">若堅持走RL</a>
+    <a href="#next">下一步</a>
+    <a href="#sources">文獻</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="kicker">Macro Positioning Review · Loop 4 · Independent of prior technical route</div>
+  <h1>不是「哪個獎勵更聰明」，是<em>「這件事在整個領域裡站得住嗎」</em></h1>
+  <p class="deck">前三輪迴圈（交叉分析 → 深度展開 → 查證修正）已經把「連續時間解析 swept-volume 碰撞推理」定為立身之本，並在 <b>RL 論文之間</b>驗證過新穎性。這一輪的任務不是再挑一次技術路線，而是退到題目本身，問一句前三輪都沒問過的問題：<b>如果拿去跟這個領域裡最強的非 RL 基準比，這個方向還站得住嗎？</b>答案是：技術判斷本身没錯，但戰場選錯了——需要重新定位，而不是重新設計獎勵。</p>
+</div>
+
+<main>
+
+<section id="summary">
+  <div class="eyebrow">Executive Summary</div>
+  <h2 class="sec">核心判斷</h2>
+  <div class="rule"></div>
+  <div class="verdictbox">
+    <b class="label">一句話結論</b>
+    <p class="body" style="margin:0">前三輪把「連續時間 swept-volume 碰撞推理」定位成<b>「一個更好的 RL policy 該用什麼獎勵」</b>；但這個問題在 2025–2026 的機器人運動規劃領域裡，已經被 GPU 平行優化規劃器（cuRobo 一類）在生產環境中解掉了——<b>不需要訓練、不需要模擬器、100ms 內含動態障礙重規劃、且保證連續時間無穿隧</b>。同一套數學（Part⑤ 的 τ 線性化、swept 積分、連續 TTC 根）若繼續拿去「訓練一個 RL policy」，會直接撞上審稿人最自然的問題：「為什麼不用 cuRobo？」——這是前三輪從未做過的基準比較，也是它們共同的「見樹不見林」之處。真正宏觀重要、且對頂會/頂刊可辯護的路，是把同一套解析幾何<b>重新定位成「輕量、免訓練、免模擬器的安全過濾層」，掛載在 2025–2026 真正的典範轉移對象——擴散策略 / VLA 這類生成式操作策略——之上</b>，因為這正是該領域自己剛承認、還沒解決、而且現有解法（reachability analysis、world model）都遠比解析幾何昂貴的缺口。
+  </div>
+  <p class="body">下面依序給出：這個題目在整個領域裡的座標（§領域定位）、兩個前三輪都沒發現的宏觀缺口（§缺口①②）、對前三輪判斷逐條打分（§評估）、以及有證據支持的新建議定位與退路（§建議定位、§若堅持走RL）。</p>
+</section>
+
+<section id="landscape">
+  <div class="eyebrow">Field Positioning</div>
+  <h2 class="sec">領域定位：這個題目現在站在地圖的哪一格</h2>
+  <div class="rule"></div>
+  <p class="body">把「機械臂無碰撞運動規劃」攤開成一張 2025–2026 的地圖，大致分四個象限，而 DynURPlanner 目前明確落在最擁擠、競爭最直接的那一格：</p>
+  <table>
+    <tr><th>象限</th><th>代表方法</th><th>特徵</th><th>DynURPlanner 現況</th></tr>
+    <tr><td><b>經典優化</b></td><td>cuRobo（NVIDIA GPU 平行軌跡優化）、MPC/MPPI、RRT*/PRM</td><td>免訓練、可證明式連續碰撞保證、生產已部署；需要準確幾何/狀態估計與 GPU</td><td>目前立身之本的「連續時間、無穿隧、免模擬器」訴求，<b>幾乎逐字重疊 cuRobo 已公開宣稱的能力</b>（見 §缺口①）</td></tr>
+    <tr><td><b>純 RL / model-free policy</b></td><td>URPlanner (UOAR+APE2)、多數動態避障 DRL 論文、EAAI 2026 競品</td><td>單一場景訓練、獎勵工程為主要貢獻點，論文間彼此比獎勵設計</td><td><b>目前所在位置</b>：D-UOAR / 連續 TTC / swept 屏蔽都是「更好的獎勵」路線</td></tr>
+    <tr><td><b>生成式操作策略</b></td><td>Diffusion Policy、VLA（π0、GR00T、RDT-1B 等）</td><td>端到端從示範學習，動作以 chunk 形式輸出；顯式碰撞保證幾乎不存在，是已知弱點</td><td>目前完全未涉及；但這是 2025–2026 實際論文量與資金最集中的方向</td></tr>
+    <tr><td><b>安全層 / 混合</b></td><td>Residual MPC+RL、SafeDojo（VLA 的 safe RL）、PACS/RAIL/Latent Safety Filters（reachability-based）</td><td>不重新設計 policy，而是給既有 policy 掛一層安全過濾/校正；2025–2026 新興且活躍</td><td>目前<b>完全未涉足</b>，但 URPlanner 的解析幾何機器<b>剛好是這格最缺的那塊拼圖</b>（見 §建議定位）</td></tr>
+  </table>
+  <p class="body">關鍵的宏觀事實：一篇 2026 的綜述 <a class="src" href="https://arxiv.org/abs/2603.24318" target="_blank">《Toward Generalist Neural Motion Planners for Robotic Manipulators: Challenges and Opportunities》</a>（arXiv:2603.24318）明確指出，當前的通用操作策略（generalist manipulation policies，即 VLA 一類）<b>「在雜亂環境中表現掙扎，因為它們依賴獨立的低階運動規劃/控制模組」</b>，且對分布外場景泛化能力差——這是這個領域自己承認、且被視為重要的未解問題。這句話幾乎就是在描述：<b>「誰能把嚴謹的碰撞推理，接到生成式策略上」是目前公認重要，但「誰能訓練出更會避障的單一 RL policy」已經不是。</b></p>
+</section>
+
+<section id="gap1">
+  <div class="eyebrow">Overlooked Gap #1</div>
+  <h2 class="sec">缺口①：前三輪從未跟這個領域最強的非 RL 基準比過</h2>
+  <div class="rule"></div>
+  <p class="body"><span class="tag ok">已驗證</span> <a class="src" href="https://developer.nvidia.com/blog/cuda-accelerated-robot-motion-generation-in-milliseconds-with-curobo/" target="_blank">NVIDIA cuRobo</a> 是 GPU 平行的機械臂運動規劃庫，公開文件與 2025 年的工業擴展研究（<a class="src" href="https://arxiv.org/html/2508.04146v1" target="_blank">arXiv:2508.04146</a>）明確描述：</p>
+  <div class="card core">
+    <ul class="body" style="margin:0">
+      <li>在 NVIDIA AGX Orin 上 <b>100ms 內</b>生成運動計畫，軌跡以 <b>500Hz</b> 執行</li>
+      <li><b>連續 swept 碰撞項</b>（signed distance function + activation distance smoothing）——保證碰撞避免<b>不只在離散時間點，而是貫穿整條軌跡</b>（逐字對應「無穿隧」訴求）</li>
+      <li>對移動障礙用 <b>MPC 每 ~50ms 重規劃</b>一次，持續納入場景中移動物件的最新狀態</li>
+      <li>支援複雜幾何（OBB、mesh BVH、voxel ESDF），不限於簡化的 AABB</li>
+    </ul>
+  </div>
+  <p class="body">對照本系列立身之本的原句——「<i>因為 URPlanner 的幾何是解析的，它是少數能在不依賴模擬器、不計算最小距離的前提下，對一個控制區間做精確連續時間碰撞推理的框架</i>」——這句話描述的<b>結果</b>（連續時間、無穿隧、不需要模擬器/訓練互動）cuRobo 已經用完全不同的手段（GPU 平行 SDF 優化，而非 RL 訓練）達成，而且<b>已在工業界部署</b>。這不代表「swept volume 當 RL 獎勵」這個技術細節是假的——查證仍然成立（NeuralSVCD 等文獻確實只把 swept volume 用於碰撞偵測，<a class="src" href="https://arxiv.org/html/2509.00499v1" target="_blank">arXiv:2509.00499</a>）——但代表<b>「達成連續無穿隧避障」本身不再是稀缺的、值得單獨宣稱的結果</b>。頂會審稿人不會問「這個 reward 是不是第一個用 swept volume」，而會問：</p>
+  <div class="verdictbox" style="border-left-color:var(--bad)">
+    <b class="label" style="color:var(--bad)">審稿人的第一個問題（前三輪從未回答）</b>
+    <p class="body" style="margin:0">「cuRobo 已經即時、可證明地解決連續時間動態避障，且不需要訓練一個 policy——你的 RL 方法比它好在哪裡？更快？更省算力？更能處理 cuRobo 處理不了的東西？」<b>前三輪的查證帳本（~25 條引用）全部是 RL/獎勵設計文獻，沒有一條是經典優化/MPC 基準</b>——這是查證範圍本身的系統性盲區，而不是某條引用查錯。</p>
+  </div>
+  <p class="body">誠實地說，這個問題<b>有好答案</b>（RL policy 的推論成本遠低於 GPU 優化、可在無 GPU 的嵌入式平台跑、可聯合優化難以寫成解析代價的目標如人機協作舒適度……），但<b>前三輪從未把這些答案寫下來、也從未把 cuRobo 列為基線</b>——這正是「見樹不見林」的具體表現：三輪查證都在同一棵樹（RL 文獻）上越爬越細，沒有人抬頭看旁邊那片森林（經典優化已經長多高）。</p>
+</section>
+
+<section id="gap2">
+  <div class="eyebrow">Overlooked Gap #2</div>
+  <h2 class="sec">缺口②：領域正在把「安全避障」從「訓練一個新 policy」搬到「幫既有生成式策略掛一層濾網」</h2>
+  <div class="rule"></div>
+  <p class="body">2025–2026 的檢索結果顯示一條清晰、活躍、且正在快速累積頂會/頂刊產出的新典範：<b>不是重新設計一個能避障的 RL policy，而是給現有的（通常是模仿學習/擴散/VLA）策略，掛一層即時安全過濾器</b>。這條線目前的代表工作全部集中在 2025 下半年到 2026：</p>
+  <table>
+    <tr><th>工作</th><th>做法</th><th>與本題目的關係</th></tr>
+    <tr><td><b>SafeDojo</b><br><span style="color:var(--ink-soft);font-size:12px">arXiv:2606.20698, 2026</span></td><td>世界模型 + safe RL，給 VLA 模型套上碰撞安全約束（Lagrangian 約束優化），Franka 真機驗證五個任務</td><td>直接競爭者／同溫層：證明「VLA 的安全避障」是被認可、可發表、可真機驗證的題目<span class="tag low">摘要層級</span></td></tr>
+    <tr><td><b>PACS</b><br><span style="color:var(--ink-soft);font-size:12px">arXiv:2511.06385, TUM/Stanford</span></td><td>對 diffusion policy 的 action chunk 用 <b>reachability analysis</b> 做路徑一致的安全介入</td><td>做的正是「安全過濾層」，但用可達性分析——比解析幾何昂貴很多<span class="tag low">摘要層級</span></td></tr>
+    <tr><td><b>RAIL</b><br><span style="color:var(--ink-soft);font-size:12px">arXiv:2409.19190</span></td><td>可達性輔助的模仿學習安全執行，Franka Panda 真機：純 diffusion policy 失敗、掛 RAIL 後成功</td><td>直接證據：<b>生成式策略本身不會自動避障</b>，需要外掛安全層<span class="tag low">摘要層級</span></td></tr>
+    <tr><td><b>Latent Safety Filters</b><br><span style="color:var(--ink-soft);font-size:12px">arXiv:2502.00935</span></td><td>在世界模型的潛空間做 Hamilton-Jacobi 可達性分析</td><td>同一條線，計算量更重（需要學一個世界模型）<span class="tag low">摘要層級</span></td></tr>
+    <tr><td><b>Residual MPC</b><br><span style="color:var(--ink-soft);font-size:12px">2025</span></td><td>RL 與 GPU 平行 MPC 混合，而非純 RL 或純 MPC</td><td>證實「混合」而非「二選一」是當前的實務共識<span class="tag low">摘要層級</span></td></tr>
+  </table>
+  <p class="body">這條線裡<b>沒有一個</b>用「解析幾何、閉式可積、不需要訓練世界模型或做可達性分析」的方式做安全過濾——全部依賴 reachability analysis（需要求解 HJ 偏微分方程或其近似）或 world model（需要先訓練一個生成式動態模型）。<b>這正是 Part⑤ 已經推導好的 τ 線性化 + swept 積分 + 連續 TTC 根，理論上可以填的洞</b>：同樣的解析幾何，換一個掛載對象（不是「訓練我自己的 RL policy」，而是「即時檢查/校正任何策略吐出的動作」），就從「在擁擠的 RL 獎勵設計紅海裡卷」變成「在剛起步、方法多樣性還很低、且被領域自己點名重要的安全過濾器賽道上第一個用解析幾何」。</p>
+</section>
+
+<section id="assess">
+  <div class="eyebrow">Assessment of Prior Rounds</div>
+  <h2 class="sec">前三輪判斷逐條評估：站得住 vs 見樹不見林</h2>
+  <div class="rule"></div>
+  <table>
+    <tr><th>前三輪的判斷</th><th>評估</th><th>理由</th></tr>
+    <tr><td>URPlanner 的解析參數空間（AABB+線段、免模擬器、免最小距離）是真正的獨有資產</td><td><span class="tag ok">站得住</span></td><td>這個判斷不受本輪影響——問題不在「這個幾何機器好不好」，而在「拿它去做什麼」。事實上本輪的建議定位（§建議定位）更依賴這個資產，而非否定它</td></tr>
+    <tr><td>Part⑤ 的數學推導（τ 線性化、swept 積分閉式可積、連續 TTC 為有理方程根）</td><td><span class="tag ok">站得住，且可直接複用</span></td><td>這套推導與「它要拿去訓練 RL 還是拿去做安全濾網」無關，是純幾何/代數結果，本輪建議原封不動繼續用</td></tr>
+    <tr><td>「趨勢獎勵」已被 EAAI 2026 競品佔據，需降級為 table-stakes</td><td><span class="tag ok">站得住</span></td><td>這是查證抓到的真實競爭訊號，判斷正確，本輪沒有新證據推翻</td></tr>
+    <tr><td>「swept volume 從未被當 RL 獎勵」是空位，故以此為立身之本</td><td><span class="tag corr">技術上對，策略上見樹不見林</span></td><td>窄範圍內為真，但這個空位的<b>價值被高估</b>——因為達成同樣結果的非 RL 方法（cuRobo）早已存在且更成熟，「填一個沒人填過的 RL 獎勵洞」≠「填一個這個領域真正缺的洞」</td></tr>
+    <tr><td>ENPIRE 式自動獎勵設計降為選配、非基礎</td><td><span class="tag ok">站得住</span></td><td>本輪同意：自動調參是加速器，不該是主論點，這與本輪建議互不衝突</td></tr>
+    <tr><td>整體定位：「訓練一個更會避障的 RL policy，投 RA-L/IROS」</td><td><span class="tag bad">最大的見樹不見林之處</span></td><td>三輪查證都在同一個賽道（RL 論文 vs RL 論文）裡把新穎性磨得很細，卻從未退一步問「這個賽道本身，此刻是不是這個題目裡最重要的賽道」——這正是本輪要修正的</td></tr>
+  </table>
+  <div class="verdictbox">
+    <b class="label">為什麼會發生這個盲區</b>
+    <p class="body" style="margin:0">前三輪的查證方法（多路平行檢索 + 逐條開原始頁）非常嚴謹，但<b>查詢詞本身已經預設了賽道</b>——都是「DRL + dynamic obstacle + reward」「trend-aware RL」之類，自然只會找到同賽道的競品。這是系統性方法論限制，不是任何一輪執行不力：<b>要跳出賽道，必須先問「這個問題除了 RL 還有誰在解」，而不是「RL 裡還有誰在解」。</b>本輪正是換了查詢角度（cuRobo、diffusion policy 安全過濾、VLA 運動規劃綜述）才看到前面看不到的森林。</p>
+  </div>
+</section>
+
+<section id="pivot">
+  <div class="eyebrow">Recommended Direction</div>
+  <h2 class="sec">建議定位：把解析幾何從「新獎勵」重新定位為「輕量安全濾網」</h2>
+  <div class="rule"></div>
+  <div class="card core">
+    <b style="color:var(--core);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase">新的一句話定位</b>
+    <p class="body" style="margin-top:6px"><b>URPlanner 的解析幾何 + Part⑤ 的連續時間推導，重新包裝成一個免訓練、免世界模型、免可達性求解的即時安全過濾器</b>——輸入是任何策略（你自己訓的 RL、擴散策略、甚至 VLA 的 action chunk）提議的下一段動作，輸出是「這段動作在 [t, t+Δt] 內是否會與已知/預測的移動障礙發生連續碰撞」，用閉式 τ 根運算做出裁決，必要時做最小修正而非整段拒絕。</p>
+  </div>
+  <h3 class="sub">為什麼這個定位在宏觀上更重要</h3>
+  <ul class="body">
+    <li><b>對齊領域自己承認的缺口</b>：2603.24318 明確說生成式操作策略在雜亂場景「掙扎」且依賴獨立規劃模組——你的濾網直接是「獨立規劃模組」與「生成式策略」之間缺的那條線</li>
+    <li><b>對比對象變了，且對你有利</b>：不再跟 cuRobo 比「誰更會規劃全局軌跡」（會輸，那是它的主場），而是跟 PACS/RAIL/Latent Safety Filters 比「誰的即時安全檢查更便宜」——閉式代數 vs. 可達性分析/世界模型，這是可測量、可辯護、大概率贏的比較（延遲、無需訓練資料、無需 GPU）</li>
+    <li><b>與 N2（APE2 屏蔽）自然合流，且格局變大</b>：現有計畫裡的「用 APE2 候選池做屏蔽」本來就是同一套機制的特例（只是只服務自己訓的 policy）；重新定位後，同一套機制變成<b>可以服務任何策略</b>的通用安全層，論文的受眾從「用 URPlanner 的人」擴大到「所有部署生成式操作策略、需要安全保證的人」</li>
+    <li><b>與指導老師的題目字面完全相容</b>：題目寫的是「collision-free motion planning ... in dynamic environments」，沒有規定必須是「訓練一個新policy」；「保證任何策略的輸出都無碰撞」同樣是這個題目的直接、甚至更強的解法</li>
+    <li><b>對碩士生的工程量反而更省</b>：不需要從頭訓練 SAC/PPO、不需要課程學習、不需要解 reward hacking——核心工作是把 Part⑤ 已經推好的閉式運算包成一個可插拔模組，並在 2–3 種宿主策略（可以就是你自己訓練的 baseline RL policy、一個公開的 diffusion policy checkpoint）上量測延遲/侵入率/任務成功率</li>
+  </ul>
+  <h3 class="sub">具體的可發表切法（建議兩篇，難度遞增）</h3>
+  <table>
+    <tr><th>第一篇（核心、風險低）</th><th>第二篇（高賣點，需第一篇先成）</th></tr>
+    <tr><td>「A Closed-Form, Training-Free Safety Filter for Continuous-Time Dynamic Collision Avoidance in Manipulator Action Chunks」——只做濾網本身：閉式 τ 根運算、與 reachability-based（PACS/RAIL 之類）和 GPU-optimization-based（cuRobo）在延遲/準確率/CPU可行性上的三方比較。投 RA-L / IROS。</td><td>「Retrofitting Analytic Collision Safety onto Diffusion/VLA Manipulation Policies」——把濾網掛到一個真實的 diffusion policy 或小型 VLA 上，量測「掛濾網前後」的動態避障成功率提升（呼應 RAIL 的敘事，但用便宜很多的機制達成）。投 CoRL / ICRA。</td></tr>
+  </table>
+</section>
+
+<section id="fallback">
+  <div class="eyebrow">Alternative / Fallback</div>
+  <h2 class="sec">若指導老師 / 你仍希望保留「訓練一個 RL policy」路線</h2>
+  <div class="rule"></div>
+  <p class="body">上面是本輪認為宏觀上最重要的方向，但如果因為題目敘述、實驗室慣例、或老師偏好，仍要走「訓練一個新 policy」這條路（也就是延續 D-UOAR + SAC + APE2 的原計畫），<b>宏觀重要性檢驗要求你在論文裡明確做到兩件前三輪沒做的事</b>，否則同一個審稿人問題會反覆出現：</p>
+  <ol class="body">
+    <li><b>把 cuRobo（或至少一個 GPU 優化基線）列為主要基線</b>，在你的動態場景上實際跑一次比較——不需要贏在「軌跡品質」，但必須能講清楚在<b>哪個具體維度</b>贏（例如：推論延遲在無 GPU 邊緣裝置上、或面對感測噪聲/未建模動力學時的魯棒性、或可聯合優化 HRC 舒適度等難以寫成解析代價的目標）</li>
+    <li><b>在論文的 related work / motivation 段落正面回答「為什麼是 RL 不是 MPC」</b>，而不是只跟其他 RL 論文比獎勵設計——這是把「見樹不見林」的風險前置到寫作階段去主動化解，而不是等審稿人問</li>
+  </ol>
+  <p class="body">兩條路徑共用 Part⑤ 的全部數學，差別只在包裝與比較對象；如果時間許可，<b>兩篇論文可以並行規劃</b>——安全濾網作為第一篇（風險低、宏觀更重要），RL policy 作為第二篇或碩論的延伸章節（重用同一套推導，讀者會看到你對這個空間有系統性掌握）。</p>
+</section>
+
+<section id="next">
+  <div class="eyebrow">Next Loop</div>
+  <h2 class="sec">下一輪迴圈需要查證的具體問題</h2>
+  <div class="rule"></div>
+  <p class="body">本輪判斷基於 WebSearch 摘要層級的檢索（未逐篇開全文），誠實列出仍待確認的事項，避免重蹈前一輪「數字幻覺」的錯：</p>
+  <ul class="body">
+    <li><span class="tag low">摘要層級</span> SafeDojo、PACS、RAIL、Latent Safety Filters 的具體數字（成功率提升幅度、延遲毫秒數）尚未逐篇開全文核實，正式寫作前需要像前三輪一樣做逐條查證帳本</li>
+    <li><span class="tag low">待查</span> cuRobo 的「連續 swept 碰撞項」在動態障礙（非靜態場景）下的實測延遲與失敗模式，需要讀 arXiv:2508.04146 全文或跑一次 cuRobo 官方 benchmark 確認，而不是只信技術部落格摘要</li>
+    <li><span class="tag low">待查</span> 是否已有工作把「解析閉式幾何」（而非 reachability/world model）用作生成式策略的安全濾網——本輪搜尋未找到，但這是「空位是否真實存在」的關鍵查證，必須在正式提案前反覆檢索確認，如同前一輪抓出 EAAI 競品的方式</li>
+    <li>與指導老師 fengkang@u.nus.edu 確認：題目更看重「訓練一個新 policy」的工程完整度，還是「重新定位為安全層」的系統性/影響力——這是判斷之外，只有老師能拍板的範疇界定問題</li>
+  </ul>
+</section>
+
+<section id="sources">
+  <div class="eyebrow">Sources — This Loop</div>
+  <h2 class="sec">本輪查證之核心來源（摘要層級，待逐篇覆核）</h2>
+  <div class="rule"></div>
+  <ul class="body" style="font-size:13.5px">
+    <li>NVIDIA cuRobo — <a class="src" href="https://developer.nvidia.com/blog/cuda-accelerated-robot-motion-generation-in-milliseconds-with-curobo/" target="_blank">CUDA-Accelerated Robot Motion Generation in Milliseconds</a>（NVIDIA Technical Blog）</li>
+    <li>Industrial Robot Motion Planning with GPUs: Integration of cuRobo for Extended DOF Systems (2025) — <a class="src" href="https://arxiv.org/html/2508.04146v1" target="_blank">arXiv:2508.04146</a></li>
+    <li>Toward Generalist Neural Motion Planners for Robotic Manipulators: Challenges and Opportunities (2026) — <a class="src" href="https://arxiv.org/abs/2603.24318" target="_blank">arXiv:2603.24318</a></li>
+    <li>SafeDojo: Safe Reinforcement Learning for VLA via Interactive World Model (2026) — <a class="src" href="https://arxiv.org/html/2606.20698" target="_blank">arXiv:2606.20698</a></li>
+    <li>From Demonstrations to Safe Deployment: Path-Consistent Safety Filtering for Diffusion Policies, PACS (2025) — <a class="src" href="https://arxiv.org/html/2511.06385" target="_blank">arXiv:2511.06385</a></li>
+    <li>RAIL: Reachability-Aided Imitation Learning for Safe Policy Execution — <a class="src" href="https://arxiv.org/pdf/2409.19190" target="_blank">arXiv:2409.19190</a></li>
+    <li>Generalizing Safety Beyond Collision-Avoidance via Latent-Space Reachability Analysis (2025) — <a class="src" href="https://arxiv.org/html/2502.00935" target="_blank">arXiv:2502.00935</a></li>
+    <li>Residual MPC: Blending Reinforcement Learning with GPU-Parallelized Model Predictive Control (2025) — ResearchGate</li>
+    <li>NeuralSVCD for Efficient Swept Volume Collision Detection — <a class="src" href="https://arxiv.org/html/2509.00499v1" target="_blank">arXiv:2509.00499</a>（延續前一輪查證：swept volume 目前僅用於碰撞偵測，未見用作生成式策略安全濾網）</li>
+    <li>A trend-aware reinforcement learning approach for adaptive motion planning of robotic manipulators in dynamic environments (EAAI 2026) — <a class="src" href="https://www.sciencedirect.com/science/article/abs/pii/S0952197626005658" target="_blank">ScienceDirect S0952197626005658</a>（同前一輪已確認之競品，未變）</li>
+  </ul>
+  <p class="body" style="font-size:12.5px;color:var(--ink-soft)">方法說明：本輪為 WebSearch 摘要層級檢索（約 10 次查詢、2 次全文摘要抓取），非逐篇全文深讀；核心論證（cuRobo 能力範圍、安全濾網典範轉移的存在）有多源交叉確認，具體數字標為待查，正式寫入論文前須按前三輪的查證帳本方法逐條核實原文。</p>
+</section>
+
+</main>
+
+<footer>
+  DynURPlanner · 宏觀定位重判（第四輪迴圈）· 獨立於前三輪技術路線之爭 · 2026-07　|　基底 = URPlanner (2505.20175)　|　督導 fengkang@u.nus.edu
+</footer>
+
+</body>
+</html>

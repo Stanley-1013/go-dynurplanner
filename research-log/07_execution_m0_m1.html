@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第七輪 · 執行紀錄:M0 + M1(Figure-1 誕生)</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--ur:#2563b8;--key:#7c3aed;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);--maxw:1080px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .hero{max-width:var(--maxw);margin:0 auto;padding:46px 24px 14px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.6rem,3.2vw,2.5rem);line-height:1.18;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){h1{color:#dfeee7}}
+  h1 em{font-style:italic;color:var(--core)}
+  .deck{font-size:15px;color:var(--ink-soft);max-width:820px}
+  main{max-width:var(--maxw);margin:0 auto;padding:14px 24px 90px}
+  section{margin-top:50px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.3rem,2.2vw,1.85rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body,ul.body,ol.body{font-size:14.5px;line-height:1.8;max-width:820px}
+  ul.body li,ol.body li{margin-bottom:6px}
+  p.body b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){p.body b{color:#dfeee7}}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.core{border-color:var(--core)}
+  .card.corr{border-color:var(--corr)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox.corr{border-left-color:var(--corr)}
+  b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+  b.label.corr{color:var(--corr)}
+  a{color:var(--ur)}
+  img.fig{max-width:100%;border:1px solid var(--rule);border-radius:10px;background:#fff}
+  code.inline{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--paper-2);padding:1px 6px;border-radius:5px}
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 7</span>
+    <a href="#verify">查證結果</a>
+    <a href="#m0">M0 工具</a>
+    <a href="#lemma-fix">引理更正</a>
+    <a href="#m1">M1 實驗</a>
+    <a href="#findings">兩個發現</a>
+    <a href="#caveats">誠實邊界</a>
+    <a href="#next">下一步</a>
+  </nav>
+</header>
+<div class="hero">
+  <div class="kicker">Loop 7 · Execution Log · From literature to instruments to data</div>
+  <h1>M0 + M1 執行紀錄:<em>Figure-1 有真實數據了</em>,而且它比藍圖的預測更有趣</h1>
+  <p class="deck">本輪從文獻工作轉入執行:三項查證關閉兩項(皆利多)、M0 真值工具上線(20/20 測試綠)、M1 穿隧率實驗跑出 300 個 episode 的真實數據。過程中發生了兩次「證據修正理論」:測試抓到藍圖引理的數學漏洞(已修正並重新推導),實驗數據推翻了 H1 的單調性預測(修正後的主張反而更強)。這正是研究迴圈該有的樣子。</p>
+</div>
+<main>
+
+<section id="verify">
+  <div class="eyebrow">Verification Closeout</div>
+  <h2 class="sec">三項查證:關閉兩項,皆為利多</h2>
+  <div class="rule"></div>
+  <table>
+    <tr><th>查證項</th><th>結果</th><th>影響</th></tr>
+    <tr><td>DRP 程式碼可得性</td><td><span class="tag ok">已關閉</span> 程式碼 + IMPACT 權重已釋出(pre-release):<a href="https://github.com/deep-reactive-policy/drp" target="_blank">github.com/deep-reactive-policy/drp</a>,完整版宣稱 2026-06;DRPBench 場景檔是否隨附<b>未確認</b></td><td>M2 之後可用真實 SOTA 當對照/宿主,不需重造</td></tr>
+    <tr><td>拱心石新穎性(佔據預報輔助任務)</td><td><span class="tag ok">已關閉(六種檢索)</span> 無先例。最接近:arXiv:2508.20457(協作機器人避障)用佔據預測器但<b>凍結後才跑 RL</b>(全文引句確認「encoder-decoder and safety critic frozen」)——感知模組模式,非輔助任務模式</td><td>界線乾淨,且該文成為我們的關鍵引文;引文圖譜檢索仍建議寫作前補一輪</td></tr>
+    <tr><td>EAAI 競品全文</td><td><span class="tag low">仍未關閉</span> ScienceDirect 403;無 arXiv/機構庫版本。狀態表徵與獎勵形式仍僅摘要級</td><td>維持 Loop 3 的處理:機制錯開論證不依賴其全文細節</td></tr>
+  </table>
+</section>
+
+<section id="m0">
+  <div class="eyebrow">M0 · The Instrument</div>
+  <h2 class="sec">M0 完成:連續時間真值檢查器上線(code/,pytest 20/20)</h2>
+  <div class="rule"></div>
+  <ul class="body">
+    <li><b>Panda 運動學</b>(<code class="inline">godynur/panda.py</code>):modified DH(與 URPlanner Eq.4 同convention)、URPlanner 連桿合併((1,2),(3,4),(5,6),(7,法蘭)→4 段,paper 原文確認)、關節極限。從 URPlanner PDF 全文抽出並對齊:a_o=5cm、ζ=1、M=2、N=3;<b>a_r 論文未給數值</b>→設 config,問師兄</li>
+    <li><b>靜態幾何</b>(<code class="inline">geometry.py</code>):Eq.6–10 的 slab 法重疊長 + UOAR,對 brute-force 採樣 100 案例驗證</li>
+    <li><b>連續時間核心</b>(<code class="inline">continuous.py</code>):τ-線性化下 slab 有理函數的<b>斷點枚舉法</b>(線性/二次根),精確 τ*(非採樣)、掃掠重疊積分(分段 Gauss-Legendre)、引理膨脹。驗證:對 4001 點密集掃描 300 隨機案例一致;Δt→0 退化回靜態 UOAR(Loop 3 的相容性宣稱,已實測);<b>穿隧回歸案例</b>——4 m/s 薄盒在步間穿過線段,離散端點檢查兩頭全綠、連續檢查器在 τ*≈0.0525s 抓到</li>
+  </ul>
+</section>
+
+<section id="lemma-fix">
+  <div class="eyebrow">Correction #1 · Tests Beat the Blueprint</div>
+  <h2 class="sec">引理更正:初稿弦誤差界被自己的測試否證</h2>
+  <div class="rule"></div>
+  <div class="verdictbox corr">
+    <b class="label corr">證據修正理論(一)</b>
+    <p class="body" style="margin:0">藍圖初稿的 ε_lin = ΣᵢRᵢδθᵢ²/8 <b>不成立</b>:它把多關節同動當成獨立弧誤差相加,漏掉 FK Hessian 的交叉項 ∂²p/∂qᵢ∂qⱼ (i≠j)。隨機測試給出反例:實測偏差 2.36mm > 宣稱上界 1.99mm。重新推導(利用 ∂/∂qᵢ(p−oⱼ) = zᵢ×(p−oⱼ) 的鏈式恆等式,得 |Hᵢⱼ| ≤ 2R<sub>max(i,j)</sub>):<b>ε_lin = ¼(Σᵢ√Rᵢ·|δθᵢ|)²</b>,經 200 隨機構型 × 3 內插點驗證全部覆蓋。代價:此界實測約 30 倍保守——動作剪裁 |δθ|≤0.05 rad/步時 ε_lin≈2cm,仍在膨脹預算內;以精確 Hessian 範數收緊列為已知改進路徑。藍圖 §保守性引理已同步更正。</p>
+  </div>
+</section>
+
+<section id="m1">
+  <div class="eyebrow">M1 · The Experiment</div>
+  <h2 class="sec">M1:穿隧率實驗(300 episodes,5 個速度級)</h2>
+  <div class="rule"></div>
+  <p class="body"><b>協議</b>:貪婪目標追逐策略(候選動作 + <b>標準離散端點碰撞檢查</b>——正是 DRL 訓練迴圈的做法;不含任何學習,使現象歸屬於「檢查協議」而非「策略好壞」),在 3 障礙動態場景跑 60 episodes × 5 個速度級(0.1–2.0 m/s,含薄板與方塊障礙)。每一步同時做:(1) 連續真值稽核(精確 τ*);(2) S∈{1,2,4,8,16} 子步離散檢查。碰撞即終止(碰撞是 terminal)。Δt=0.05s、|δθ|≤0.05 rad/步、a_r=0.06m。單 seed,總運行 30 秒。</p>
+  <img class="fig" src="../code/experiments/results/m1/figure1_tunneling.png" alt="Figure 1: tunneling rate vs obstacle speed, by subsampling depth">
+  <table>
+    <tr><th>障礙速度 (m/s)</th><th>真實碰撞 episode 數 /60</th><th>S=1 漏檢</th><th>S=2</th><th>S=4</th><th>S=8</th><th>S=16</th><th>成功率(脈絡)</th></tr>
+    <tr><td>0.1</td><td>14</td><td>4 (29%)</td><td>2</td><td>2</td><td>2</td><td>1</td><td>70%</td></tr>
+    <tr><td>0.25</td><td>16</td><td>2 (13%)</td><td>2</td><td>1</td><td>1</td><td>1</td><td>68%</td></tr>
+    <tr><td>0.5</td><td>29</td><td>5 (17%)</td><td>2</td><td>0</td><td>0</td><td>0</td><td>47%</td></tr>
+    <tr><td>1.0</td><td>47</td><td>8 (17%)</td><td>3</td><td>1</td><td>1</td><td>1</td><td>22%</td></tr>
+    <tr><td>2.0</td><td>49</td><td>4 (8%)</td><td>3</td><td>2</td><td>1</td><td>1</td><td>18%</td></tr>
+    <tr><td><b>合計</b></td><td><b>155</b></td><td><b>23 (14.8%)</b></td><td><b>12 (7.7%)</b></td><td><b>6 (3.9%)</b></td><td><b>5 (3.2%)</b></td><td><b>4 (2.6%)</b></td><td>—</td></tr>
+  </table>
+</section>
+
+<section id="findings">
+  <div class="eyebrow">Two Findings</div>
+  <h2 class="sec">兩個發現:一個如預期,一個推翻 H1(且更強)</h2>
+  <div class="rule"></div>
+  <div class="card core">
+    <b class="label">發現一(如預期,已量化)</b>
+    <p class="body" style="margin:0"><b>標準離散檢查漏掉 14.8% 的真實碰撞;16 倍子採樣仍漏 2.6%。</b>「多插幾個採樣點就好」的反駁現在有成本曲線可答:S=16 意味著 16 倍檢查成本,仍漏 4/155——而我們的斷點法檢查器成本與少量子步同量級、且精確。這正是論文 Figure-1 + 反駁表的素材。</p>
+  </div>
+  <div class="verdictbox corr">
+    <b class="label corr">證據修正理論(二):H1 的單調性預測錯了,修正後主張更強</b>
+    <p class="body" style="margin:0">藍圖 H1 預測「穿隧率隨障礙速度單調上升」。數據:<b>絕對碰撞數</b>隨速度暴增(14→49 / 60 episodes),但 <b>S=1 漏檢率不單調</b>——在最慢的 0.1 m/s 也有 29%(4/14,小樣本)。物理解釋:穿隧由<b>相對掃掠速度</b>驅動,而機械臂自己的遠端連桿在 0.05 rad/步 × 20Hz 下可達 ~1 m/s——<b>手臂自身的運動就足以掃過薄障礙而不被端點檢查看見</b>。修正後的 H1':「離散檢查的漏檢在所有障礙速度下都存在(相對掃掠是驅動因子,機械臂自身運動貢獻常數項);碰撞頻率隨障礙速度上升」。這比原 H1 更強:它意味著<b>連準靜態場景的 manipulator RL 基準都低估了碰撞</b>,不只是快障礙場景。</p>
+  </div>
+</section>
+
+<section id="m1h">
+  <div class="eyebrow">M1-Hardened · 2026-07-07</div>
+  <h2 class="sec">M1 加固版:3 seeds × 100 eps × 5 速度級,764 次碰撞稽核——第三個反直覺發現</h2>
+  <div class="rule"></div>
+  <img class="fig" src="../code/experiments/results/m1_hardened/figure1_hardened.png" alt="Hardened Figure 1: Wilson CIs, thickness stratification, wall-clock comparison">
+  <table>
+    <tr><th>障礙速度 (m/s)</th><th>碰撞數</th><th>S=1 漏檢率 [95% Wilson CI]</th><th>S=4</th><th>S=16</th></tr>
+    <tr><td>0.1</td><td>68</td><td><b>45.6%</b> [34.3%, 57.3%]</td><td>7.4%</td><td>1.5%</td></tr>
+    <tr><td>0.25</td><td>96</td><td>21.9% [14.8%, 31.1%]</td><td>4.2%</td><td>1.0%</td></tr>
+    <tr><td>0.5</td><td>138</td><td>20.3% [14.4%, 27.8%]</td><td>3.6%</td><td>0.7%</td></tr>
+    <tr><td>1.0</td><td>211</td><td>14.2% [10.1%, 19.6%]</td><td>1.4%</td><td>0.5%</td></tr>
+    <tr><td>2.0</td><td>251</td><td>13.9% [10.2%, 18.8%]</td><td>2.8%</td><td>0.8%</td></tr>
+    <tr><td><b>合併</b></td><td><b>764</b></td><td><b>19.0%</b> [16.4%, 21.9%]</td><td>3.1% [2.1%, 4.6%]</td><td>0.8% [0.4%, 1.7%]</td></tr>
+  </table>
+  <div class="card core">
+    <b class="label">發現三(反直覺,CI 支撐):漏檢率隨障礙速度下降——標準協議最糟的地方正是大家以為最安全的準靜態場景</b>
+    <p class="body" style="margin:0">第一輪 300 eps 看到的「低速也有漏檢」在 764 次碰撞下變得更尖銳:<b>0.1 m/s 時漏檢率 45.6%,是 2.0 m/s(13.9%)的三倍多</b>,且 CI 不重疊。機制:低速下的碰撞由<b>機械臂自身掃掠</b>主導——短暫的擦掠式接觸(碰了就分開),端點檢查幾乎必然錯過;高速障礙則是「撞進來就留在裡面」,端點看得見。推論:<b>所有用離散檢查的 manipulator 基準,在準靜態場景高估安全性最嚴重</b>——這正是多數論文自認最可靠的實驗區。</p>
+  </div>
+  <ul class="body">
+    <li><b>厚度直覺也錯了</b>:compact 障礙漏檢率(22.7% [18.6%, 27.3%], n=353)<b>高於</b>薄板(15.8% [12.6%, 19.7%], n=411)。解釋(暫定):驅動因子是<b>擦掠機率</b>(總截面小的物體更容易被擦過即離)而非「薄」本身——薄板另外兩維大(10–25cm 半寬),一旦接觸大面就會停留到端點。寫論文時以「grazing vs plow-in」框架呈現,標記為觀察性解釋</li>
+    <li><b>成本結論在規模下成立</b>:精確稽核 1.50 ms/步 < S=16 離散(1.92 ms/步,仍漏 0.8%);S=8(0.97ms)漏 1.4%。純 Python+NumPy 未優化——「精確性的價格 ≈ 8 個子步」,而且兩邊可同幅度加速</li>
+    <li>細節:<code class="inline">experiments/m1_hardened.py</code>,結果 <code class="inline">experiments/results/m1_hardened/</code>(m1h_results.json 含每筆碰撞的速度/seed/厚度/嚴重度/各 S 是否抓到)</li>
+  </ul>
+  <div class="card core">
+    <b class="label">嚴重度分層(回答「漏掉的碰撞嚴重嗎」)</b>
+    <p class="body" style="margin:0">被 S=1 漏掉的 145 次碰撞 vs 被抓到的 619 次:最大重疊長中位數 <b>1.4cm vs 10.2cm</b>、接觸時長中位數 0.48 vs 0.68——漏掉的確實偏向擦掠,<b>但尾部不可忽視</b>:漏掉者的 q75 = 3.6cm、最大 <b>25.1cm</b>(深度接觸,協議完全看不見)。兩面都要寫進論文:漏掉的碰撞「典型較輕、但含深接觸尾部」——對 HRC 而言,一個漏掉 19% 接觸事件、其中四分之一侵入超過 3.6cm 的安全帳本,不能稱為 sound。</p>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="eyebrow">Honest Boundaries</div>
+  <h2 class="sec">誠實邊界(寫論文前必須處理)</h2>
+  <div class="rule"></div>
+  <ul class="body">
+    <li><s>小樣本</s> <span class="tag ok">已解決</span>:加固版 3 seeds × 764 碰撞 + Wilson CI,主要結論(合併 19.0% [16.4%, 21.9%]、低速最糟的反直覺趨勢)在 CI 下站得住</li>
+    <li><b>協議研究,非策略研究</b>:貪婪腳本策略刻意不含學習;數據刻畫的是檢查協議的性質。訓練後策略的漏檢率留給 M1b(DRP 權重稽核)/M3 實測</li>
+    <li><b>場景分布</b>:薄板佔一半是設計選擇;加固版已按厚度分層報告(且發現 compact 反而更容易被漏——見發現三),分布選擇的影響已可量化</li>
+    <li><b>a_r=0.06m 是佔位值</b>:URPlanner 論文未給數值,需與師兄對齊後重跑(結論的方向不受影響,數值會動)</li>
+    <li><s>擦掠 vs 侵入的深度未分層</s> <span class="tag ok">已解決</span>:嚴重度分層完成(見上)——漏掉的碰撞典型較輕(中位 1.4cm)但含深接觸尾部(q75 3.6cm、最大 25.1cm),「missed ≠ mild」成立且不過度宣稱</li>
+  </ul>
+</section>
+
+<section id="m2pre">
+  <div class="eyebrow">M2-pre · Keystone Kill Test · 2026-07-07</div>
+  <h2 class="sec">拱心石判定:存活(條件式通過),經一次架構迭代</h2>
+  <div class="rule"></div>
+  <p class="body"><b>測試</b>:佔據預報器(k=3 幀歷史)能否在未來佔據 IoU 上同時贏過 (1) persistence(複製最後一幀)與 (2) velocity-blind k=1 對照?預註冊判準:中高速雙贏,否則拱心石死。<b>v1 失敗</b>暴露兩個測試設計錯誤:bottleneck 解碼器無 identity 捷徑(重建能力混淆了運動預測)、預測地平線 50ms 太短(0.5 m/s 障礙每步僅移半個體素,persistence 物理上近乎最優)。<b>v2 修正</b>:U-Net skips + 最後一幀直通輸出層;地平線改 0.2s(對避障有意義的預警距離)。</p>
+  <table>
+    <tr><th>速度 (m/s)</th><th>k3</th><th>k1 對照</th><th>persistence</th><th>判定</th></tr>
+    <tr><td>0.1</td><td>0.351</td><td>0.249</td><td><b>0.723</b></td><td>輸 persist(物理必然:0.2s 僅移 2cm < ½ 體素,無運動可學)</td></tr>
+    <tr><td>0.25</td><td>0.309</td><td>0.246</td><td><b>0.425</b></td><td>輸 persist</td></tr>
+    <tr><td>0.5</td><td><b>0.251</b></td><td>0.219</td><td>0.209</td><td><span class="tag ok">PASS</span></td></tr>
+    <tr><td>1.0</td><td><b>0.148</b></td><td>0.094</td><td>0.059</td><td><span class="tag ok">PASS</span>(2.5× persist)</td></tr>
+    <tr><td>2.0</td><td><b>0.063</b></td><td>0.026</td><td>0.014</td><td><span class="tag ok">PASS</span>(4.5× persist)</td></tr>
+  </table>
+  <div class="verdictbox">
+    <b class="label">判定與條件</b>
+    <p class="body" style="margin:0"><b>拱心石存活</b>:預註冊判準(中高速雙贏)通過;k3 > k1 於全部速度成立——「預報輔助任務能把運動資訊壓入潛向量」的機制兩輪皆確認。<b>三個誠實條件</b>:(1) 絕對預報品質仍弱(高速 IoU 僅 0.06–0.15,任務含反彈的不可約不確定性;RL 輔助任務只需要梯度訊號,但也要防它太弱)——GPU 加大訓練、dice/focal loss 是既定加強路徑;(2) 「預報器兼任部署期體素屏蔽的檢查對象」這個雙角色設計<b>尚未驗證</b>,以目前精度不可行——部署屏蔽的退路是常速外推體素(解析,免學習),把預報器限縮在潛狀態角色;(3) 輔助地平線定為 ~0.2s(或多地平線),寫入 M2-full 設計。訓練成本註記:CPU(16 核殘餘)每模型 ~20 分鐘,4000 步——GPU 版(本機 3070)可放大 10 倍預算。</p>
+  </div>
+</section>
+
+<section id="next">
+  <div class="eyebrow">Next</div>
+  <h2 class="sec">下一步(M1 收尾 → M2 開工)</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li><b>M1 論文化加固</b>:episodes ×5、3 seeds、Wilson CI、按厚度分層、計時對比(斷點法 vs S-子步的牆鐘時間)——半天工程</li>
+    <li><b>M1b(強化 Figure-1)</b>:對 <b>DRP 公開權重</b>做同樣的連續時間稽核(它的動作是 10 步 action chunk,正好是連續稽核的絕佳對象)——把「協議研究」升級成「SOTA 也存在此盲點」的實證</li>
+    <li><b>M2 開工</b>:解析光柵化器(盒→體素,閉式)+ 佔據預報輔助頭 + 柵格編碼器,進入拱心石驗證(H2)</li>
+    <li>見師兄:a_r 數值、柵格語義(二值 vs 距離場)、特權訓練架構的認可、算力/真機檔期(問題清單在 <a href="06_research_blueprint.html#advisor">Loop 6 §給師兄</a>)</li>
+  </ol>
+</section>
+
+</main>
+<footer>Loop 7 執行紀錄 · M0(20/20 tests)+ M1(300 episodes, 155 collisions audited)· 兩次證據修正理論 · 2026-07-06</footer>
+</body>
+</html>

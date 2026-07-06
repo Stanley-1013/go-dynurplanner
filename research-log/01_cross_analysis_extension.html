@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交叉分析與延伸研究 · 動態環境的無碰撞 DRL 運動規劃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1a1442;       /* 第三身分：深靛紫 = 綜合/新生 */
+    --navy-2:#241a59;
+    --navy-line:#3b2f7a;
+    --paper:#f6f1e7;
+    --paper-2:#ece6d6;
+    --ink:#23201a;
+    --ink-soft:#5a5446;
+    --rule:#d8cfb9;
+
+    --ur:#2563b8;     /* URPlanner 藍 */
+    --en:#76b900;     /* ENPIRE 綠 */
+    --syn:#7c3aed;    /* 綜合紫 */
+
+    --c-thesis:#e8a317; --c-concept:#c0392b; --c-evidence:#2563b8; --c-concession:#2e8b57; --c-method:#7c3aed;
+    --shadow-card:0 1px 2px rgba(26,20,66,.06),0 10px 30px rgba(26,20,66,.09);
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1200px 700px at 85% -15%,#fbf7ee 0%,transparent 55%),var(--paper);
+    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.65}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(rgba(120,100,60,.035) 1px,transparent 1px);background-size:3px 3px;mix-blend-mode:multiply}
+
+  /* nav */
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));
+    color:#ece9fb;border-bottom:1px solid var(--navy-line);box-shadow:0 6px 20px rgba(26,20,66,.3)}
+  .top-inner{max-width:var(--maxw);margin:0 auto;padding:11px 26px;display:flex;align-items:center;gap:8px;overflow-x:auto}
+  .top-inner .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:#b9a9f0;
+    text-transform:uppercase;border:1px solid #4a3d8f;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:6px}
+  .top-inner a{white-space:nowrap;font-size:12.5px;font-weight:500;color:#c7bdee;text-decoration:none;padding:6px 10px;border-radius:7px;transition:.18s}
+  .top-inner a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .top-inner a.active{background:#fff;color:var(--navy)}
+
+  /* hero */
+  .hero{max-width:var(--maxw);margin:0 auto;padding:54px 26px 18px;position:relative;z-index:1}
+  .hero .kicker{font-family:"IBM Plex Mono",monospace;font-size:13px;letter-spacing:.22em;color:var(--syn);text-transform:uppercase}
+  .hero h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.9rem,4vw,3.1rem);line-height:1.12;margin:.18em 0 .25em;color:var(--navy);letter-spacing:.005em}
+  .hero h1 em{font-style:italic;color:var(--syn)}
+  .hero .deck{font-size:16px;color:var(--ink-soft);max-width:760px;line-height:1.7}
+  .hero .deck b{color:var(--ink)}
+  .pillars{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+  .pillar{flex:1 1 200px;background:#fffdf8;border:1px solid var(--rule);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-card)}
+  .pillar .t{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+  .pillar.s1 .t{color:var(--ur)} .pillar.s2 .t{color:var(--en)} .pillar.s3 .t{color:var(--syn)}
+  .pillar .h{font-family:Lora,serif;font-size:17px;font-weight:600;color:var(--navy);margin-bottom:5px}
+  .pillar p{margin:0;font-size:13px;color:var(--ink-soft)}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:20px 26px 80px;position:relative;z-index:1}
+  section{margin-top:54px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.2em;color:var(--syn);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.5rem,2.6vw,2.15rem);color:var(--navy);font-weight:600;margin:.12em 0 .3em}
+  h3.sub{font-family:Lora,serif;font-size:1.18rem;color:var(--navy-2);font-weight:600;margin:28px 0 8px}
+  p.body{font-size:15.5px;line-height:1.78;color:#33302a;max-width:880px}
+  p.body b{color:var(--navy-2)}
+  .lead-rule{height:3px;width:64px;background:linear-gradient(90deg,var(--syn),transparent);border-radius:3px;margin:6px 0 18px}
+
+  /* comparison table */
+  .ctable{width:100%;border-collapse:separate;border-spacing:0;margin:18px 0;font-size:14px;background:#fffdf8;
+    border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-card)}
+  .ctable th,.ctable td{padding:13px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+  .ctable thead th{background:var(--navy);color:#fff;font-weight:600;font-family:"IBM Plex Sans"}
+  .ctable thead th.ur{background:var(--ur)} .ctable thead th.en{background:var(--en);color:#10260a}
+  .ctable tbody tr:last-child td{border-bottom:none}
+  .ctable td:first-child{font-weight:600;color:var(--navy);width:21%;background:var(--paper-2)}
+  .ctable td.c-ur{background:rgba(37,99,184,.05)} .ctable td.c-en{background:rgba(118,185,0,.06)}
+
+  /* complementarity / pipeline cards */
+  .complement{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin:22px 0}
+  .cbox{background:#fffdf8;border:1px solid var(--rule);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-card)}
+  .cbox.ur{border-top:4px solid var(--ur)} .cbox.en{border-top:4px solid var(--en)}
+  .cbox h4{margin:0 0 8px;font-size:14px;color:var(--navy)}
+  .cbox .lbl{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+  .cbox.ur .lbl{color:var(--ur)} .cbox.en .lbl{color:var(--en)}
+  .cbox ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:var(--ink-soft)}
+  .cbox li{margin:4px 0}
+  .fuse{font-size:30px;color:var(--syn);text-align:center;font-weight:700}
+  @media(max-width:780px){.complement{grid-template-columns:1fr}.fuse{transform:rotate(90deg)}}
+
+  /* callout */
+  .callout{border-radius:14px;padding:20px 22px;margin:20px 0;font-size:15px;line-height:1.7;box-shadow:var(--shadow-card)}
+  .callout .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-bottom:9px}
+  .callout.gap{background:#fbe7e3;border:1px solid #e3b3a8}
+  .callout.gap .tag{background:#c0392b;color:#fff}
+  .callout.idea{background:#efe7fb;border:1px solid #c8b6f0}
+  .callout.idea .tag{background:var(--syn);color:#fff}
+  .callout.memory{background:#e9f3ff;border:1px solid #aecdf2}
+  .callout.memory .tag{background:var(--ur);color:#fff}
+  .callout b{color:var(--navy-2)}
+  .callout .eq{font-family:"IBM Plex Mono",monospace;font-size:14px;background:rgba(255,255,255,.7);
+    border-left:3px solid var(--syn);padding:9px 13px;margin:11px 0;border-radius:7px;color:var(--navy-2);overflow-x:auto}
+
+  /* method cards */
+  .mcards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:18px 0}
+  .mcard{background:#fffdf8;border:1px solid var(--rule);border-radius:14px;padding:20px;box-shadow:var(--shadow-card);position:relative}
+  .mcard .num{font-family:Lora,serif;font-size:30px;font-weight:600;color:#e7dffb;position:absolute;top:12px;right:18px;line-height:1}
+  .mcard h4{margin:0 0 4px;font-size:15.5px;color:var(--navy);font-family:"IBM Plex Sans";font-weight:700}
+  .mcard .rq{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--syn);letter-spacing:.1em;margin-bottom:10px}
+  .mcard p{margin:0 0 9px;font-size:13.8px;color:#3f3a30;line-height:1.65}
+  .mcard ul{margin:8px 0 0;padding-left:17px;font-size:13.3px;color:var(--ink-soft)}
+  .mcard li{margin:5px 0}
+  .mcard code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--paper-2);padding:1px 5px;border-radius:4px;color:var(--navy-2)}
+  @media(max-width:780px){.mcards{grid-template-columns:1fr}}
+
+  /* RQ list */
+  .rqlist{counter-reset:rq;margin:16px 0}
+  .rqitem{display:flex;gap:14px;background:#fffdf8;border:1px solid var(--rule);border-left:4px solid var(--syn);
+    border-radius:12px;padding:15px 18px;margin:10px 0;box-shadow:var(--shadow-card)}
+  .rqitem::before{counter-increment:rq;content:"RQ" counter(rq);font-family:"IBM Plex Mono",monospace;font-weight:600;
+    color:var(--syn);font-size:14px;white-space:nowrap;padding-top:2px}
+  .rqitem div{font-size:14.5px;color:#33302a}
+  .rqitem b{color:var(--navy-2)}
+
+  /* experiment table */
+  .etable{width:100%;border-collapse:separate;border-spacing:0;margin:16px 0;font-size:13.5px;background:#fffdf8;
+    border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-card)}
+  .etable th,.etable td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+  .etable thead th{background:var(--navy-2);color:#fff;font-weight:600}
+  .etable tbody tr:last-child td{border-bottom:none}
+  .etable td:first-child{font-weight:600;color:var(--navy)}
+
+  /* timeline */
+  .timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}
+  .phase{background:#fffdf8;border:1px solid var(--rule);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-card);border-top:4px solid var(--syn)}
+  .phase .pm{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--syn);letter-spacing:.1em}
+  .phase h4{margin:6px 0 7px;font-size:14.5px;color:var(--navy)}
+  .phase ul{margin:0;padding-left:16px;font-size:12.8px;color:var(--ink-soft)}
+  .phase li{margin:4px 0}
+  @media(max-width:780px){.timeline{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.timeline{grid-template-columns:1fr}}
+
+  /* contribution chips */
+  .contrib{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:16px 0}
+  .cc{background:linear-gradient(165deg,var(--navy),var(--navy-2));color:#ece9fb;border-radius:14px;padding:20px;box-shadow:0 14px 34px rgba(26,20,66,.28)}
+  .cc .n{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;color:#b9a9f0}
+  .cc h4{margin:7px 0 8px;font-size:15.5px;color:#fff;font-family:Lora,serif;font-weight:600}
+  .cc p{margin:0;font-size:13.3px;color:#c7bdee;line-height:1.6}
+  @media(max-width:780px){.contrib{grid-template-columns:1fr}}
+
+  /* risk table */
+  .risk{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .rk{background:#fffdf8;border:1px solid var(--rule);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow-card)}
+  .rk h4{margin:0 0 6px;font-size:14px;color:#a23226}
+  .rk p{margin:0;font-size:13.3px;color:var(--ink-soft)}
+  .rk p b{color:var(--c-concession)}
+  @media(max-width:780px){.risk{grid-template-columns:1fr}}
+
+  footer{max-width:var(--maxw);margin:0 auto;padding:34px 26px;color:var(--ink-soft);font-size:12.5px;text-align:center;border-top:1px solid var(--rule);margin-top:60px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <span class="home">交叉 + 延伸研究</span>
+    <a href="#cross">① 交叉分析</a>
+    <a href="#gap">② 缺口</a>
+    <a href="#rq">③ 研究問題</a>
+    <a href="#method">④ 方法設計</a>
+    <a href="#reward">⑤ 趨勢獎勵</a>
+    <a href="#related">⑤·5 文獻定位</a>
+    <a href="#fuse">⑥ 與 ENPIRE 融合</a>
+    <a href="#exp">⑦ 實驗計畫</a>
+    <a href="#contrib">⑧ 貢獻</a>
+    <a href="#risk">⑨ 風險</a>
+    <a href="#plan">⑩ 時程</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="kicker">Master's-Level Extension Proposal</div>
+  <h1>動態環境下機械臂的<br><em>無碰撞運動規劃</em>：從 URPlanner 到 DynURPlanner</h1>
+  <p class="deck">本文件先對 <b>URPlanner</b>（DRL 運動規劃的通用範式）與 <b>ENPIRE</b>（真實世界 agentic 自主研究框架）做交叉分析，再以 URPlanner 第一作者 Fengkang Ying 提出的碩士題目「<b>Collision-free Motion Planning for Robot Manipulator in Dynamic Environments Based on DRL</b>」為目標，提出一個具體、可發表的延伸研究設計——核心在於<b>狀態表徵、獎勵函數、演算法</b>三者如何從「靜態」躍遷到「動態」。</p>
+
+  <div class="pillars">
+    <div class="pillar s1">
+      <div class="t">Paper A · URPlanner</div>
+      <div class="h">便宜的「怎麼規劃」</div>
+      <p>參數化空間 + UOAR（免最小距離稠密獎勵）+ APE2 + ED2。優勢：平台無關、計算快 ~90×、免 IK。限制：<b>僅限靜態障礙</b>。</p>
+    </div>
+    <div class="pillar s2">
+      <div class="t">Paper B · ENPIRE</div>
+      <div class="h">自主的「誰來改進」</div>
+      <p>EN/PI/R/E 四模組讓 coding agent 在真實硬體上自動重置/驗證/迭代策略。優勢：自主設計獎勵與演算法。限制：<b>真實迭代昂貴、token 超線性</b>。</p>
+    </div>
+    <div class="pillar s3">
+      <div class="t">Extension · DynURPlanner</div>
+      <div class="h">動態的「會動的牆」</div>
+      <p>把 UOAR 升級為含「趨勢/預測」的時空獎勵、狀態加入障礙運動、APE2 加時序記憶；並用 ENPIRE 式自主研究在便宜參數空間中自動調出該獎勵。</p>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- ① CROSS ANALYSIS -->
+<section id="cross">
+  <div class="eyebrow">Part ①</div>
+  <h2 class="sec">交叉分析：兩篇論文是正交而互補的</h2>
+  <div class="lead-rule"></div>
+  <p class="body">兩篇論文乍看都談「機器人 + 學習」，但它們作用在<b>完全不同的抽象層級</b>。URPlanner 改進「機械臂<b>該怎麼算出</b>一條無碰撞軌跡」；ENPIRE 改進「<b>由誰、用什麼迴圈</b>去把一個機器人策略迭代到好」。前者是「物件層」的演算法貢獻，後者是「元層」的研究流程貢獻。正因正交，它們可以相乘。</p>
+
+  <table class="ctable">
+    <thead>
+      <tr><th>對照維度</th><th class="ur">URPlanner (Paper A)</th><th class="en">ENPIRE (Paper B)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>抽象層級</td><td class="c-ur">物件層：規劃演算法本身</td><td class="c-en">元層：自動化研究迴圈</td></tr>
+      <tr><td>核心命題</td><td class="c-ur">把避障從「最小距離計算」重構為「線段-包圍盒重疊計算」</td><td class="c-en">缺的抽象是「真實世界可重複回饋迴圈」，補上即可讓 agent 自主研究</td></tr>
+      <tr><td>誰在學</td><td class="c-ur">DRL 策略（機械臂控制器）</td><td class="c-en">coding agent（研究員的替身）+ 其訓練的策略</td></tr>
+      <tr><td>迭代基質</td><td class="c-ur"><b>參數化空間</b>：解析可算、無需真實互動、便宜</td><td class="c-en"><b>真實硬體</b>：不可預測、昂貴、但才是終極驗證</td></tr>
+      <tr><td>獎勵函數</td><td class="c-ur">人手設計的 UOAR（重疊長度）+ 位姿獎勵</td><td class="c-en">coding agent <b>自動合成</b>的二元獎勵</td></tr>
+      <tr><td>主要優勢</td><td class="c-ur">計算快 ~90×、平台無關、免 IK、訓練/部署皆廉</td><td class="c-en">免人類保姆、可機群擴展、跨任務遷移</td></tr>
+      <tr><td>關鍵限制</td><td class="c-ur"><b>僅靜態障礙</b>；狀態不含障礙資訊；UOAR 盒外無梯度</td><td class="c-en"><b>真實迭代貴</b>；token 超線性；自動獎勵可能 reward hacking</td></tr>
+      <tr><td>對方恰好能補</td><td class="c-ur">→ 需要自動化的獎勵/超參搜尋（ENPIRE 強項）</td><td class="c-en">→ 需要便宜、解析可算的迭代基質（URPlanner 強項）</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">互補性：彼此的限制正是對方的優勢</h3>
+  <div class="complement">
+    <div class="cbox ur">
+      <span class="lbl">URPlanner 的痛</span>
+      <h4>獎勵與超參靠人手調</h4>
+      <ul>
+        <li>UOAR 權重 ζ、安全偏移 a<sub>o</sub> 都是人工試出的甜蜜點</li>
+        <li>擴到動態場景時，「該怎麼設計動態獎勵」沒有現成答案</li>
+        <li>但它有一個<b>便宜到 0.06s 生成、解析可算</b>的參數空間</li>
+      </ul>
+    </div>
+    <div class="fuse">⊗</div>
+    <div class="cbox en">
+      <span class="lbl">ENPIRE 的痛</span>
+      <h4>真實硬體迭代太貴</h4>
+      <ul>
+        <li>真實 rollout 慢、token 成本隨機群超線性增長</li>
+        <li>但它<b>最擅長</b>自動合成/精修獎勵、自動改訓練碼、自動調超參</li>
+        <li>缺一個能讓它「便宜地試錯上萬次」的基質</li>
+      </ul>
+    </div>
+  </div>
+  <p class="body">這個 <b>⊗</b> 就是延伸研究第三條貢獻線（§⑥）的種子：把 URPlanner 的<b>參數化空間當作 ENPIRE 的便宜基質</b>，讓 coding agent 在其中自動搜尋「動態 UOAR」的形式與權重——一方解決另一方的限制。</p>
+</section>
+
+<!-- ② GAP -->
+<section id="gap">
+  <div class="eyebrow">Part ②</div>
+  <h2 class="sec">缺口：URPlanner 為什麼一遇到「會動的障礙」就失效</h2>
+  <div class="lead-rule"></div>
+  <p class="body">延伸題目不是憑空發明，而是直接踩在 URPlanner 自己留下的三個裂縫上（§II Eq.2、§III-B Eq.10、§VIII-D）。把這三點講清楚，延伸研究的「必要性」就成立了。</p>
+
+  <div class="callout gap">
+    <span class="tag">Gap 1 · 狀態盲視</span>
+    <b>狀態向量根本不編碼障礙物。</b>URPlanner 的 <code>s_t = [q_t, p_T, p_G, Δp, Δo, D]</code>（Eq.2）只含關節角、工具/目標位姿與誤差，<b>沒有任何障礙物資訊</b>。靜態場景中，策略可以把固定障礙的位置「背」進網路權重；但障礙一旦移動，狀態就不再是馬可夫的——同一個 <code>s_t</code> 在障礙的不同位置會對應完全不同的最佳動作。這使問題從 MDP 退化為 <b>POMDP</b>。
+  </div>
+
+  <div class="callout gap">
+    <span class="tag">Gap 2 · 反應式、盒外無梯度</span>
+    <b>UOAR 只在「線段已侵入膨脹盒」時才有非零訊號。</b>由 Eq.10，<code>r_UOAR = −Σ重疊長度 / Σ連桿長</code>；當連桿仍在盒外，重疊長度 = 0，獎勵 = 0、<b>梯度 = 0</b>。靜態時這沒問題（位姿獎勵負責遠距引導）；但面對<b>逼近中的動態障礙</b>，等到偵測為「已侵入」往往為時已晚——機械臂沒有提前讓路的誘因。這是純<b>反應式</b>避障的典型病。
+  </div>
+
+  <div class="callout gap">
+    <span class="tag">Gap 3 · 作者親自留下的鉤子</span>
+    URPlanner §VIII-D 與結論明說兩件事：(i) 對隨機/變動障礙，<b>須把障礙資訊納入狀態</b>，並提議用「<b>固定解析度的 3D 佔據柵格</b>」維持狀態維度固定；(ii)「<b>未來工作探索動態環境下的移動障礙，並可把人建模為移動障礙以支援人機協作 (HRC)</b>」。換言之，動態環境是作者<b>官方授權</b>的延伸方向，且已給出狀態表徵的雛形。
+  </div>
+</section>
+
+<!-- ③ RQ -->
+<section id="rq">
+  <div class="eyebrow">Part ③</div>
+  <h2 class="sec">研究問題</h2>
+  <div class="lead-rule"></div>
+  <div class="rqlist">
+    <div class="rqitem"><div><b>狀態表徵：</b>如何在<b>維持狀態維度固定</b>的前提下，讓策略同時感知障礙的<b>位置與運動趨勢</b>（速度/方向），使動態規劃重新近似馬可夫？佔據柵格、物件中心向量、時序堆疊三者的取捨為何？</div></div>
+    <div class="rqitem"><div><b>獎勵函數：</b>如何把只在「已侵入」才有訊號的反應式 UOAR，擴展為含<b>「趨勢/預測」項</b>的時空獎勵，使機械臂能<b>提前</b>對逼近的障礙讓路，且仍維持<b>最小距離無關</b>與解析可算？（核心，見 §⑤）</div></div>
+    <div class="rqitem"><div><b>演算法：</b>APE2 的混合評估與多候選探索，在 POMDP + 動態安全約束下要如何強化？是否需要<b>時序記憶（recurrent）</b>與<b>安全 RL（CMDP/shielding）</b>來保證碰撞率上界？</div></div>
+    <div class="rqitem"><div><b>跨論文綜合：</b>能否用 ENPIRE 式 agentic autoresearch，在 URPlanner 的<b>便宜參數空間</b>中自動搜尋上述動態獎勵的形式與權重，從而同時解決「人手調獎勵」與「真實迭代貴」兩個痛點？</div></div>
+  </div>
+</section>
+
+<!-- ④ METHOD -->
+<section id="method">
+  <div class="eyebrow">Part ④</div>
+  <h2 class="sec">方法設計：DynURPlanner</h2>
+  <div class="lead-rule"></div>
+  <p class="body">沿用 URPlanner 的參數化空間骨架（障礙 = AABB、連桿 = 線段+膨脹盒），但在三個地方做動態化改造。設計原則：<b>盡量維持「解析可算、最小距離無關、平台無關」三大原有優勢</b>，只在必要處增加時間維度。</p>
+
+  <div class="mcards">
+    <div class="mcard">
+      <span class="num">A</span>
+      <h4>狀態表徵：感知運動趨勢</h4>
+      <div class="rq">對應 RQ1 / Gap 1</div>
+      <p>對 URPlanner 的 <code>s_t</code> 補上障礙的時空資訊，三條候選路線（將做消融比較）：</p>
+      <ul>
+        <li><b>物件中心（低維）：</b>每障礙 <code>[中心, 範圍, 估計線速度 v]</code>。維度低、可直接餵 MLP；需偵測/追蹤。</li>
+        <li><b>時序堆疊佔據柵格（免追蹤）：</b>採作者建議的固定解析度 3D 佔據柵格，堆疊最近 <code>k</code> 幀 → 用 3D-CNN/ConvGRU 編出固定維度潛在向量，讓網路自行<b>推斷速度</b>。</li>
+        <li><b>混合：</b>柵格編碼障礙場 + 顯式 EE/目標向量。</li>
+      </ul>
+    </div>
+    <div class="mcard">
+      <span class="num">B</span>
+      <h4>獎勵：反應 → 預測（見 §⑤）</h4>
+      <div class="rq">對應 RQ2 / Gap 2</div>
+      <p>把 UOAR 升級為 <b>D-UOAR（Dynamic UOAR）</b>，加入兩個維持「最小距離無關」的趨勢項：</p>
+      <ul>
+        <li><b>預測侵入（前瞻 Δt）：</b>用估計速度把障礙盒前推 <code>Δt</code>，計算<b>未來重疊長度</b>並提前懲罰。</li>
+        <li><b>逼近速率/勢能差：</b>對「重疊勢能」的時間變化做 potential-based shaping，<b>逼近扣分、遠離給分</b>。</li>
+      </ul>
+    </div>
+    <div class="mcard">
+      <span class="num">C</span>
+      <h4>演算法：APE2 + 記憶 + 安全</h4>
+      <div class="rq">對應 RQ3 / Gap 1,2</div>
+      <p>在 APE2 上做兩處增補：</p>
+      <ul>
+        <li><b>時序記憶：</b>actor/critic 改用 GRU 或對狀態做幀堆疊，補回 POMDP 損失的時間資訊。</li>
+        <li><b>安全 RL：</b>把「動態碰撞率」設為 CMDP 約束（Lagrangian），或加 <b>shielding</b> 在執行前否決會撞的候選動作——天然契合 APE2「先生多候選再選優」的結構。</li>
+        <li><b>課程學習：</b>靜態 → 慢速 → 快速/對抗式移動障礙，逐步加難。</li>
+      </ul>
+    </div>
+    <div class="mcard">
+      <span class="num">D</span>
+      <h4>資料：ED2 條件化於障礙運動</h4>
+      <div class="rq">對應 RQ2,3</div>
+      <p>把 URPlanner 的擴散式資料生成 ED2 <b>條件化於障礙運動模式</b>，自動合成大量「動態場景軌跡」做資料補償（DC），降低高維狀態帶來的樣本需求；生成軌跡仍以參數空間的連續碰撞檢測過濾。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ⑤ REWARD (the user's memory) -->
+<section id="reward">
+  <div class="eyebrow">Part ⑤ · 核心創新</div>
+  <h2 class="sec">趨勢獎勵：不只看「現在離牆多近」，更看「下一刻是要撞還是要離開」</h2>
+  <div class="lead-rule"></div>
+
+  <div class="callout memory">
+    <span class="tag">這正是你回憶中的概念（已查證）</span>
+    你記得的「離牆近、以位置來說獎勵可能低，但還要看下一瞬間是<b>趨向撞牆還是離開</b>，這也要算進獎勵」——這在文獻上有<b>明確且成熟</b>的對應。查證後最貼近你描述的是 <b>Lütjens 等人「Missing Velocity in Dynamic Obstacle Avoidance based on DRL」(arXiv:2112.12465)</b>：他們明確主張「<b>只有位置不足以避開移動障礙，必須把速度/趨勢納入狀態</b>，否則 agent 無法預測未來碰撞風險、無法及時讓路」，並用 LSTM-TD3（時序網路）解決。而 URPlanner 其實已<b>部分內建</b>此思想（APE2 的 Q 值），只是沒做到動態。它對應三個彼此相關、皆有文獻支撐的機制 ↓
+  </div>
+
+  <h3 class="sub">① 它在理論上叫「基於勢能的獎勵塑形」(Potential-Based Reward Shaping)</h3>
+  <p class="body">Ng, Harada &amp; Russell (1999) 證明：給原獎勵加上一個「勢能差」項 <b>不會改變最優策略</b>，卻能大幅加速學習。把「離障礙的危險程度」定義成一個勢能 <code>Φ(s)</code>，則塑形獎勵正是相鄰兩狀態的勢能差——這個差<b>恰好編碼了「在逼近還是在遠離」的趨勢</b>：</p>
+  <div class="callout idea" style="margin-top:0">
+    <div class="eq">F(s, s′) = γ · Φ(s′) − Φ(s)</div>
+    當機械臂<b>逼近</b>障礙：Φ 上升 → F &lt; 0（扣分）；當它<b>遠離</b>：Φ 下降 → F &gt; 0（給分）。即使「當前位置」很靠近牆，只要「下一刻在離開」，塑形項就給正回饋——完全是你描述的行為。
+  </div>
+
+  <h3 class="sub">② 它在工程上等價於「逼近速率 / Time-to-Collision」項</h3>
+  <p class="body">勢能差在連續時間下就是危險勢能的<b>時間導數</b>。具體到 DynURPlanner，可令重疊勢能 <code>Φ = Σ 預測重疊長度</code>，其變化率 <code>dΦ/dt</code> 即「逼近速率」。也可改用更直觀的 <b>TTC（碰撞剩餘時間）</b>。查證發現這已是成熟做法：Damanik 等人的 <b>「TTC-force Reward Shaping」(AAMAS 2023)</b> 指出「<b>預期碰撞時間比『到障礙距離』更能表達碰撞風險，因為它同時納入了距離與相對速度</b>」——這正是「不只看位置、要看趨勢」的精確數學化；且 TTC 越小越危險、即使尚未接觸也有梯度，直接補上 Gap 2 的「盒外無梯度」。D-UOAR 的完整形式：</p>
+  <div class="callout idea" style="margin-top:0">
+    <div class="eq">r_DUOAR = −[ overlap<sub>now</sub> + α · overlap<sub>pred</sub>(t+Δt) ] / ΣL<sub>j</sub>　+　β · ( Φ(s) − γΦ(s′) )</div>
+    第一項 = 原 UOAR 的當前重疊（反應）；<b>第二項 overlap<sub>pred</sub></b> = 把障礙前推 Δt 後的預測重疊（前瞻）；<b>第三項</b> = 勢能差 / 逼近速率（趨勢）。三項皆<b>最小距離無關、解析可算</b>，保住 URPlanner 的原始優勢。
+  </div>
+
+  <h3 class="sub">③ URPlanner 其實已經有一半：APE2 的 V<sub>HPE</sub></h3>
+  <p class="body">你的記憶裡還有「要看<b>之後的成功/失敗機會</b>」——這正是 URPlanner 的 APE2 在做的事。它的混合評估 <code>V_HPE = η·Q_LTR + (1−η)·R_IR</code>（Eq.17）裡，<b>Q 值（long-term return）本身就是「這個狀態-動作未來會不會成功」的估計</b>。所以「看未來趨勢」在 URPlanner 中已體現在<b>動作評估</b>層；DynURPlanner 要做的是把同樣的「未來導向」下沉到<b>獎勵訊號</b>層（用勢能差/預測項），讓即時回饋 R_IR 在動態場景也具前瞻性——兩層一致，互相強化。</p>
+
+  <div class="callout idea">
+    <span class="tag">一句話總結</span>
+    把「危險」從<b>位置的函數 Φ(位置)</b> 升級為<b>位置與趨勢的函數</b>，再對它取「下一刻 − 現在」的差（或前推 Δt 的預測），就得到一個會「<b>獎勵離開、懲罰逼近</b>」的稠密訊號。這既是你記得的那個想法，也是 DynURPlanner 補上 URPlanner 動態缺口的關鍵獎勵設計——而且理論上（PBRS）<b>保證不破壞最優策略</b>。
+  </div>
+</section>
+
+<!-- ⑤·5 RELATED WORK (grounded) -->
+<section id="related">
+  <div class="eyebrow">Part ⑤·5 · 已查證文獻</div>
+  <h2 class="sec">文獻定位：這個方向已有人做，但留了一個 URPlanner 形狀的洞</h2>
+  <div class="lead-rule"></div>
+  <p class="body">依你的提醒，我上網查了實際研究而非憑記憶下結論。結論是：「動態障礙 + DRL + 趨勢獎勵」<b>確實是活躍的研究線</b>（這對提案是好事——代表方向被同行認可、可比較的基線充足），但現有工作幾乎都仍依賴<b>距離 / 最小距離 / 光達</b>來建構狀態與獎勵——而這正是 URPlanner 刻意拋棄的東西。所以 DynURPlanner 的真正空位是：<b>把「最小距離無關、解析可算、平台無關」的 UOAR 範式，與「速度/TTC/勢能差」的趨勢獎勵首次結合</b>。</p>
+
+  <table class="etable">
+    <thead><tr><th>已查證的相關工作</th><th>它證實了什麼</th><th>與本提案的差異（= 空位）</th></tr></thead>
+    <tbody>
+      <tr><td><b>Lütjens et al.</b> — Missing Velocity in Dynamic Obstacle Avoidance (DRL), arXiv:2112.12465</td><td>位置-only 狀態不足以避動態障礙；<b>須納入速度/趨勢</b>；用 LSTM-TD3 時序網路。直接證實 Gap 1 與 §④-C 的記憶模組。</td><td>它針對導航/點質點，仍用相對距離。本提案落在<b>多自由度機械臂 + 重疊長度（非距離）</b>。</td></tr>
+      <tr><td><b>Damanik et al.</b> — TTC-force Reward Shaping (AAMAS 2023)</td><td>「<b>TTC 比距離更能表達碰撞風險，因納入相對速度</b>」——你回憶的概念之數學化；TTC 提供盒外梯度。</td><td>多機器人導航。本提案把 TTC 接到<b>線段-包圍盒重疊</b>並以參數空間解析計算。</td></tr>
+      <tr><td><b>Han et al.</b> — RVO-shaped rewards, arXiv:2203.10229</td><td>用「速度障礙 (VO/RVO) 面積 + 預期碰撞時間」做獎勵 + 雙向 recurrent，證實<b>預測式獎勵 + 時序網路</b>可行。</td><td>機器人對機器人互避。本提案為單臂對<b>外生移動障礙</b>，且強調最小距離無關。</td></tr>
+      <tr><td><b>MDPI Appl. Sci. 2025</b> — Robotic Arms DRL with Adaptive Reward；以及 <b>proactive HRC</b> (ScienceDirect 2024)</td><td>機械臂 + 隨機移動圓柱 / 人體部位，<b>自適應/前瞻獎勵</b>，HRC 成功率 ~93%。證實「人=移動障礙」路線可行（呼應 URPlanner §VIII-D）。</td><td>仍以<b>距離/接近度</b>為主訊號。本提案的 MD-無關 + ENPIRE 自動獎勵設計（§⑥）為其所無。</td></tr>
+      <tr><td><b>Ng, Harada &amp; Russell (1999)</b> — Policy Invariance / PBRS</td><td>F = γΦ(s′)−Φ(s) <b>不改變最優策略</b>。為「趨勢項是否會把策略帶歪」提供理論保證。</td><td>理論基石，本提案直接採用以約束 D-UOAR 的趨勢項。</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout idea">
+    <span class="tag">查證後的修正結論（不過度宣稱）</span>
+    「趨勢/速度/TTC 獎勵」與「動態機械臂避障 DRL」<b>都不是本提案首創</b>，這點要誠實。本提案的可辯護新穎性收斂為三點：(1) 把這些趨勢獎勵<b>嫁接到 URPlanner 的最小距離無關、解析可算的重疊長度範式</b>（現有動態工作仍用距離/光達）；(2) 在<b>固定維度時空狀態</b>下保住平台無關；(3) 用 <b>ENPIRE 式自主研究在便宜參數空間自動設計該動態獎勵</b>——這第三點目前文獻上尚無人做，是最強的差異化賣點。
+  </div>
+</section>
+
+<!-- ⑥ FUSE -->
+<section id="fuse">
+  <div class="eyebrow">Part ⑥</div>
+  <h2 class="sec">與 ENPIRE 融合：讓 agent 自動「發明」這個動態獎勵</h2>
+  <div class="lead-rule"></div>
+  <p class="body">§⑤ 的 D-UOAR 有許多<b>需要人手定的設計選擇</b>：前瞻時長 Δt、權重 α/β/γ、勢能 Φ 的形式、課程的難度排程……這正是 ENPIRE 最擅長自動化的東西。而 ENPIRE 最大的痛是「真實迭代太貴」，URPlanner 的參數空間恰好提供「<b>解析可算、0.06s 生成</b>」的便宜基質。兩者相乘得到第三條貢獻線：</p>
+
+  <div class="callout idea">
+    <span class="tag">綜合假設</span>
+    <b>在 URPlanner 的參數化空間中執行 ENPIRE 式 agentic autoresearch</b>：coding agent 把參數空間當成「免費 rollout 的環境模組 (EN)」，自動合成並精修 D-UOAR 的形式與權重、自動調 APE2 超參與課程，僅在<b>少數驗證階段</b>才動用真實 Franka。預期同時達成：(i) 免去人手調獎勵；(ii) 把 ENPIRE 的 token/機器人成本壓到可接受；(iii) 得到一個比人手設計更穩健的動態避障獎勵。
+  </div>
+  <p class="body">這條線把「碩士可做的紮實工程題（DynURPlanner）」升級為「<b>有頂會賣點的綜合題</b>」——它正面回應了題目敘述中「state representation、reward function design、algorithm optimization」三個關鍵詞，又巧妙地把兩篇來源論文縫在一起。可作為論文的進階章節或第二篇投稿。</p>
+</section>
+
+<!-- ⑦ EXPERIMENT -->
+<section id="exp">
+  <div class="eyebrow">Part ⑦</div>
+  <h2 class="sec">實驗計畫</h2>
+  <div class="lead-rule"></div>
+  <table class="etable">
+    <thead><tr><th>項目</th><th>設計</th></tr></thead>
+    <tbody>
+      <tr><td>動態場景</td><td>輸送帶式等速障礙、擺動障礙、隨機遊走障礙、錄製的人手臂軌跡（HRC 前導）；障礙速度分級（慢/中/快/對抗）。</td></tr>
+      <tr><td>平台</td><td>模擬：參數空間 + CoppeliaSim/Isaac 對照（沿用 URPlanner 設定）。真實：7-DoF Franka Emika Panda + 動捕或視覺追蹤的移動障礙。</td></tr>
+      <tr><td>基線</td><td>① 原 URPlanner（靜態策略 + 週期性重規劃）② 人工勢場 (APF) / 動態窗口法 ③ MPC ④ 反應式 DRL（無趨勢項）⑤ DynURPlanner 各消融。</td></tr>
+      <tr><td>消融</td><td>狀態三選一（物件中心 / 柵格 / 混合）；獎勵逐項加（當前重疊 → +預測項 → +勢能差）；演算法（APE2 vs +GRU vs +安全約束）。</td></tr>
+      <tr><td>指標</td><td>成功率、<b>動態碰撞率</b>、軌跡長度、<b>運動中最小動態間距</b>、重規劃延遲、<b>對障礙速度的魯棒性曲線</b>、樣本效率。</td></tr>
+      <tr><td>假設驗證</td><td>H1：含趨勢項的 D-UOAR 在中/高速障礙下碰撞率顯著低於反應式。H2：時序狀態 + GRU 優於單幀。H3：ENPIRE 式自動搜尋的獎勵 ≥ 人手最佳調參，且真實成本大幅降低。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ⑧ CONTRIB -->
+<section id="contrib">
+  <div class="eyebrow">Part ⑧</div>
+  <h2 class="sec">預期貢獻與新穎性</h2>
+  <div class="lead-rule"></div>
+  <div class="contrib">
+    <div class="cc"><div class="n">Contribution 1</div><h4>D-UOAR 動態避障獎勵</h4><p>首個「最小距離無關 + 解析可算 + 含前瞻/趨勢項」的動態障礙避障稠密獎勵；以 PBRS 保證不破壞最優策略，補上 UOAR 盒外無梯度的反應式缺陷。</p></div>
+    <div class="cc"><div class="n">Contribution 2</div><h4>POMDP 化的固定維度時空狀態</h4><p>系統比較物件中心 / 時序佔據柵格 / 混合三種表徵，落實 URPlanner §VIII-D 的柵格雛形，使動態規劃重新近似馬可夫並維持平台無關。</p></div>
+    <div class="cc"><div class="n">Contribution 3</div><h4>便宜基質上的 agentic 自主研究</h4><p>把 URPlanner 參數空間與 ENPIRE 自主研究迴圈縫合，自動設計動態獎勵與超參——同時解決 A 的「人手調獎勵」與 B 的「真實迭代貴」，是兩篇的原創綜合。</p></div>
+  </div>
+</section>
+
+<!-- ⑨ RISK -->
+<section id="risk">
+  <div class="eyebrow">Part ⑨</div>
+  <h2 class="sec">風險與可行性</h2>
+  <div class="lead-rule"></div>
+  <div class="risk">
+    <div class="rk"><h4>高維柵格 → 樣本爆炸</h4><p>3D 佔據柵格使狀態維度暴增、訓練變慢（URPlanner 自己也只說「未來優化」）。<b>緩解：</b>先用低維物件中心表徵打通流程，再升級柵格；用 ED2 動態資料補償提升樣本效率。</p></div>
+    <div class="rk"><h4>速度估計噪聲</h4><p>預測項依賴障礙速度估計，視覺追蹤有噪聲。<b>緩解：</b>前瞻 Δt 設短；用勢能差（一階差分）作為對噪聲更穩健的退路；卡爾曼濾波平滑。</p></div>
+    <div class="rk"><h4>sim-to-real 動態落差</h4><p>動態接觸與時序在真實世界更難遷移（ENPIRE 的 2/3 失敗教訓）。<b>緩解：</b>沿用 URPlanner 平台無關設計 + 域隨機化 + 閉環重規劃（URPlanner 已驗證可數毫秒重規劃）。</p></div>
+    <div class="rk"><h4>自動獎勵的 reward hacking</h4><p>若用 ENPIRE 自動合成獎勵，可能優化出「看似避障」的退化解。<b>緩解：</b>用參數空間的真值碰撞檢測作為獨立驗證；趨勢項以 PBRS 限制不改最優策略。</p></div>
+  </div>
+</section>
+
+<!-- ⑩ PLAN -->
+<section id="plan">
+  <div class="eyebrow">Part ⑩</div>
+  <h2 class="sec">建議時程（約 18–24 個月）</h2>
+  <div class="lead-rule"></div>
+  <div class="timeline">
+    <div class="phase"><div class="pm">Phase 1 · M1–4</div><h4>復現與基線</h4><ul><li>復現 URPlanner 參數空間 + UOAR + APE2</li><li>建動態場景模擬器</li><li>跑靜態 + 週期重規劃基線</li></ul></div>
+    <div class="phase"><div class="pm">Phase 2 · M4–9</div><h4>D-UOAR 與狀態</h4><ul><li>實作預測項 + 勢能差趨勢獎勵</li><li>三種狀態表徵消融</li><li>驗證 H1 / H2</li></ul></div>
+    <div class="phase"><div class="pm">Phase 3 · M9–15</div><h4>演算法 + 真機</h4><ul><li>APE2 + GRU + 安全約束 + 課程</li><li>Franka 真機 + 移動障礙驗證</li><li>投稿第一篇</li></ul></div>
+    <div class="phase"><div class="pm">Phase 4 · M15–22</div><h4>ENPIRE 綜合</h4><ul><li>參數空間上跑 agentic autoresearch</li><li>自動獎勵 vs 人手調 (H3)</li><li>HRC 前導 + 投稿第二篇</li></ul></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  交叉分析 + 碩士級延伸研究提案 · DynURPlanner<br>
+  來源：URPlanner (Ying et al., arXiv:2505.20175, 2025) × ENPIRE (Xiao et al., NVIDIA/CMU/UC Berkeley, 2026)<br>
+  目標題目：Collision-free Motion Planning for Robot Manipulator in Dynamic Environments Based on DRL (supervisor: fengkang@u.nus.edu)
+</footer>
+
+<script>
+  const links=[...document.querySelectorAll('header.top a')];
+  const map=links.map(a=>({a,t:document.querySelector(a.getAttribute('href'))})).filter(x=>x.t);
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){
+    links.forEach(l=>l.classList.remove('active'));
+    const m=map.find(x=>x.t===e.target); if(m)m.a.classList.add('active');}});
+  },{rootMargin:'-15% 0px -75% 0px'});
+  map.forEach(x=>obs.observe(x.t));
+</script>
+</body>
+</html>

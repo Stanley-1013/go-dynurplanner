@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENPIRE · 雙欄批注精讀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0a1f1a;        /* ENPIRE 用 NVIDIA 墨綠深色，與 URPlanner 海軍藍區隔 */
+    --navy-2:#0f2c23;
+    --navy-line:#27513f;
+    --paper:#f6f1e7;
+    --paper-2:#ece6d6;
+    --ink:#23201a;
+    --ink-soft:#5a5446;
+    --rule:#d8cfb9;
+
+    --c-thesis:#e8a317;        --c-thesis-bg:#fbeec2;     --c-thesis-edge:#c9871a;
+    --c-concept:#c0392b;       --c-concept-bg:#f6d6cf;    --c-concept-edge:#a23226;
+    --c-evidence:#2563b8;      --c-evidence-bg:#cfe0f5;   --c-evidence-edge:#1f4f93;
+    --c-concession:#2e8b57;    --c-concession-bg:#cfeadb; --c-concession-edge:#246b43;
+    --c-method:#7c3aed;        --c-method-bg:#e2d7f7;     --c-method-edge:#6028c0;
+
+    --nv:#76b900; /* NVIDIA green accent */
+    --shadow-card:0 1px 2px rgba(10,31,26,.06),0 8px 24px rgba(10,31,26,.07);
+    --maxw:1480px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:radial-gradient(1200px 600px at 80% -10%,#fbf7ee 0%,transparent 60%),var(--paper);
+    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.6;
+  }
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(rgba(120,100,60,.035) 1px,transparent 1px);
+    background-size:3px 3px;mix-blend-mode:multiply;}
+
+  header.top{position:sticky;top:0;z-index:50;
+    background:linear-gradient(180deg,var(--navy) 0%,var(--navy-2) 100%);
+    color:#e8f2ea;border-bottom:1px solid var(--navy-line);box-shadow:0 6px 20px rgba(10,31,26,.25);}
+  .top-inner{max-width:var(--maxw);margin:0 auto;padding:14px 26px}
+  .brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .brand .tag{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--nv);border:1px solid #2f5a3f;padding:3px 9px;border-radius:999px;}
+  .brand h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.05rem,1.4vw,1.5rem);margin:0;color:#fff}
+  .brand h1 b{color:var(--nv);font-weight:600}
+  .brand .course{font-size:12.5px;color:#9cc3a8;margin-left:auto;text-align:right;line-height:1.35}
+  .legend{display:flex;gap:8px 16px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .legend .lab{font-size:11px;color:#9cc3a8;letter-spacing:.12em;text-transform:uppercase;margin-right:2px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#dcecdf}
+  .chip i{width:15px;height:15px;border-radius:4px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
+  .chip.thesis i{background:var(--c-thesis)} .chip.concept i{background:var(--c-concept)}
+  .chip.evidence i{background:var(--c-evidence)} .chip.concession i{background:var(--c-concession)}
+  .chip.method i{background:var(--c-method)}
+
+  nav.sections{position:sticky;top:0;z-index:40;background:rgba(246,241,231,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);}
+  .sec-inner{max-width:var(--maxw);margin:0 auto;padding:8px 26px;display:flex;gap:4px;overflow-x:auto}
+  nav.sections a{white-space:nowrap;font-size:12.5px;font-weight:500;color:var(--ink-soft);
+    text-decoration:none;padding:6px 11px;border-radius:7px;transition:.18s;}
+  nav.sections a:hover{background:var(--paper-2);color:var(--navy)}
+  nav.sections a.active{background:var(--navy);color:#fff}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:30px 26px 80px;position:relative;z-index:1}
+  .section-head{margin:46px 0 8px;padding-top:10px}
+  .section-head .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.2em;
+    color:var(--c-method);text-transform:uppercase;}
+  .section-head h2{font-family:Lora,serif;font-size:clamp(1.4rem,2.2vw,2rem);margin:.1em 0 0;
+    color:var(--navy);font-weight:600;}
+  .section-head .sub{font-size:13px;color:var(--ink-soft);margin-top:4px}
+
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start;margin:18px 0}
+  .orig{font-family:Lora,serif;font-size:16.5px;line-height:1.74;color:var(--ink);
+    background:#fffdf8;border:1px solid var(--rule);border-radius:12px;padding:20px 24px;box-shadow:var(--shadow-card);}
+  .orig p{margin:0 0 14px} .orig p:last-child{margin-bottom:0}
+  .orig .pn{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#a99f86;letter-spacing:.1em;display:block;margin-bottom:6px}
+  .orig .eq{font-family:"IBM Plex Mono",monospace;font-size:14px;background:var(--paper-2);
+    border-left:3px solid var(--navy-line);padding:8px 12px;margin:10px 0;border-radius:6px;overflow-x:auto;color:var(--navy-2)}
+
+  mark{padding:1px 2px;border-radius:3px;color:inherit;background:transparent;
+    box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.thesis{background:var(--c-thesis-bg);border-bottom:2px solid var(--c-thesis-edge)}
+  mark.concept{background:var(--c-concept-bg);border-bottom:2px solid var(--c-concept-edge);font-weight:500}
+  mark.evidence{background:var(--c-evidence-bg);border-bottom:2px solid var(--c-evidence-edge)}
+  mark.concession{background:var(--c-concession-bg);border-bottom:2px solid var(--c-concession-edge)}
+  mark.method{background:var(--c-method-bg);border-bottom:2px solid var(--c-method-edge)}
+
+  .note{border-radius:12px;background:#fffdf8;border:1px solid var(--rule);
+    border-left:5px solid var(--navy-line);padding:16px 18px;box-shadow:var(--shadow-card);font-size:14px}
+  .note.t-thesis{border-left-color:var(--c-thesis-edge)} .note.t-concept{border-left-color:var(--c-concept-edge)}
+  .note.t-evidence{border-left-color:var(--c-evidence-edge)} .note.t-concession{border-left-color:var(--c-concession-edge)}
+  .note.t-method{border-left-color:var(--c-method-edge)}
+  .note .role{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;padding:3px 9px;
+    border-radius:999px;margin-bottom:10px;background:var(--paper-2);color:var(--navy-2)}
+  .note dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 10px}
+  .note dt{font-weight:700;color:var(--navy);font-size:12.5px;white-space:nowrap}
+  .note dd{margin:0;color:#3f3a30} .note dd b{color:var(--c-concept);font-weight:600}
+  .note .flag{margin-top:11px;padding:9px 11px;border-radius:8px;font-size:13px;
+    background:#fbf3e3;border:1px dashed var(--c-thesis-edge);color:#6b5414}
+  .note .flag.warn{background:#f7e3df;border-color:var(--c-concept-edge);color:#7a2a20}
+  .note .flag b{font-weight:700} .note .flag::before{content:"⚑ ";font-weight:700}
+
+  .synth{margin-top:70px;background:linear-gradient(165deg,var(--navy) 0%,#11362a 100%);
+    color:#e7f1ea;border-radius:18px;padding:40px clamp(22px,4vw,56px);
+    box-shadow:0 20px 50px rgba(10,31,26,.35);position:relative;overflow:hidden}
+  .synth::after{content:"";position:absolute;width:380px;height:380px;right:-120px;top:-120px;
+    background:radial-gradient(circle,rgba(118,185,0,.28),transparent 65%)}
+  .synth h2{font-family:Lora,serif;font-size:clamp(1.5rem,2.5vw,2.1rem);margin:0 0 6px;color:#fff}
+  .synth .lead{color:#a3c9af;font-size:14px;margin-bottom:28px}
+  .skeleton{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:26px 0 30px}
+  .skeleton .step{flex:1 1 150px;background:rgba(255,255,255,.05);border:1px solid #2f5a3f;border-radius:12px;padding:14px 16px}
+  .skeleton .step .k{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--nv);letter-spacing:.15em}
+  .skeleton .step .v{font-size:14px;margin-top:6px;color:#eaf3ec;font-weight:500}
+  .skeleton .arrow{display:flex;align-items:center;color:#5e8a6c;font-size:22px}
+  .onesent{background:rgba(232,163,23,.12);border:1px solid var(--c-thesis-edge);border-radius:12px;
+    padding:18px 22px;font-family:Lora,serif;font-size:17px;line-height:1.6;color:#fdebc0;margin:8px 0 30px}
+  .onesent b{color:#ffd980}
+  .sw-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .sw{border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.6}
+  .sw.strong{background:rgba(46,139,87,.16);border:1px solid var(--c-concession-edge)}
+  .sw.weak{background:rgba(192,57,43,.14);border:1px solid var(--c-concept-edge)}
+  .sw h3{margin:0 0 8px;font-size:14px;letter-spacing:.04em}
+  .sw.strong h3{color:#8ee0ad} .sw.weak h3{color:#f3a99e}
+  .sw p{margin:0;color:#dcecdf}
+
+  footer{max-width:var(--maxw);margin:0 auto;padding:30px 26px;color:var(--ink-soft);font-size:12.5px;text-align:center}
+
+  @media(max-width:900px){
+    .row{grid-template-columns:1fr;gap:12px} .orig{order:1}.note{order:2}
+    .sw-grid{grid-template-columns:1fr}
+    .skeleton{flex-direction:column}.skeleton .arrow{transform:rotate(90deg);justify-content:center}
+    .brand .course{margin-left:0;text-align:left;width:100%}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <span class="tag">Paper Annotation · NVIDIA</span>
+      <h1><b>ENPIRE</b>: Agentic Robot Policy Self-Improvement in the Real World</h1>
+      <span class="course">機器人運動規劃 · 論文精讀批注<br>Xiao, Xie, Zhang et&nbsp;al. — NVIDIA / CMU / UC Berkeley (2026)</span>
+    </div>
+    <div class="legend">
+      <span class="lab">維度圖例</span>
+      <span class="chip thesis"><i></i>核心論點 / Thesis</span>
+      <span class="chip concept"><i></i>關鍵概念 / 術語</span>
+      <span class="chip evidence"><i></i>實證證據 / 數據</span>
+      <span class="chip concession"><i></i>讓步 / 反駁處理</span>
+      <span class="chip method"><i></i>方法論說明</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sections">
+  <div class="sec-inner">
+    <a href="#abs">Abstract</a>
+    <a href="#intro">1. 引言</a>
+    <a href="#en">2.1 環境建構 (EN)</a>
+    <a href="#pire">2.2 策略改進 (PIRE)</a>
+    <a href="#exp">3. 實驗</a>
+    <a href="#scale">3.3 機群擴展</a>
+    <a href="#metric">3.6 資源利用率</a>
+    <a href="#lim">4. 限制</a>
+    <a href="#related">5. 相關工作</a>
+    <a href="#synth">★ 論證骨架總覽</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ABSTRACT -->
+<div class="section-head" id="abs">
+  <span class="eyebrow">Abstract</span>
+  <h2>摘要</h2>
+  <div class="sub">把「真實世界機器人學習」重構為「coding agent 可管理的優化過程」</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">Abstract</span>
+    <p>Achieving dexterous robotic manipulation in the real world relies heavily on <mark class="concept">human supervision and algorithmic engineering</mark>, which is a central bottleneck in the pursuit of general physical intelligence. Although emerging coding agents can generate code to automate algorithm search, <mark class="concession">their successes remain largely confined to digital environments.</mark></p>
+    <p>We conjecture that the missing abstraction to automate robotics research is a <mark class="thesis">repeatable feedback loop for real-world policy improvement: reset the scene, execute a policy, verify the outcome, and refine the next iteration.</mark> To bridge this gap, we introduce <mark class="thesis">ENPIRE, a harness framework for coding agents</mark> with four core modules: <mark class="method">Environment (EN), Policy Improvement (PI), Rollout (R), and Evolution (E).</mark></p>
+    <p>Powered by ENPIRE, frontier coding agents can autonomously develop a policy to achieve a <mark class="evidence">99% success rate on challenging dexterous tasks (PushT, pin insertion, GPU insertion, zip-tie cutting).</mark> We propose two metrics — <mark class="concept">Mean Robot Utilization (MRU) and Mean Token Utilization (MTU)</mark> — to measure multi-agent physical autoresearch efficiency.</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：全文縮影 / 缺口—抽象—系統—指標</span>
+    <dl>
+      <dt>① 功能</dt><dd>四步推進：點出瓶頸（人類監督）→ 指出 coding agent 只在數位世界成功 → 提出缺的抽象（<b>可重複的真實世界回饋迴圈</b>）→ 落成系統（ENPIRE 四模組）+ 提出新指標。</dd>
+      <dt>② 邏輯角色</dt><dd>總命題節點。與 URPlanner 不同，本文的 thesis 不是「更好的演算法」，而是「<b>一個讓 AI agent 能自主迭代真實機器人策略的框架抽象</b>」——層次更高（meta-level）。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「missing abstraction」把貢獻定位成「發現了一個缺失的範式」，比「我們做了個系統」格局更大。99% 成功率是強鉤子。漏洞：「autonomously」需打折——EN 階段仍需人類回饋（一次性成本），摘要用 amortize 邏輯辯護，但「自主」程度的邊界要到 §2.1 才清楚。</dd>
+    </dl>
+    <div class="flag">注意本文與 URPlanner 的<b>抽象層級差異</b>：URPlanner 改進「機器人怎麼規劃」，ENPIRE 改進「<b>誰來改進機器人策略</b>」（用 AI agent 取代人類研究員）。兩者可正交組合。</div>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="section-head" id="intro">
+  <span class="eyebrow">Section 1</span>
+  <h2>引言：把人類從「保姆式」策略改進中解放</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">1 ¶1–3</span>
+    <p>Frontier policy training methods still rely on humans behind the scenes to participate in the data collection, evaluation with reset, and algorithm adjustment life cycle. <mark class="thesis">Humans labor of babysitting policy improvement inevitably become one of the limiting factors of how quickly robots acquire dexterity.</mark></p>
+    <p>Recent advances in autonomous research (autoresearch), powered by coding agents, show a promising path. However, unique challenges arise when extended to real-world policy learning. <mark class="concept">First, coding agents lack real-world environment interfaces</mark> for closed-loop hypothesis testing. <mark class="concept">Second, when scaling up autoresearch throughput across a robot fleet</mark>, it remains open how to select and verify hypotheses while maintaining efficiency.</p>
+    <p>ENPIRE decomposes skill acquisition into <mark class="method">two autoresearch procedures: (i) EN — human-guided construction of an autonomous environment interface (one-time, amortized); (ii) PIRE — fully autonomous refinement from real-world feedback.</mark></p>
+  </div>
+  <div class="note t-concept">
+    <span class="role">段落功能：問題定義 + 兩大挑戰 + 兩階段分解</span>
+    <dl>
+      <dt>① 功能</dt><dd>把「人類保姆」設為要消滅的瓶頸，列出兩個阻礙（缺真實環境介面、機群擴展時的假設選擇/驗證），對應兩階段設計（EN / PIRE）。</dd>
+      <dt>② 邏輯角色</dt><dd>「缺陷清單 → 模組對應」結構（與 URPlanner 同款修辭）。兩階段的<b>切分</b>是全文最關鍵的設計決策：把「需要人」與「完全自主」在時間軸上隔離。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：「babysitting」一詞生動地把學術問題情緒化，提高記憶點。用「一次性成本 + 攤銷」化解「仍需人類」的質疑。漏洞：EN 的人類投入是否真能「攤銷」取決於任務間環境介面的<b>可重用程度</b>，論文以少數任務佐證，外推到任意任務的證據有限。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- EN -->
+<div class="section-head" id="en">
+  <span class="eyebrow">Section 2.1</span>
+  <h2>階段一：從人類回饋建構環境 (EN)</h2>
+  <div class="sub">把「物理互動」抽象成 coding agent 友善的結構化環境：安全約束 + 自動驗證 + 自動重置</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">2.1 三要素</span>
+    <p><b>Hard safety constraints:</b> restrict the config space and kinematic behaviors to a safe operational limit. Violating limits <mark class="method">triggers immediate task failure and automated reset</mark>, serving as a safeguard and a source of episode termination.</p>
+    <p><b>Automated verification:</b> coding agents synthesize a <mark class="thesis">binary reward function from procedural tool calls</mark> to distinguish outcomes. Given only a few minutes of success/failure demos, agents maximize prediction accuracy while minimizing latency (e.g., pin insertion reward from visual alignment + end-effector height + force estimates; latency &lt;150ms).</p>
+    <p><b>Automated reset:</b> tool calls (inspired by CaP-X) reset to the onset of the most challenging phase, <mark class="method">strategically focusing learning on precision bottlenecks.</mark> Safety + verification + reset = the Environment Module (EN); with policies receiving visual-proprioceptive inputs = the Rollout module (R), exposed via immutable Gym APIs.</p>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：環境模組的三支柱（方法論核心）</span>
+    <dl>
+      <dt>① 功能</dt><dd>定義讓 agent 能自主跑實驗的三個前提：<b>安全約束</b>（不撞壞硬體）、<b>自動驗證</b>（自己造獎勵函數判定成敗）、<b>自動重置</b>（無人快速重來）。</dd>
+      <dt>② 邏輯角色</dt><dd>EN 是整個自主迴圈能「無人運轉」的<b>物理前提</b>。其中「coding agent 自己合成獎勵函數」最具新意——把獎勵設計這個傳統上最需人類巧思的環節也自動化了。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「重置到最難階段的起點」聚焦學習於瓶頸，是樣本效率的巧思。用 immutable Gym API 把環境凍結成穩定介面，讓 PIRE 階段可放心改演算法。漏洞：自動合成的二元獎勵<b>準確率與延遲</b>是品質天花板——若驗證函數有偏差，後續所有自主優化都在<b>錯誤訊號上爬坡</b>，論文未深究 reward hacking 風險。</dd>
+    </dl>
+    <div class="flag warn">自動驗證 = 自動獎勵函數。若 agent 合成的 reward 有系統性偏差，PIRE 會把策略優化到「看起來成功」而非「真的成功」（reward hacking）。雙相機 AND 邏輯（Fig.4）是部分緩解但非根治。</div>
+  </div>
+</div>
+
+<!-- PIRE -->
+<div class="section-head" id="pire">
+  <span class="eyebrow">Section 2.2</span>
+  <h2>階段二：從真實回饋自主改進策略 (PI + E)</h2>
+  <div class="sub">coding agent 讀文獻、提假設、改訓練碼；多 agent 去中心化並行加速</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">2.2 PI 迴圈</span>
+    <p>The agent receives the task description and is granted <mark class="method">write permissions to a streamlined training codebase.</mark> Through the PI module it <mark class="thesis">reviews the literature, generates insights, formulates hypotheses, and directly modifies the training code</mark> (BC, RL algorithms) to optimize performance based on real-world automatic verification. To gather evidence, it invokes APIs to log trajectories, videos, and reward signals.</p>
+    <p><b>Multi-agent scaling (Evolution):</b> deploy N agents across N robots to test N hypotheses asynchronously. Each branches off the same baseline codebase, collaborating via <mark class="method">Git</mark>; agents spontaneously cherry-pick, copy, or merge successful recipes. <mark class="evidence">Scaling parallel agent-robot pairs drastically reduces wall-clock time to discover a high-success recipe.</mark></p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：兌現「自主研究」總命題</span>
+    <dl>
+      <dt>① 功能</dt><dd>描述 agent 如何像人類研究員一樣跑「讀文獻→提假設→改碼→看結果」迴圈，並用 Git 作為<b>多 agent 協作的演化基質</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>論證的核心機制段。把「自主改進」具體化為「對訓練碼的可寫權限 + 文獻驅動的假設」。Evolution 用 Git merge 做假設選擇，是把<b>軟體工程的協作範式移植到機器人研究</b>的關鍵類比。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「agents 自發 cherry-pick/merge」把多 agent 協作講得像開源社群，生動且可擴展。漏洞：「直接改訓練碼」意味著 agent 可能引入<b>難以察覺的 bug 或不安全更新</b>；論文未談如何防止演化過程退化或收斂到局部最優的訓練配方。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- EXPERIMENTS -->
+<div class="section-head" id="exp">
+  <span class="eyebrow">Section 3.1–3.2</span>
+  <h2>實驗：啟發式學習 + 梯度式學習</h2>
+  <div class="sub">三個前沿 coding agent（Codex/Claude Code/Kimi）× 真實 + 模擬任務</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">3.1 / 3.2</span>
+    <p>Tasks requiring precise reactive control: <mark class="concept">Push-T, Pin insertion (4mm holes), GPU-insertion, Zip-tie cutting.</mark> Benchmark three agents: Codex (GPT-5.5 xhigh), Claude Code (Opus 4.7 High), Kimi Code (Kimi K2.6 thinking).</p>
+    <p>On Push-T heuristic learning: <mark class="evidence">all agents solve it in simulation; but the real world causes two of three to fail.</mark> Simulators offer consistent low-variance physics; real-world conditions are non-deterministic and time-varying (dynamics, friction, object movements). <mark class="concession">To improve real-world robustness, we encourage agents to explore and combine diverse learning methods (heuristics + gradient-based).</mark></p>
+    <p>Pin insertion (gradient-based): agents achieve 50 consecutive successes by tuning BC, iterative BC + online rollout aggregation, offline/online RL with a BC-regularization term, and hyperparameters.</p>
+  </div>
+  <div class="note t-evidence">
+    <span class="role">段落功能：能力驗證 + 揭示「真實世界才是難點」</span>
+    <dl>
+      <dt>① 功能</dt><dd>證明 ENPIRE 能驅動多種 coding agent 在<b>真實</b>精密任務上自主收斂；並用「模擬全過、真實兩敗」凸顯 sim-to-real 差距正是本框架的價值所在。</dd>
+      <dt>② 邏輯角色</dt><dd>實證支柱兼<b>反差論證</b>。「模擬簡單、真實才難」這個對比把全文價值錨定在「<b>真實世界</b>的自主研究」，與 §5 相關工作中「別人只在數位/模擬迴圈」形成主要區隔。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「2/3 agent 在真實世界失敗」這種反直覺數據，反而強化「真實世界 autoresearch 是未解難題」的論點。漏洞：N=3 個 agent、少數任務，<b>樣本量小</b>；「鼓勵 agent 結合多種方法」帶有人類引導成分，與「完全自主」略有張力。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- SCALING -->
+<div class="section-head" id="scale">
+  <span class="eyebrow">Section 3.3–3.5</span>
+  <h2>機群擴展、經驗遷移與 VLA 協同</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">3.3 / 3.4 / 3.5</span>
+    <p><b>Fleet scaling:</b> sizes 1/4/8 robots. In Push-T, <mark class="evidence">scaling 1→8 agents cuts time-to-1.0-score from ~5h to ~2h</mark>; in pin insertion, from &gt;1.5h to ~40min. Multi-agent also applies <mark class="method">code-based domain randomization</mark> during reset (broader spatial variation than prior work → stronger robustness).</p>
+    <p><b>Continue learning:</b> insights from multi-agent autoresearch <mark class="concession">transfer to similar novel tasks</mark> — appending documented training-recipe evolution to a new task's instructions (GPU insertion) yields high success.</p>
+    <p><b>Synergy with VLAs:</b> ENPIRE integrates vision-language-action models (GR00T) with procedural tool calls for long-horizon manipulation — agent learns to hover over scissors, grasp, and cut a zip tie.</p>
+  </div>
+  <div class="note t-evidence">
+    <span class="role">段落功能：證明「可擴展性」這一第二論點</span>
+    <dl>
+      <dt>① 功能</dt><dd>用機群規模 vs 時間的數據證明 ENPIRE 能<b>用機器人資源換 wall-clock 時間</b>；並展示經驗可跨任務遷移、可與 VLA 大模型協同。</dd>
+      <dt>② 邏輯角色</dt><dd>呼應摘要「scales on a robot fleet」的承諾。擴展性是把 ENPIRE 從「單機 demo」抬升為「可規模化研究基礎設施」的關鍵論點。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：時間數字（5h→2h、1.5h→40min）直觀有力。VLA 協同把框架接到當紅大模型，擴大影響面。漏洞：擴展只測到 8 台，且 §3.6 自承「token 成本超線性增長」——擴展的<b>經濟性拐點</b>其實已隱現，但此處只報喜不報憂。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- METRICS -->
+<div class="section-head" id="metric">
+  <span class="eyebrow">Section 3.6</span>
+  <h2>量化 agent 資源利用率：MRU 與 MTU</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">3.6 新指標</span>
+    <p><mark class="thesis">Mean Robot Utilization (MRU)</mark> = fraction of research wall-clock time the robot is actively executing. <mark class="thesis">Mean Token Utilization (MTU)</mark> = tokens consumed per minute. We further measure Tokens-to-Success and Time-to-Success. <mark class="concept">A perfectly resource-saturated agent pushes both toward 1; in practice neither reaches it for any frontier agent.</mark></p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：提出新評估維度（次級貢獻）</span>
+    <dl>
+      <dt>① 功能</dt><dd>為「物理 autoresearch」這個新問題提出<b>專屬效率指標</b>：機器人利用率（稀缺物理資源）與 token 利用率（運算成本）。</dd>
+      <dt>② 邏輯角色</dt><dd>把貢獻從「一個系統」擴展為「一個可被測量、可被比較的研究範式」。指標化是讓後續研究能接續的<b>制度性貢獻</b>。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：類比 GPU 利用率，把「機器人是新瓶頸資源」這個洞見指標化，立論點新穎。漏洞：MRU/MTU 仍是<b>描述性</b>指標，未給出「如何優化它們」的方法；且兩指標可能彼此衝突（多 agent 提高 GPU 用量卻降低單機 MRU）。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- LIMITATIONS -->
+<div class="section-head" id="lim">
+  <span class="eyebrow">Section 4</span>
+  <h2>限制：資源低利用與 token 成本超線性</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">4 限制</span>
+    <p><b>Underutilized resources:</b> agents don't fully use robots while reading logs, writing code, debugging, or waiting for the LM backbone. <mark class="concession">As we scale robots, MRU decreases while GPU utilization increases</mark> — agent teams spend more time summarizing peer branches and less operating the robot.</p>
+    <p><b>Token cost grows super-linearly:</b> as fleet size increases, <mark class="concession">token usage grows faster than the ideal linear trend.</mark> Increasing fleet size <mark class="thesis">trades token efficiency for faster policy improvement</mark> — larger fleets reach success sooner but require a disproportionately higher token budget.</p>
+  </div>
+  <div class="note t-concession">
+    <span class="role">段落功能：誠實揭示框架的經濟學代價</span>
+    <dl>
+      <dt>① 功能</dt><dd>承認兩個核心代價：機器人在 agent「思考/協調」時閒置；機群越大 token 成本越超線性膨脹。</dd>
+      <dt>② 邏輯角色</dt><dd>論證的<b>自我設限</b>。把擴展性論點（§3.3）的反面誠實補齊，形成「速度 vs 成本」的權衡敘事，提升整體可信度。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「trades efficiency for speed」把限制框成<b>可選的權衡</b>而非缺陷。漏洞：限制聚焦於「效率/成本」，<b>迴避了更根本的問題</b>——自動驗證的正確性、演化過程的安全性、long-horizon 任務的泛化天花板，這些更難的限制未被列入。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- RELATED -->
+<div class="section-head" id="related">
+  <span class="eyebrow">Section 5</span>
+  <h2>相關工作：在硬體上跑迴圈才是關鍵差異</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">5.1–5.3</span>
+    <p>Code-as-Policies, ProgPrompt established <mark class="concept">executable code as the agent's action</mark>. Self-improvement loops need each trial cheap enough to repeat at scale — Minecraft skill libraries, Eureka reward design (Isaac Gym rollouts free). <mark class="thesis">In every prior case, the loop closes on a cheap substrate (simulation/code); real-robot execution serves only as a sim-to-real or data target, never as the medium of iteration.</mark></p>
+    <p>Two gaps: <mark class="thesis">(1) no system autonomously runs and optimizes a physical robotics loop under an explicit hardware budget</mark> (classical robot scientists fixed the apparatus, never wrote their own tools); (2) <mark class="thesis">no benchmark measures utilization of a scarce physical resource</mark> rather than capability or cost-per-paper. Our system addresses both.</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：精準定位本文的獨特性</span>
+    <dl>
+      <dt>① 功能</dt><dd>用「迭代發生在哪種基質上」這條軸線重新組織所有相關工作，論證前人都在<b>便宜基質（模擬/程式）</b>上閉環，唯獨本文在<b>真實硬體</b>上閉環。</dd>
+      <dt>② 邏輯角色</dt><dd>全文<b>差異化論證的最強段</b>。把貢獻濃縮成兩個前人未填的 gap（硬體預算下的物理迴圈、稀缺物理資源的利用率指標），定位極其鋒利。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：「the medium of iteration」這個切角極漂亮——不比演算法強弱，而比「迴圈跑在哪」，一舉把自己與整片文獻區隔。漏洞：這個區隔<b>成立的代價就是貴</b>（§4 已自承）；批評者可問：既然模擬便宜，為何不先在模擬把迴圈跑到極致再 sim-to-real？本文的回答（真實物理不可預測）說服力依賴 §3 那「2/3 失敗」的小樣本。</dd>
+    </dl>
+    <div class="flag">本文的立論軸 = 「迭代的<b>媒介</b>」。這與 URPlanner 的立論軸（規劃的<b>計算成本</b>）完全不同——交叉研究時，這正是兩篇可互補之處：URPlanner 提供便宜的真實-等價模擬基質，可能緩解 ENPIRE 的成本痛點。</div>
+  </div>
+</div>
+
+<!-- SYNTHESIS -->
+<section class="synth" id="synth">
+  <h2>★ 論證結構總覽</h2>
+  <div class="lead">全文邏輯骨架：問題 → 論點 → 證據 → 反駁處理 → 結論</div>
+
+  <div class="skeleton">
+    <div class="step"><div class="k">問題 PROBLEM</div><div class="v">真實世界靈巧操作依賴人類「保姆式」監督與演算法工程；coding agent 的自主研究只在數位/模擬世界成功</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">論點 THESIS</div><div class="v">缺的抽象 = 真實世界可重複回饋迴圈。ENPIRE 四模組(EN/PI/R/E)把它實例化；兩階段隔離「需人」與「全自主」</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">證據 EVIDENCE</div><div class="v">多 agent 在真實精密任務達 99%/50 連續成功；機群 1→8 把時間 5h→2h、1.5h→40min；提出 MRU/MTU 指標</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">反駁 REBUTTAL</div><div class="v">用「一次性成本攤銷」化解「仍需人」；用相關工作「迭代媒介」軸線區隔前人；誠實承認資源低利用+token 超線性</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">結論 CONCLUSION</div><div class="v">把真實機器人學習轉為 coding agent 可管理的優化過程；以犧牲 token 效率換取策略改進速度</div></div>
+  </div>
+
+  <div class="onesent">
+    <b>作者核心主張（一句話版）：</b>機器人靈巧度進步的真正瓶頸是「<b>人類研究員的勞動</b>」，只要為 coding agent 補上一個能在<b>真實硬體</b>上自動重置、自動驗證、自動迭代的回饋迴圈抽象（ENPIRE），AI agent 就能像研究員一樣自主把真實世界策略爬升到接近滿分，並能用機群規模換取速度。
+  </div>
+
+  <div class="sw-grid">
+    <div class="sw strong">
+      <h3>◎ 論證最強處</h3>
+      <p><b>相關工作的「迭代媒介」定位（§5）+ 99% 真實成功率。</b>作者不在「演算法誰更強」上糾纏，而是提出一條全新比較軸——<b>閉環迴圈跑在便宜基質還是真實硬體上</b>——使前人工作整齊地落在「另一邊」，貢獻的獨特性無可爭辯；再以真實世界 99%／50 連續成功的硬數據兜底。立論角度與實證強度兼具。</p>
+    </div>
+    <div class="sw weak">
+      <h3>△ 論證最弱處</h3>
+      <p><b>「自主」程度與自動驗證的可靠性。</b>「fully autonomous」其實建立在 EN 階段的人類回饋與人類「鼓勵結合多方法」之上；更關鍵的是整個自主迴圈爬坡的訊號來自 <b>agent 自己合成的二元獎勵函數</b>——若該函數有偏差，PIRE 會優化出「看似成功」的策略（reward hacking）。加上真實任務樣本量小（3 agent、少數任務、機群僅到 8 台），普適性證據偏薄。</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  ENPIRE 雙欄批注精讀 · 五維度邏輯分析（核心論點／關鍵概念／實證證據／讓步反駁／方法論）<br>
+  原文：Wenli Xiao, Jia Xie, Tonghe Zhang et&nbsp;al. — NVIDIA / CMU / UC Berkeley (2026) · research.nvidia.com/labs/gear/enpire
+</footer>
+
+<script>
+  const links=[...document.querySelectorAll('nav.sections a')];
+  const map=links.map(a=>({a,t:document.querySelector(a.getAttribute('href'))})).filter(x=>x.t);
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){
+    links.forEach(l=>l.classList.remove('active'));
+    const m=map.find(x=>x.t===e.target); if(m)m.a.classList.add('active');}});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  map.forEach(x=>obs.observe(x.t));
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+{
+  "config": {
+    "dt": 0.05,
+    "a_r": 0.06,
+    "max_steps": 100,
+    "n_obstacles": 3,
+    "episodes": 60,
+    "speeds": [
+      0.1,
+      0.25,
+      0.5,
+      1.0,
+      2.0
+    ],
+    "substeps": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "seed": 0
+  },
+  "results": {
+    "0.1": {
+      "episodes": 60,
+      "successes": 42,
+      "steps": 2014,
+      "contact_steps": 14,
+      "missed": {
+        "1": 4,
+        "2": 2,
+        "4": 2,
+        "8": 2,
+        "16": 1
+      },
+      "episodes_with_miss": {
+        "1": 4,
+        "2": 2,
+        "4": 2,
+        "8": 2,
+        "16": 1
+      }
+    },
+    "0.25": {
+      "episodes": 60,
+      "successes": 41,
+      "steps": 2003,
+      "contact_steps": 16,
+      "missed": {
+        "1": 2,
+        "2": 2,
+        "4": 1,
+        "8": 1,
+        "16": 1
+      },
+      "episodes_with_miss": {
+        "1": 2,
+        "2": 2,
+        "4": 1,
+        "8": 1,
+        "16": 1
+      }
+    },
+    "0.5": {
+      "episodes": 60,
+      "successes": 28,
+      "steps": 1872,
+      "contact_steps": 29,
+      "missed": {
+        "1": 5,
+        "2": 2,
+        "4": 0,
+        "8": 0,
+        "16": 0
+      },
+      "episodes_with_miss": {
+        "1": 5,
+        "2": 2,
+        "4": 0,
+        "8": 0,
+        "16": 0
+      }
+    },
+    "1.0": {
+      "episodes": 60,
+      "successes": 13,
+      "steps": 835,
+      "contact_steps": 47,
+      "missed": {
+        "1": 8,
+        "2": 3,
+        "4": 1,
+        "8": 1,
+        "16": 1
+      },
+      "episodes_with_miss": {
+        "1": 8,
+        "2": 3,
+        "4": 1,
+        "8": 1,
+        "16": 1
+      }
+    },
+    "2.0": {
+      "episodes": 60,
+      "successes": 11,
+      "steps": 672,
+      "contact_steps": 49,
+      "missed": {
+        "1": 4,
+        "2": 3,
+        "4": 2,
+        "8": 1,
+        "16": 1
+      },
+      "episodes_with_miss": {
+        "1": 4,
+        "2": 3,
+        "4": 2,
+        "8": 1,
+        "16": 1
+      }
+    }
+  }
+}

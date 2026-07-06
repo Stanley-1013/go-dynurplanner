@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第五輪迴圈 · 更正與扎根方向</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--ur:#2563b8;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);--maxw:1050px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .hero{max-width:var(--maxw);margin:0 auto;padding:46px 24px 14px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.6rem,3.2vw,2.5rem);line-height:1.16;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){h1{color:#dfeee7}}
+  h1 em{font-style:italic;color:var(--bad)}
+  .deck{font-size:15px;color:var(--ink-soft);max-width:800px}
+  main{max-width:var(--maxw);margin:0 auto;padding:14px 24px 90px}
+  section{margin-top:48px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.3rem,2.2vw,1.8rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body,ul.body,ol.body{font-size:14.5px;line-height:1.8;max-width:800px}
+  ul.body li,ol.body li{margin-bottom:6px}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.bad{border-color:var(--bad)}
+  .card.core{border-color:var(--core)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.bad{background:var(--bad-bg);color:var(--bad)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox.bad{border-left-color:var(--bad)}
+  b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+  b.label.bad{color:var(--bad)}
+  a{color:var(--ur)}
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 5</span>
+    <a href="#correction">更正</a>
+    <a href="#newcomp">新競品 DRP</a>
+    <a href="#pacs-correction">PACS 修正</a>
+    <a href="#grounded">扎根後方向</a>
+    <a href="#rq">研究問題</a>
+    <a href="#todo">下一步</a>
+  </nav>
+</header>
+<div class="hero">
+  <div class="kicker">Loop 5 · Direct full-text verification of Round 4's claims</div>
+  <h1>第四輪的核心主張<em>錯了一半</em>——但錯的方向反而更有利</h1>
+  <p class="deck">第四輪說「cuRobo 已經解決連續動態避障，RL policy 沒有存在的必要」——這句話只查了 cuRobo 自己的行銷部落格，沒有查真正的第三方動態場景基準測試。這一輪直接開全文查證，發現一篇 2025-09 的論文用 cuRobo 當基線親自測過：cuRobo 在真正動態的場景下成功率只有 39.5%（浮動動態障礙）、甚至 0%（目標被擋住）。這推翻了第四輪「RL 已被 cuRobo 商品化」的判斷，但也帶出一個更強、更直接的新競品，需要立刻正視。</p>
+</div>
+<main>
+
+<section id="correction">
+  <div class="eyebrow">Honest Correction</div>
+  <h2 class="sec">更正：cuRobo 在真正動態場景下其實表現很差</h2>
+  <div class="rule"></div>
+  <div class="card bad">
+    <b class="label bad">第四輪的原句（現已更正）</b>
+    <p class="body" style="margin:0 0 10px">「cuRobo... 對移動障礙用 MPC 每 ~50ms 重規劃一次...已達成同樣結果」——這個判斷來自 NVIDIA 官方技術部落格的摘要式敘述，<b>從未查證 cuRobo 在對抗性/不可預測動態場景下的實測成功率</b>。</p>
+    <b class="label bad">查證後的事實</b>
+    <p class="body" style="margin:0">「Deep Reactive Policy」(DRP, <a href="https://arxiv.org/html/2509.06953v1" target="_blank">arXiv:2509.06953</a>, 2025-09) 直接把 cuRobo 當基線，在動態場景測試：</p>
+  </div>
+  <table>
+    <tr><th>場景</th><th>cuRobo 成功率</th><th>DRP（學習式反應策略）成功率</th></tr>
+    <tr><td>靜態場景（對照組）</td><td>82.97%</td><td>84.60%（接近）</td></tr>
+    <tr><td>浮動動態障礙</td><td><b style="color:var(--bad)">39.50%</b></td><td><b style="color:var(--core)">75.50%</b></td></tr>
+    <tr><td>目標被動態擋住</td><td><b style="color:var(--bad)">0%</b></td><td><b style="color:var(--core)">66.67%</b></td></tr>
+  </table>
+  <p class="body">DRP 論文給的理由：「<i>cuRobo 每次都從頭規劃，且難以應對噪聲與部分可觀測——傳統規劃器假設對環境有完整認知與靜態條件</i>」<span class="tag low">全文查證</span>。這不是行銷部落格的宣稱，是同儕檢視前（arXiv preprint）但有具體數字、具體基線、具體場景設計的實測結果。</p>
+  <div class="verdictbox">
+    <b class="label">修正後的判斷</b>
+    <p class="body" style="margin:0">第四輪「RL policy 已被 cuRobo 商品化，應該轉向安全濾網」的核心論證<b>不成立</b>——GPU 優化規劃器在真正動態、不可預測的場景下並沒有解決這個問題，這正是為什麼 DynURPlanner 原本要解的問題（訓練一個能處理動態障礙的策略）依然是真問題、依然重要。<b>但</b>這不代表可以退回第三輪的方向重新開始，因為查證同時挖出一個比 EAAI 2026 競品嚴重得多的新對手（見下）。</p>
+  </div>
+</section>
+
+<section id="newcomp">
+  <div class="eyebrow">New, More Serious Competitor</div>
+  <h2 class="sec">新競品：DRP 已經是「學習式動態避障」的當前最佳水準</h2>
+  <div class="rule"></div>
+  <p class="body">DRP（IMPACT 策略）不是又一篇同溫層論文，而是目前查到<b>最直接、最完整覆蓋這個題目核心訴求</b>的工作，需要如實承認它的份量：</p>
+  <ul class="body">
+    <li><b>方法</b>：Transformer 策略（IMPACT），先用 cuRobo 產生的 1000 萬條靜態場景專家軌跡做行為克隆（behavior cloning）預訓練，再用「IMPACT + Geometric Fabrics」當教師做 student-teacher 迭代精修，補上動態互動能力</li>
+    <li><b>基線覆蓋完整</b>：cuRobo、AIT*、RMP（經典）；MπNets、MπFormer、NeuralMP（神經規劃器）——幾乎涵蓋了 §領域定位 表格裡「經典優化」與「生成式/神經規劃」兩個象限的代表工作</li>
+    <li><b>輸入表徵</b>：原始點雲（PointNet++ 編碼），比 URPlanner 的 AABB+線段簡化幾何更通用，但也更重、更黑箱</li>
+    <li><b>推論速度</b>：300Hz（RTX 4090），3.48ms 冷啟動延遲——比 URPlanner 宣稱的優勢（免 IK、~90x 加速）量級接近，需要正面比較才知道誰真的更快</li>
+    <li><b>论文自己承認的洞</b><span class="tag ok">已驗證</span>：<b>完全沒有討論連續時間碰撞檢測、swept volume，也沒有任何正式的碰撞安全保證</b>；動態場景的訓練資料是靠「student-teacher 迭代」湊出來的，因為「每個動作後都要重新規劃專家軌跡在計算上不可行」——換句話說，<b>DRP 對動態障礙的處理本質上仍是離散時間點雲快照的反應式應對，沒有 Part⑤ 那套連續時間解析推理</b>；失敗模式論文沒有拆解「是撞到還是超時」，這是一個明確待補的空白</li>
+  </ul>
+</section>
+
+<section id="pacs-correction">
+  <div class="eyebrow">Secondary Correction</div>
+  <h2 class="sec">次要修正：PACS 的可達性分析其實已經很便宜，不是「昂貴的對照組」</h2>
+  <div class="rule"></div>
+  <p class="body">第四輪把 reachability-based 安全濾網（PACS/RAIL/Latent Safety Filters）描述成「比解析幾何昂貴很多」，這個對比也需要修正。全文查證 PACS（<a href="https://arxiv.org/html/2511.06385" target="_blank">arXiv:2511.06385</a>）<span class="tag ok">已驗證</span>：</p>
+  <div class="card">
+    <p class="body" style="margin:0">「安全步驟平均計算時間為 <b>0.20ms</b>（相較 CBF 的 0.64ms），軌跡重算約 <b>5ms</b>」，運行在 <b>1kHz</b> 安全迴圈、Franka FR3 真機。它用的「可達佔用集」本質上也是基於「已知速度/加速度上界」做區間式的解析包絡計算——<b>跟 URPlanner 的解析幾何在計算精神上其實比想像中接近</b>，差別是 PACS 額外把感測誤差的不確定性也包進可達集（更穩健但也更保守），而 URPlanner 目前的推導假設障礙速度是點估計（更精確但對噪聲更脆弱）。</p>
+  </div>
+  <p class="body">因此「解析幾何比現有安全濾網便宜」這個賣點<b>不能繼續當作主要差異化論點</b>——真正還站得住的差異，是 <b>URPlanner 用簡單解析基元（AABB+線段）換來的閉式可積分/可求根特性，讓多步前瞻（swept 積分、TTC 根）可以直接解析求解，不需要數值可達集傳播</b>；這是計算<i>路徑</i>不同（閉式代數 vs. 集合傳播數值方法），不是「快 10 倍」這種可以隨便宣稱的量級差異，需要實測才能講清楚誰真的更快、在什麼條件下。
+</section>
+
+<section id="grounded">
+  <div class="eyebrow">Grounded Direction — Loop 5 Verdict</div>
+  <h2 class="sec">扎根後的方向判斷</h2>
+  <div class="rule"></div>
+  <div class="verdictbox">
+    <b class="label">新的立身之本</b>
+    <p class="body" style="margin:0">不是「取代 DRP」（一個碩士生從頭訓練、資料量 1000 萬條軌跡、還有 IsaacGym 平行模擬基礎設施的工作，不可能短期內正面打贏），而是<b>補上 DRP 論文自己留下、且明確承認未處理的洞</b>：DRP 類的學習式反應策略在動態場景仍有 24.5%／33.3% 的殘餘失敗，論文完全沒有分析這些失敗是不是「碰撞」，也完全沒有連續時間碰撞推理。Part⑤ 已經推好的 τ 線性化 + swept 積分 + 連續 TTC 根，可以直接拿來：<b>(a) 診斷</b> DRP 類策略的殘餘失敗中有多少是離散時間點雲快照漏檢的「穿隧」碰撞；<b>(b) 修補</b>——在 DRP 的動作輸出上疊加一層輕量解析屏蔽/修正，看能否把 75.5%/66.7% 推得更高。</p>
+  </div>
+  <p class="body">這個定位同時滿足宏觀重要性的三個檢驗：</p>
+  <ol class="body">
+    <li><b>對齊當前最強基準，而非迴避它</b>——直接用 DRP 公開報告的數字做對照，不用再自己重新證明「動態避障對 RL 有價值」（DRP 已經幫你證明了，帶著具體數字）</li>
+    <li><b>填的洞是真實、可驗證、被論文自己承認的</b>——不是「猜測」有洞，是 DRP 原文白紙黑字說沒做連續時間碰撞檢測、沒做失敗模式拆解</li>
+    <li><b>工程量對碩士生可行</b>——不需要重建 DRP 的訓練管線；可以用 DRP 開源權重（若有釋出）或用你自己複現的簡化版反應策略當宿主，加一層 Part⑤ 的解析屏蔽做 A/B 比較，這是「疊加式」貢獻，不是「從零打敗」</li>
+  </ol>
+</section>
+
+<section id="rq">
+  <div class="eyebrow">Refined Research Question</div>
+  <h2 class="sec">收斂後的研究問題（供下一輪細化方法論）</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li><b>RQ1（診斷）</b>：在 DRP 式學習反應策略的動態避障失敗案例中，有多少比例是「連續時間穿隧」——即離散時間步之間，連桿真的掃過障礙但快照沒偵測到？（需要自己複現一個簡化反應策略 + Part⑤ 的連續碰撞地面真值做事後分析）</li>
+    <li><b>RQ2（修補）</b>：在同一策略的動作輸出上加一層 Part⑤ 解析屏蔽（偵測到 τ*&lt;Δt 就修正/否決該候選動作），能否顯著降低動態場景碰撞率，且不明顯犧牲任務成功率／延遲？</li>
+    <li><b>RQ3（比較定位）</b>：這層解析屏蔽跟 PACS 式可達集方法比，在延遲、對速度估計噪聲的穩健性、實作複雜度上各自的優劣是什麼？（誠實面對：PACS 已經很快，不能只靠「我更快」取勝，要講清楚在哪個維度贏）</li>
+  </ol>
+  <p class="body" style="font-size:13px;color:var(--ink-soft)">DRP 是否公開釋出程式碼/權重、DRPBench 場景是否可取得，是決定 RQ1/RQ2 能否直接執行、還是需要自己重新實作一個簡化反應策略當宿主的關顈前提，見下方待辦。</p>
+</section>
+
+<section id="todo">
+  <div class="eyebrow">Immediate Next Steps</div>
+  <h2 class="sec">下一步待辦（誠實列出信心等級）</h2>
+  <div class="rule"></div>
+  <ul class="body">
+    <li><span class="tag low">待查</span> DRP（arXiv:2509.06953）是否有開源程式碼/權重/DRPBench 場景——這直接決定 RQ1/RQ2 能不能用真實基準執行，而不是自己另起爐灶</li>
+    <li><span class="tag low">待查</span> cuRobo 的失敗案例（39.5%/0%）與 DRP 的殘餘失敗（24.5%/33.3%）各自的具體失敗模式（碰撞 vs. 超時 vs. 卡在局部最優），論文都沒細分，需要看附錄或自己重跑</li>
+    <li><span class="tag low">待查</span> PACS 的「可達佔用集」數學形式需要全文細讀（目前只查到延遲數字），才能精確比較它跟 Part⑤ 解析幾何在噪聲穩健性上的真實差距</li>
+    <li>建議把 RQ1（失敗模式診斷）當第一個可立即動手的小實驗——不需要等基礎設施到位，只需要一個簡化的反應式策略 + 動態場景模擬器 + Part⑤ 的碰撞地面真值檢查器，這是本輪迴圈之後最快能產出「真實數據」而非「文獻判斷」的一步</li>
+  </ul>
+</section>
+
+</main>
+<footer>DynURPlanner · 第五輪迴圈：對第四輪的全文查證與更正 · 新扎根方向 = 診斷並修補 DRP 類反應策略的連續時間殘餘失敗 · 2026-07</footer>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Paper PDFs (copyrighted) and heavy artifacts stay local
+sources/*.pdf
+code/.venv/
+**/__pycache__/
+*.pt
+*.pyc

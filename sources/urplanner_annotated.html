@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URPlanner · 雙欄批注精讀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0b1f3a;
+    --navy-2:#13294b;
+    --navy-line:#27416b;
+    --paper:#f6f1e7;
+    --paper-2:#efe8d8;
+    --ink:#23201a;
+    --ink-soft:#5a5446;
+    --rule:#d8cfb9;
+
+    /* 五維度語義色 */
+    --c-thesis:#e8a317;        --c-thesis-bg:#fbeec2;     --c-thesis-edge:#c9871a;
+    --c-concept:#c0392b;       --c-concept-bg:#f6d6cf;    --c-concept-edge:#a23226;
+    --c-evidence:#2563b8;      --c-evidence-bg:#cfe0f5;   --c-evidence-edge:#1f4f93;
+    --c-concession:#2e8b57;    --c-concession-bg:#cfeadb; --c-concession-edge:#246b43;
+    --c-method:#7c3aed;        --c-method-bg:#e2d7f7;     --c-method-edge:#6028c0;
+
+    --shadow-card:0 1px 2px rgba(11,31,58,.06),0 8px 24px rgba(11,31,58,.07);
+    --maxw:1480px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #fbf7ee 0%, transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    line-height:1.6;
+  }
+  /* faint paper grain */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(rgba(120,100,60,.035) 1px,transparent 1px);
+    background-size:3px 3px;mix-blend-mode:multiply;
+  }
+
+  /* ---------- top nav ---------- */
+  header.top{
+    position:sticky;top:0;z-index:50;
+    background:linear-gradient(180deg,var(--navy) 0%,var(--navy-2) 100%);
+    color:#eaf1fb;border-bottom:1px solid var(--navy-line);
+    box-shadow:0 6px 20px rgba(11,31,58,.25);
+  }
+  .top-inner{max-width:var(--maxw);margin:0 auto;padding:14px 26px}
+  .brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .brand .tag{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:#7fa8df;border:1px solid #2c4a78;
+    padding:3px 9px;border-radius:999px;
+  }
+  .brand h1{
+    font-family:Lora,serif;font-weight:600;font-size:clamp(1.05rem,1.4vw,1.5rem);
+    margin:0;letter-spacing:.01em;color:#fff;
+  }
+  .brand .course{font-size:12.5px;color:#9db8de;margin-left:auto;text-align:right;line-height:1.35}
+
+  /* legend */
+  .legend{display:flex;gap:8px 16px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .legend .lab{font-size:11px;color:#9db8de;letter-spacing:.12em;text-transform:uppercase;margin-right:2px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#dce7f6}
+  .chip i{width:15px;height:15px;border-radius:4px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
+  .chip.thesis i{background:var(--c-thesis)}
+  .chip.concept i{background:var(--c-concept)}
+  .chip.evidence i{background:var(--c-evidence)}
+  .chip.concession i{background:var(--c-concession)}
+  .chip.method i{background:var(--c-method)}
+
+  /* ---------- section nav ---------- */
+  nav.sections{
+    position:sticky;top:0;z-index:40;background:rgba(246,241,231,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);
+  }
+  .sec-inner{max-width:var(--maxw);margin:0 auto;padding:8px 26px;display:flex;gap:4px;overflow-x:auto}
+  nav.sections a{
+    white-space:nowrap;font-size:12.5px;font-weight:500;color:var(--ink-soft);
+    text-decoration:none;padding:6px 11px;border-radius:7px;transition:.18s;
+  }
+  nav.sections a:hover{background:var(--paper-2);color:var(--navy)}
+  nav.sections a.active{background:var(--navy);color:#fff}
+
+  /* ---------- layout ---------- */
+  main{max-width:var(--maxw);margin:0 auto;padding:30px 26px 80px;position:relative;z-index:1}
+  .section-head{
+    margin:46px 0 8px;padding-top:10px;
+  }
+  .section-head .eyebrow{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.2em;
+    color:var(--c-method);text-transform:uppercase;
+  }
+  .section-head h2{
+    font-family:Lora,serif;font-size:clamp(1.4rem,2.2vw,2rem);margin:.1em 0 0;
+    color:var(--navy);font-weight:600;letter-spacing:.005em;
+  }
+  .section-head .sub{font-size:13px;color:var(--ink-soft);margin-top:4px}
+
+  .row{
+    display:grid;grid-template-columns:1fr 1fr;gap:26px;
+    align-items:start;margin:18px 0;
+  }
+  /* original text column */
+  .orig{
+    font-family:Lora,serif;font-size:16.5px;line-height:1.74;color:var(--ink);
+    background:#fffdf8;border:1px solid var(--rule);border-radius:12px;
+    padding:20px 24px;box-shadow:var(--shadow-card);
+  }
+  .orig p{margin:0 0 14px}
+  .orig p:last-child{margin-bottom:0}
+  .orig .pn{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:#a99f86;
+    letter-spacing:.1em;display:block;margin-bottom:6px;
+  }
+  .orig .eq{
+    font-family:"IBM Plex Mono",monospace;font-size:14px;background:var(--paper-2);
+    border-left:3px solid var(--navy-line);padding:8px 12px;margin:10px 0;border-radius:6px;
+    overflow-x:auto;color:var(--navy-2);
+  }
+
+  /* highlight styles — intentional underline+wash, not a flat marker */
+  mark{padding:1px 2px;border-radius:3px;color:inherit;background:transparent;
+    box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.thesis{background:var(--c-thesis-bg);border-bottom:2px solid var(--c-thesis-edge)}
+  mark.concept{background:var(--c-concept-bg);border-bottom:2px solid var(--c-concept-edge);font-weight:500}
+  mark.evidence{background:var(--c-evidence-bg);border-bottom:2px solid var(--c-evidence-edge)}
+  mark.concession{background:var(--c-concession-bg);border-bottom:2px solid var(--c-concession-edge)}
+  mark.method{background:var(--c-method-bg);border-bottom:2px solid var(--c-method-edge)}
+
+  /* annotation card */
+  .note{
+    border-radius:12px;background:#fffdf8;border:1px solid var(--rule);
+    border-left:5px solid var(--navy-line);padding:16px 18px;box-shadow:var(--shadow-card);
+    font-size:14px;
+  }
+  .note.t-thesis{border-left-color:var(--c-thesis-edge)}
+  .note.t-concept{border-left-color:var(--c-concept-edge)}
+  .note.t-evidence{border-left-color:var(--c-evidence-edge)}
+  .note.t-concession{border-left-color:var(--c-concession-edge)}
+  .note.t-method{border-left-color:var(--c-method-edge)}
+
+  .note .role{
+    display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;
+    padding:3px 9px;border-radius:999px;margin-bottom:10px;
+    background:var(--paper-2);color:var(--navy-2);
+  }
+  .note dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 10px}
+  .note dt{
+    font-weight:700;color:var(--navy);font-size:12.5px;white-space:nowrap;
+    font-family:"IBM Plex Sans";
+  }
+  .note dd{margin:0;color:#3f3a30}
+  .note dd b{color:var(--c-concept);font-weight:600}
+  .note .flag{
+    margin-top:11px;padding:9px 11px;border-radius:8px;font-size:13px;
+    background:#fbf3e3;border:1px dashed var(--c-thesis-edge);color:#6b5414;
+  }
+  .note .flag.warn{background:#f7e3df;border-color:var(--c-concept-edge);color:#7a2a20}
+  .note .flag b{font-weight:700}
+  .note .flag::before{content:"⚑ ";font-weight:700}
+
+  /* ---------- bottom synthesis ---------- */
+  .synth{
+    margin-top:70px;background:linear-gradient(165deg,var(--navy) 0%,#13325c 100%);
+    color:#e9f0fb;border-radius:18px;padding:40px clamp(22px,4vw,56px);
+    box-shadow:0 20px 50px rgba(11,31,58,.35);position:relative;overflow:hidden;
+  }
+  .synth::after{content:"";position:absolute;width:380px;height:380px;right:-120px;top:-120px;
+    background:radial-gradient(circle,rgba(124,58,237,.35),transparent 65%);}
+  .synth h2{font-family:Lora,serif;font-size:clamp(1.5rem,2.5vw,2.1rem);margin:0 0 6px;color:#fff}
+  .synth .lead{color:#a9c2e6;font-size:14px;margin-bottom:28px}
+  .skeleton{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:26px 0 30px}
+  .skeleton .step{
+    flex:1 1 150px;background:rgba(255,255,255,.05);border:1px solid #2c4a78;
+    border-radius:12px;padding:14px 16px;position:relative;
+  }
+  .skeleton .step .k{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#7fa8df;letter-spacing:.15em}
+  .skeleton .step .v{font-size:14px;margin-top:6px;color:#eaf1fb;font-weight:500}
+  .skeleton .arrow{display:flex;align-items:center;color:#5b7bb0;font-size:22px}
+  .onesent{
+    background:rgba(232,163,23,.12);border:1px solid var(--c-thesis-edge);border-radius:12px;
+    padding:18px 22px;font-family:Lora,serif;font-size:17px;line-height:1.6;color:#fdebc0;margin:8px 0 30px;
+  }
+  .onesent b{color:#ffd980}
+  .sw-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .sw{border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.6}
+  .sw.strong{background:rgba(46,139,87,.14);border:1px solid var(--c-concession-edge)}
+  .sw.weak{background:rgba(192,57,43,.14);border:1px solid var(--c-concept-edge)}
+  .sw h3{margin:0 0 8px;font-size:14px;font-family:"IBM Plex Sans";letter-spacing:.04em}
+  .sw.strong h3{color:#8ee0ad}
+  .sw.weak h3{color:#f3a99e}
+  .sw p{margin:0;color:#dce7f6}
+
+  footer{max-width:var(--maxw);margin:0 auto;padding:30px 26px;color:var(--ink-soft);font-size:12.5px;text-align:center}
+
+  @media(max-width:900px){
+    .row{grid-template-columns:1fr;gap:12px}
+    .orig{order:1}.note{order:2}
+    .sw-grid{grid-template-columns:1fr}
+    .skeleton{flex-direction:column}.skeleton .arrow{transform:rotate(90deg);justify-content:center}
+    .brand .course{margin-left:0;text-align:left;width:100%}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <span class="tag">Paper Annotation</span>
+      <h1>URPlanner: A Universal Paradigm for Collision-Free Robotic Motion Planning Based on Deep Reinforcement Learning</h1>
+      <span class="course">機器人運動規劃 · 論文精讀批注<br>Ying et&nbsp;al., arXiv:2505.20175 (2025)</span>
+    </div>
+    <div class="legend">
+      <span class="lab">維度圖例</span>
+      <span class="chip thesis"><i></i>核心論點 / Thesis</span>
+      <span class="chip concept"><i></i>關鍵概念 / 術語</span>
+      <span class="chip evidence"><i></i>實證證據 / 數據</span>
+      <span class="chip concession"><i></i>讓步 / 反駁處理</span>
+      <span class="chip method"><i></i>方法論說明</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sections">
+  <div class="sec-inner">
+    <a href="#abs">Abstract</a>
+    <a href="#intro">I. 引言與動機</a>
+    <a href="#contrib">I-B. 貢獻</a>
+    <a href="#prob">II. 問題形式化</a>
+    <a href="#param">III. 空間參數化 / UOAR</a>
+    <a href="#ape2">IV. APE2 演算法</a>
+    <a href="#ed2">V. 專家資料擴散 ED2</a>
+    <a href="#impl">VI. 整體實作</a>
+    <a href="#exp">VII. 實驗結果</a>
+    <a href="#disc">VIII. 討論</a>
+    <a href="#concl">IX. 結論</a>
+    <a href="#synth">★ 論證骨架總覽</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ ABSTRACT ============ -->
+<div class="section-head" id="abs">
+  <span class="eyebrow">Abstract</span>
+  <h2>摘要</h2>
+  <div class="sub">全文論證的壓縮版：問題 → 三項方法貢獻 → 驗證承諾</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">Abstract</span>
+    <p><mark class="concept">Collision-free motion planning for redundant robot manipulators</mark> in complex environments is yet to be explored. Although recent advancements at the intersection of deep reinforcement learning (DRL) and robotics have highlighted its potential, <mark class="thesis">current DRL-based collision-free motion planners for manipulators are highly costly, hindering their deployment and application.</mark> This is due to an <mark class="concept">overreliance on the minimum distance</mark> between the manipulator and obstacles, inadequate exploration and decision-making by DRL, and inefficient data acquisition and utilization.</p>
+    <p>In this article, we propose <mark class="thesis">URPlanner, a universal paradigm for collision-free robotic motion planning based on DRL.</mark> URPlanner offers several advantages: it is <mark class="concept">platform-agnostic, cost-effective</mark> in both training and deployment, and <mark class="concept">applicable to arbitrary manipulators without solving inverse kinematics.</mark></p>
+    <p>To achieve this, we first develop a <mark class="method">parameterized task space and a universal obstacle avoidance reward (UOAR) that is independent of minimum distance.</mark> Second, we introduce an <mark class="method">augmented policy exploration and evaluation algorithm (APE2)</mark> that can be applied to various DRL algorithms. Third, we propose an <mark class="method">expert data diffusion (ED2) strategy</mark>, which can produce a large-scale trajectory dataset from only a few expert demonstrations. Finally, <mark class="evidence">the superiority of the proposed methods is comprehensively verified through experiments.</mark></p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：全文縮影 / 問題—方案—承諾</span>
+    <dl>
+      <dt>① 功能</dt><dd>標準摘要三段式：先點出<b>研究缺口</b>（現有 DRL 規劃器昂貴、難部署），再宣告<b>解決方案</b>（URPlanner 及三項貢獻），最後給出<b>驗證承諾</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>論證鏈的「總命題」節點。三項貢獻（UOAR / APE2 / ED2）分別對應作者診斷的三個病灶——這是全文最關鍵的<b>一對一映射</b>，後續每一節都在償還這裡開出的承諾。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「三病灶 → 三藥方」的對稱結構讓貢獻顯得必然而非拼湊。潛在漏洞：「universal / platform-agnostic」是極強的宣稱，摘要未限定邊界（靜態障礙、需已知 DH 參數），易被審稿人視為 over-claim。</dd>
+    </dl>
+    <div class="flag">「universal」「platform-agnostic」屬於高風險形容詞，需在正文用明確定義收斂——留意 §I-B 是否補上限定條件。</div>
+  </div>
+</div>
+
+<!-- ============ INTRODUCTION ============ -->
+<div class="section-head" id="intro">
+  <span class="eyebrow">Section I-A</span>
+  <h2>引言：動機與相關工作</h2>
+  <div class="sub">建立「傳統法 vs 學習法」二分，並逐一拆解三個 DRL 既有缺陷</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">I-A ¶1–2</span>
+    <p>Robot manipulators have been increasingly utilized across diverse environments. Particularly, <mark class="concept">redundant manipulators</mark> can move more flexibly and are more adaptable due to their enhanced ability to avoid collision and singularity. However, <mark class="thesis">the increased environmental complexity and robotic redundancy have also significantly complicated the collision-free motion planning problem.</mark></p>
+    <p>Traditional motion planning (TMP) methods, such as RRT and PRM, are <mark class="concept">probabilistically complete</mark>; this ensures a solution can always be found if it exists, as long as the search time approaches infinite. However, <mark class="concession">the path they find is non-optimal.</mark> Their variants RRT* and PRM* can find asymptotically optimal paths, but the optimization ability is limited as they do not leverage information from past experiences.</p>
+  </div>
+  <div class="note t-concept">
+    <span class="role">段落功能：背景鋪陳 + 對手定位</span>
+    <dl>
+      <dt>① 功能</dt><dd>建立問題重要性（冗餘機械臂越靈活 → 規劃越難），並把<b>傳統法（TMP）</b>立為第一個論敵。</dd>
+      <dt>② 邏輯角色</dt><dd>「對手1」的設定。作者承認 TMP 的優點（機率完備）後立刻轉折其致命傷（非最優、不能從經驗學習），這是典型的<b>讓步—反轉</b>結構。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：先給對手公平評價再批評，增加可信度。論證上把「不能利用過去經驗」設為缺陷，正好為後文「學習法」鋪墊，敘事誘導性強。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">I-A ¶3–4</span>
+    <p>Additionally, traditional methods rely on solving <mark class="concept">inverse kinematics (IK)</mark> to map trajectories from Cartesian to joint space. For redundant manipulators, the procedures can be complicated and time-consuming since there are <mark class="evidence">infinite IK solutions for each waypoint.</mark> By contrast, some learning-based methods can bypass solving the IK and directly learn a policy capable of reaching the target point by constantly controlling the joint rotation.</p>
+    <p>DRL is particularly suited for the intricate robotic motion planning problem. <mark class="concession">Despite the advancements, three main deficiencies persistently hinder its effectiveness and efficiency in real-world deployment.</mark></p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：轉向己方陣營 + 開出問題清單</span>
+    <dl>
+      <dt>① 功能</dt><dd>確立「<b>免 IK</b>」是學習法相對傳統法的核心優勢，並拋出本文真正要打的靶：DRL 自身的<b>三大缺陷</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>論證鏈的樞紐句。「three main deficiencies」是一個<b>承上啟下的清單承諾</b>，下面三段逐一展開，與摘要的三項貢獻精確對齊。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「even DRL has problems」的自我批評姿態，使後續方案顯得是對症下藥。結構工整到近乎公式化，但閱讀效率極高。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">I-A ¶5–7（三缺陷）</span>
+    <p><b>Firstly</b>, the <mark class="concept">obstacle avoidance ability</mark> is rarely considered. Current dense rewards heavily rely on the <mark class="concept">minimum distance</mark> information. For example, Sui et al. designed a linear reward proportional to the minimum distance; Ying et al. proposed a quadratic reward. However, <mark class="concession">these methods idealistically assume that the minimum distance can be accurately and efficiently obtained, while in practice it requires the geometry of all objects, sufficient sensors, and complex analyses.</mark></p>
+    <p><b>Secondly</b>, current DRL methods exhibit limitations in exploration and decision-making. Most algorithms (DDPG, TD3) produce only a single action then explore once by adding a random noise — <mark class="evidence">the single-action approach causes a lack of diversity and scalability.</mark> Multi-actor / multi-critic structures help but are inefficient or unstable in early training.</p>
+    <p><b>Thirdly</b>, <mark class="concept">data acquisition and utilization pose significant challenges.</mark> Policy optimization relies on large-scale data; prioritized experience replay helps but its effect is limited under dense reward; expert demonstrations are beneficial but acquiring substantial expert data requires extensive manual effort.</p>
+  </div>
+  <div class="note t-concession">
+    <span class="role">段落功能：三缺陷的證據化展開（讓步處理）</span>
+    <dl>
+      <dt>① 功能</dt><dd>把三個抽象缺陷各自落到<b>具體文獻 + 具體弱點</b>，為三項貢獻的「必要性」鋪設地基。</dd>
+      <dt>② 邏輯角色</dt><dd>這是全文最重要的<b>反方證據集合</b>。注意作者攻擊的核心是「minimum distance 的<b>可得性假設</b>」——這個攻擊點直接決定 UOAR 的賣點是否成立。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：對每個既有方法都「先肯定再指出隱含假設」，攻擊的是<b>前提</b>而非結論，難以反駁。<b>潛在漏洞</b>：作者宣稱最小距離「難以準確高效獲得」，但後文 §VII 又能用參數化空間近似算出 MD（PLR/CAR/COR 都在參數空間訓練）——這暴露了攻擊力度被自己稍微削弱。</dd>
+    </dl>
+    <div class="flag warn">邏輯張力：第一缺陷主張「MD 難取得」，但實驗證明 MD 可在參數空間近似取得——真正優勢其實是「<b>免去 MD 計算成本</b>」而非「MD 不可得」。論點宜由「不可得」收斂為「不經濟」。</div>
+  </div>
+</div>
+
+<!-- ============ CONTRIBUTIONS ============ -->
+<div class="section-head" id="contrib">
+  <span class="eyebrow">Section I-B</span>
+  <h2>貢獻與術語定義</h2>
+  <div class="sub">兌現摘要承諾，並為高風險形容詞補上嚴格定義</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">I-B 定義</span>
+    <p>The definition of some critical terms is given as follows:</p>
+    <p><b>1) platform-agnostic:</b> refers to two aspects: (i) the training of our motion planning scheme is <mark class="concept">independent of interaction with any specific simulated or real-world robotic platform</mark>, owing to the parameterized task space; and (ii) the trained policy can be applied to the corresponding task scenario built on any simulated or real-world platform.</p>
+    <p><b>2) universal:</b> means the proposed URPlanner can, in theory, be applied to train any manipulator in any given task scenario. <mark class="concession">However, the Denavit-Hartenberg parameters of the manipulator and the radii of the cylinders encapsulating the links should be provided.</mark></p>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：定義收斂（償還摘要的 over-claim 風險）</span>
+    <dl>
+      <dt>① 功能</dt><dd>把摘要中高風險的「platform-agnostic / universal」用<b>操作型定義</b>釘死，並明確列出前提（需提供 DH 參數與連桿半徑）。</dd>
+      <dt>② 邏輯角色</dt><dd>防禦性論證節點。回應了我們在摘要處標記的隱憂——作者其實有意識地收斂宣稱範圍，這是成熟的寫作。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：「in theory … However …」主動暴露邊界，降低被審稿人攻擊的面積。漏洞：仍迴避了「<b>僅限靜態障礙</b>」這一最大限制，該限制要到 §VIII-D 與結論才坦白。</dd>
+    </dl>
+    <div class="flag">「universal」的真實邊界 = 已知 DH 參數 + 圓柱半徑 + <b>靜態</b>障礙布局。靜態假設是延伸研究（動態環境）的最大切入點。</div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">I-B 三貢獻</span>
+    <p><mark class="thesis">1) A universal obstacle avoidance reward (UOAR)</mark> is designed. The reward is dense, independent of minimum distance, and easily calculated — obstacles and manipulator are represented by bounding boxes and line segments; the overlap length of each line segment with each bounding box is inferred as the UOAR, combined with a pose reward.</p>
+    <p><mark class="thesis">2) An augmented policy exploration and evaluation (APE2) algorithm</mark> is proposed, applicable to various DRL algorithms. It generates diverse action candidates (enhanced exploration) and uses a hybrid policy evaluation considering both immediate and long-term feedback.</p>
+    <p><mark class="thesis">3) An expert data diffusion (ED2) strategy</mark> is proposed — a diffusion model generates a large-scale trajectory dataset from only a few demonstrations; two integration methods (BC synergy vs. data compensation) are explored.</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：三項核心主張的正式宣告</span>
+    <dl>
+      <dt>① 功能</dt><dd>逐條定義三項貢獻的<b>機制</b>，不只是名稱：UOAR=重疊長度法、APE2=多候選+混合評估、ED2=擴散模型造資料。</dd>
+      <dt>② 邏輯角色</dt><dd>三條主論點（thesis 的三個子命題），構成 §III / §IV / §V 三章的標題與骨幹。論證上是「<b>缺陷i → 貢獻i</b>」的閉環。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：每項貢獻都先給「是什麼」再給「怎麼算」，可驗證性高。三項貢獻彼此<b>正交</b>（獎勵設計／演算法／資料），降低了「只是調參」的質疑。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- ============ PROBLEM FORMULATION ============ -->
+<div class="section-head" id="prob">
+  <span class="eyebrow">Section II</span>
+  <h2>問題形式化：MDP 與免 IK 動作空間</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">II 形式化</span>
+    <p>A motion planning problem is to find a sequence of collision-free configurations. It is formulated as a <mark class="method">Markov decision process (MDP)</mark>: at time t the agent captures state s<sub>t</sub>, takes action a<sub>t</sub>, transits to s<sub>t+1</sub>, and receives reward r<sub>t</sub>.</p>
+    <div class="eq">G<sub>t</sub> = r<sub>t</sub> + ξ·r<sub>t+1</sub> + ξ²·r<sub>t+2</sub> + … = r<sub>t</sub> + ξ·G<sub>t+1</sub>　(1)</div>
+    <p>In comparison to [7], we <mark class="thesis">remove the minimum distance information from s<sub>t</sub></mark> to make it more concise and practical:</p>
+    <div class="eq">s<sub>t</sub> = [q<sub>t</sub>, p<sub>T</sub>, p<sub>G</sub>, Δp, Δo, D]　(2)</div>
+    <p>We let the manipulator directly learn sequential rotations of its joints to <mark class="concept">bypass IK</mark>:</p>
+    <div class="eq">a<sub>t</sub> = [Δq<sub>1</sub>, Δq<sub>2</sub>, …, Δq<sub>i</sub>]　(3)</div>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：把問題翻譯成可學習的數學物件</span>
+    <dl>
+      <dt>① 功能</dt><dd>將運動規劃定義為 MDP，並做出兩個<b>關鍵設計決策</b>：狀態中移除 MD（呼應貢獻1）、動作設為關節角增量（呼應「免 IK」賣點）。</dd>
+      <dt>② 邏輯角色</dt><dd>承接 §I 的批評、預備 §III 的獎勵。Eq.(2) 移除 MD 是 UOAR 能成立的<b>前置條件</b>；Eq.(3) 的關節增量動作是「platform-agnostic」的數學根據。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「in comparison to [7]」明確標出與最接近前作的差異點，凸顯增量貢獻。漏洞：狀態 s<sub>t</sub> 不含任何障礙物資訊——這在靜態布局下成立，但正是<b>動態環境失效的根因</b>（§VIII-D 自承）。</dd>
+    </dl>
+    <div class="flag">Eq.(2) 的狀態向量<b>不編碼障礙物</b>。靜態場景靠策略「記住」障礙；一旦障礙會動，此狀態表徵立即不足——延伸題目的理論起點。</div>
+  </div>
+</div>
+
+<!-- ============ PARAMETERIZATION / UOAR ============ -->
+<div class="section-head" id="param">
+  <span class="eyebrow">Section III</span>
+  <h2>空間參數化與 UOAR 獎勵塑形</h2>
+  <div class="sub">貢獻 1 的完整技術實現：用「重疊長度」取代「最小距離」</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">III-A 參數化</span>
+    <p>The spatial occupancy of an obstacle with arbitrary geometry can be approximated using one or more <mark class="method">axis-aligned bounding boxes (AABBs)</mark>. Each link of the manipulator is simplified and parameterized as a <mark class="method">line segment enclosed by a cylinder with radius a<sub>r</sub></mark>:</p>
+    <div class="eq">s<sub>i</sub><sup>i-1</sup> = p<sub>i-1</sub> + (p<sub>i-1</sub>p<sub>i</sub>)·λ,　0 ≤ λ ≤ 1　(6)</div>
+    <p>By <mark class="concept">expanding the bounding boxes</mark> to include the radius a<sub>r</sub> and a safety offset a<sub>o</sub>, the whole collision-free problem transforms into ensuring line segments avoid intersections with the expanded boxes. This establishes a <mark class="concept">buffer zone</mark> aligning with clearance-based planning.</p>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：建立幾何抽象（方法論核心）</span>
+    <dl>
+      <dt>① 功能</dt><dd>定義整個方法賴以運作的<b>幾何模型</b>：障礙=AABB、連桿=線段，碰撞檢查=線段 vs 膨脹盒。</dd>
+      <dt>② 邏輯角色</dt><dd>UOAR 的數學容器。把「機械臂避障」化約為「線段不穿越盒子」，是後面所有計算可解析化、可微化思路的根。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「膨脹盒 = 連桿半徑 + 安全偏移」一步把半徑問題吸收進盒子，使線段可視為零半徑，計算大幅簡化。漏洞：AABB 對細長/旋轉障礙過度保守，作者在 §VIII-D 承認「窄通道」受限並提出多線段補丁。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">III-B UOAR 定義</span>
+    <p>The intersections of the line with bounding-box planes are solved via λ<sup>near</sup>, λ<sup>far</sup>. The segment intersects the box iff:</p>
+    <div class="eq">max(λ<sub>x</sub><sup>near</sup>, λ<sub>y</sub><sup>near</sup>, λ<sub>z</sub><sup>near</sup>, 0) ≤ min(λ<sub>x</sub><sup>far</sup>, λ<sub>y</sub><sup>far</sup>, λ<sub>z</sub><sup>far</sup>, 1)　(8)</div>
+    <p>The overlapping length is l = |λ<sup>far</sup> − λ<sup>near</sup>|·|p<sub>s</sub>p<sub>e</sub>|. The <mark class="thesis">UOAR aggregates total overlap over all G boxes and J segments, normalized by total link length:</mark></p>
+    <div class="eq">r<sub>UOAR</sub> = − (Σ<sub>j</sub> Σ<sub>g</sub> l<sub>jg</sub>) / (Σ<sub>j</sub> L<sub>j</sub>)　(10)</div>
+    <p><mark class="thesis">The proposed UOAR transforms the complex problem of calculating minimum distances into a simpler problem of avoiding overlaps with bounding boxes.</mark> The pose reward r<sub>pose</sub> = −(e<sub>p</sub> + e<sub>o</sub>) + φ<sub>aux</sub> + φ<sub>G</sub>; the integrative reward r = r<sub>pose</sub> + ζ·r<sub>UOAR</sub>　(12).</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：兌現貢獻 1（從「距離」到「重疊」的範式轉換）</span>
+    <dl>
+      <dt>① 功能</dt><dd>給出 UOAR 的封閉解析式（Eq.10），並把它與位姿獎勵線性組合成總獎勵（Eq.12）。</dd>
+      <dt>② 邏輯角色</dt><dd>這是<b>論點1的證明段</b>。核心修辭句「transforms … minimum distances into … avoiding overlaps」正是貢獻1的一句話精華。獎勵為<b>稠密</b>（重疊長度連續變化）→ 直接解決第一缺陷中「稀疏獎勵學不動」的問題。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用<b>歸一化重疊長度</b>同時達成稠密 + 尺度無關 + 無需 MD 三個目標，是設計上的精彩之處。漏洞：當線段完全在盒外時 l=0，獎勵=0，<b>盒外無梯度</b>——只在「接近並侵入」時提供方向性，遠距離避障的引導其實來自 pose reward 而非 UOAR。權重 ζ 的選取也未做敏感度分析。</dd>
+    </dl>
+    <div class="flag">UOAR 的梯度只在「線段已侵入膨脹盒」時非零。對動態障礙而言，等到侵入才有訊號可能太晚——延伸研究可考慮加入「<b>預測性侵入</b>」或時間到碰撞 (TTC) 項。</div>
+  </div>
+</div>
+
+<!-- ============ APE2 ============ -->
+<div class="section-head" id="ape2">
+  <span class="eyebrow">Section IV</span>
+  <h2>APE2：增強策略探索與評估</h2>
+  <div class="sub">貢獻 2：用「多候選動作 + 混合 Q 評估」對抗探索貧乏與評估偏差</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">IV-A 增強探索</span>
+    <p>Algorithms based on deterministic policy gradient produce only a single action a<sub>t</sub> = μ(s<sub>t</sub>). To improve exploration, APE2 generates an <mark class="thesis">action set</mark> A<sub>t</sub> with diverse and large-scale candidates:</p>
+    <div class="eq">a<sub>t</sub><sup>(σ<sub>m</sub>,n)</sup> = a<sub>t</sub> + 𝒩(0, σ<sub>m</sub>²)　(14)</div>
+    <p>M = number of Gaussian noises with diverse variance; N = times each action is explored. APE2 can efficiently explore <mark class="evidence">M×N+1 action candidates</mark> for the agent to select.</p>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：解決第二缺陷之「探索」面</span>
+    <dl>
+      <dt>① 功能</dt><dd>把單一動作+單一噪聲，擴展為「多種變異數 × 多次採樣」的<b>動作候選池</b>（M×N+1 個）。</dd>
+      <dt>② 邏輯角色</dt><dd>貢獻2的前半。針對 §I-A 第二缺陷「single-action 缺乏多樣性」的直接對應解法。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：保留確定性策略梯度的樣本效率，只在「動作輸出端」增量擴展，故可<b>外掛到任意 DRL</b>（DDPG/TD3/E3AC 皆可）——這是「演算法通用」宣稱的根據。漏洞：M×N 候選需逐一過 critic 評估，<b>推論成本隨候選數線性上升</b>，論文未量化這部分開銷。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">IV-B 混合評估</span>
+    <p>The hybrid policy evaluation consists of both the Q-value (long-term) and the reward (immediate). The integrative Q-value over K critics:</p>
+    <div class="eq">Q<sub>LTR</sub> = (1/K) Σ<sub>k</sub> Q<sub>k</sub>(s<sub>t</sub>, a<sub>t</sub>; θ<sub>k</sub>)　(15)</div>
+    <p>The immediate return R<sub>IR</sub> = Σ<sub>h</sub> r<sub>t−1+h</sub>. Hybrid evaluation V<sub>HPE</sub> = [η, 1−η]·[Q<sub>LTR</sub>, R<sub>IR</sub>]ᵀ　(17), where η = clip(t<sub>c</sub>/T, 0, 1) <mark class="method">grows from 0 to 1</mark>: early training relies on accurate immediate return, later on long-term Q.</p>
+    <div class="eq">ā<sub>t</sub> = argmax<sub>a∈A<sub>t</sub></sub> V<sub>HPE</sub>　(18)</div>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：解決第二缺陷之「決策/評估」面</span>
+    <dl>
+      <dt>① 功能</dt><dd>提出<b>隨訓練進度加權</b>的評估：早期信任「短視但準確」的即時回報，後期信任「全局但需訓練成熟」的 Q 值；並用 K 個 critic 平均緩解單一 Q 偏差。</dd>
+      <dt>② 邏輯角色</dt><dd>貢獻2的後半。回應 §I-A「單 critic 早期評估不準」的批評；η 的時間退火是本節最聰明的設計。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用一個一維標量 η 統一了「探索期 vs 收斂期」的評估哲學，可解釋性強。漏洞：取 K critic 的<b>平均</b>而非最小（如 TD3）——作者承認這可能重新引入高估偏差，靠 (ΔQ)² 懲罰項勉強壓制，理論保證較弱（見 §IV remark）。H 與 K 的選擇偏經驗。</dd>
+    </dl>
+    <div class="flag warn">取平均 Q 放棄了 TD3 取最小值的保守性，理論上可能高估。實驗（Table IV）顯示 K 越大越穩，但缺乏「為何平均優於最小」的理論論證，屬經驗性主張。</div>
+  </div>
+</div>
+
+<!-- ============ ED2 ============ -->
+<div class="section-head" id="ed2">
+  <span class="eyebrow">Section V</span>
+  <h2>ED2：專家資料擴散與利用</h2>
+  <div class="sub">貢獻 3：用擴散模型「以少生多」，再以資料補償法注入 DRL</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">V-A 擴散生成</span>
+    <p>The diffusion model ε<sub>θ</sub> transforms a trajectory τ into white Gaussian noise via a Markovian forward process (Eq.22), then learns the inverse denoising process (Eq.24). <mark class="thesis">From only a few demonstrations, the trained model generates a large number of novel trajectories without environmental exploration.</mark> A temporal U-Net encodes the diffusion over trajectories.</p>
+    <p><mark class="concession">Although these trajectories are non-optimal, they enable the manipulator to move to various poses within the designated workspace.</mark> The parameterized space verifies (Eqs.7–8) that only collision-free trajectories are utilized.</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：兌現貢獻 3（解決第三缺陷：資料昂貴）</span>
+    <dl>
+      <dt>① 功能</dt><dd>用擴散模型把「少量人類示範」放大為「大規模軌跡資料集」，且生成過程<b>無需與環境互動</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>論點3的核心。直擊 §I-A 第三缺陷「取得專家資料需大量人力」。並主動讓步「生成的軌跡非最優」，再用參數空間做碰撞過濾兜底。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：「非最優但可用 + 碰撞可過濾」的雙重防線，把生成資料的品質風險降到可接受。參數空間能解析驗證碰撞，使「離線造資料」成本極低——與 UOAR 形成<b>協同</b>。漏洞：擴散模型仍需「幾條真實示範」起步，且生成軌跡分佈受示範覆蓋面限制（§VIII-C 才談如何鋪示範）。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">V-B / V-C 兩種利用法</span>
+    <p><b>Method 1 — Hybrid Policy (BC+DRL):</b> a<sub>t</sub> = μ<sub>BC</sub>(s<sub>t</sub>) + φ·ā<sub>t</sub>　(26). BC provides a base policy; DRL adds small actions to refine. <mark class="concession">But it can only plan motions with fixed N<sub>D</sub> steps and performance depends on demonstration quality.</mark></p>
+    <p><b>Method 2 — Data Compensation (DC):</b> batch data sampled from both interaction memory (IM) and expert memory (EM); B<sub>EM</sub> grows progressively. <mark class="thesis">Since the action is no longer restricted by BC, the agent can learn optimal policies even if the EM data are non-optimal.</mark> We adopt DC as the primary technique.</p>
+  </div>
+  <div class="note t-concession">
+    <span class="role">段落功能：兩方案對比 → 主動淘汰較弱者</span>
+    <dl>
+      <dt>① 功能</dt><dd>提出兩種把擴散資料注入 DRL 的方式，並<b>論證為何選 DC 而非 Hybrid</b>：Hybrid 受 BC 品質與固定步數束縛，DC 則不受限、能學到最優。</dd>
+      <dt>② 邏輯角色</dt><dd>方法選擇的<b>內部對抗論證</b>。作者沒有只給一個方案，而是並列兩者、用後續實驗（Fig.10 魯棒性）佐證 DC 較佳，論證更有說服力。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：「我們也試了直覺方案（BC），但它有結構性缺陷，所以選 DC」——這種<b>排除式論證</b>比直接宣告更可信。漏洞：DC 把非最優資料當「高覆蓋率引導」用，其有效性依賴 §VII-B3 的實驗，理論上為何非最優資料不會帶壞策略，解釋偏直覺。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- ============ IMPLEMENTATION ============ -->
+<div class="section-head" id="impl">
+  <span class="eyebrow">Section VI</span>
+  <h2>整體實作：三模組整合</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VI 整合</span>
+    <p>URPlanner consists of three modules: a <mark class="method">DRL module (APE2)</mark>, an <mark class="method">environment module (parameterized space + reward calc)</mark>, and an <mark class="method">efficient policy learning module (ED2)</mark>. Algorithm 2 gives the overall flow: initialize APE2 with K critics, fill EM by ED2, optionally train a BC model, then loop episodes — generate raw action, explore A<sub>t</sub>, evaluate V<sub>HPE</sub>, select ā<sub>t</sub>, execute, store, sample from IM(+EM), update networks.</p>
+  </div>
+  <div class="note t-method">
+    <span class="role">段落功能：把三項貢獻組裝成一個系統</span>
+    <dl>
+      <dt>① 功能</dt><dd>說明三貢獻如何在一個訓練迴圈中協作：環境模組（含 UOAR）算獎勵 → APE2 選動作 → ED2 提供補償資料。</dd>
+      <dt>② 邏輯角色</dt><dd>論證的<b>收束點</b>。把分散三章的子論點重新綁成「URPlanner = 三模組」的整體命題，呼應摘要。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用偽碼（Algorithm 2）讓抽象貢獻變成可復現流程，增強可信度。漏洞：三模組的<b>消融交互</b>未充分拆解——後文實驗多為「逐項加上去」，較少測「拿掉某一項」對其他項的影響。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- ============ EXPERIMENTS ============ -->
+<div class="section-head" id="exp">
+  <span class="eyebrow">Section VII</span>
+  <h2>實驗結果</h2>
+  <div class="sub">三項貢獻分別對照 SOTA：UOAR vs 其他獎勵、APE2 vs 各 DRL、ED2 vs 各資料法</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VII-B1 UOAR 評估</span>
+    <p>Compared with CAR, COR (MD-based) and PLR (points-to-line MD, platform-agnostic). <mark class="evidence">For 300 interactions: CAR 72.40s, COR 72.11s, PLR 9.351s, UOAR 0.776s.</mark> With 16 obstacles, UOAR 0.861s vs PLR 32.77s. <mark class="thesis">UOAR's computational advantage grows with obstacle count.</mark> Testing success all 100%; UOAR is the only one both MD-independent AND platform-agnostic, with "very high" practical value (Table III).</p>
+  </div>
+  <div class="note t-evidence">
+    <span class="role">段落功能：論點 1 的決定性數據</span>
+    <dl>
+      <dt>① 功能</dt><dd>用<b>計算時間</b>這一單一、清晰的指標證明 UOAR 的優勢：比 MD 法快兩個數量級，且優勢隨障礙數放大。</dd>
+      <dt>② 邏輯角色</dt><dd>貢獻1的實證支柱。注意成功率四法都≈100%——所以 UOAR 的賣點<b>不是「規劃更好」而是「同樣好但便宜得多」</b>，與我們在 §I 標記的「應由不可得收斂為不經濟」一致。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：選「計算時間 + 障礙數縮放」作為主指標，把優勢可視化得極清楚（0.776 vs 72.4 觸目驚心）。漏洞：成功率持平意味著 UOAR 不改善規劃品質本身；且 PLR 也屬 platform-agnostic，UOAR 的<b>唯一性賣點主要落在速度</b>。</dd>
+    </dl>
+    <div class="flag">這是全文<b>最強證據</b>：~90× 計算加速、隨障礙數擴大、成功率無損。論點清晰、指標單一、可複現。</div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VII-B2 APE2 評估</span>
+    <p>Applied to DDPG, TD3, E3AC. APE2:5C achieves <mark class="evidence">45.7% success in episodes 1–250 (vs DDPG 0%)</mark>, lowest reward fluctuation RF=30.4, converges ~250 episodes. Generalization (Table V): for goals 5–10 cm beyond trained area, <mark class="evidence">DDPG drops to 60%, TD3 58%, but all APE2 variants stay 100%.</mark> Performance improves with more critics → adopt APE2:5C.</p>
+  </div>
+  <div class="note t-evidence">
+    <span class="role">段落功能：論點 2 的多基準驗證</span>
+    <dl>
+      <dt>① 功能</dt><dd>證明 APE2 能<b>外掛強化任意 DRL</b>（三種骨幹皆提升），且顯著改善早期成功率、穩定性、與<b>外推泛化</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>貢獻2的實證支柱。泛化數據（unseen 5–10cm：100% vs 58–60%）是比訓練成功率更有說服力的證據，因為它測的是策略品質而非擬合。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「同一改造套在三個骨幹上都贏」論證通用性，比只比一個強。漏洞：critic 越多越好但成本越高，未給<b>成本—效益拐點</b>；APE2:5C 的 5 個 critic 在部署期的開銷未討論。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VII-C 真實機器人 / 規劃器對比</span>
+    <p>Table VII: vs RRT, RRT*, DDPG:CAR, DDPG:COR. <mark class="evidence">APE2:DC-ED2 — generation 0.060s, success 100%, trajectory 1.098m (shortest), MD 5.47cm (largest), score 4.987 (highest).</mark> RRT/RRT* unstable (RRT* success only 60%, TC=0 but GC up to 4s). Learning planners need training (10–13h) but generate in ms. <mark class="thesis">APE2:DC-ED2 achieves the best overall performance among six planners.</mark></p>
+  </div>
+  <div class="note t-evidence">
+    <span class="role">段落功能：系統級整合驗證（真實 Franka 機器人）</span>
+    <dl>
+      <dt>① 功能</dt><dd>把三項貢獻合體後與傳統法+其他學習法做<b>多維評分</b>（訓練成本/生成成本/成功率/軌跡長/最小距離），證明整體最優。</dd>
+      <dt>② 邏輯角色</dt><dd>全文論證的<b>最終裁決</b>。雷達圖式綜合評分（Fig.12）把所有子論點匯成一個總分，把「URPlanner 是更好範式」的總命題落地。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用一個合成 score 統合多指標，敘事乾淨。漏洞：score 用 min-max 正規化，<b>對比對象的選取會影響相對分數</b>；且軌跡最短+最小距離最大看似雙贏，但其實 5cm 安全偏移是調出來的（§VII-C 自承 a<sub>o</sub> 過大過小都不行），存在<b>超參數甜蜜點依賴</b>。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- ============ DISCUSSION ============ -->
+<div class="section-head" id="disc">
+  <span class="eyebrow">Section VIII</span>
+  <h2>討論：通用性、泛化、與擴展</h2>
+  <div class="sub">作者主動揭示邊界，並預告動態環境作為未來工作</div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VIII-B 泛化 / 策略庫</span>
+    <p>If the new environment differs significantly (new obstacles, manipulators, target areas), the model may struggle without retraining. We abstract obstacles as bounding boxes so the policy applies to any object enclosable by the trained box. <mark class="method">A policy library</mark> stores sub-policies per region; if no feasible sub-policy exists, a new one is auto-trained (a few minutes) and added. <mark class="concession">Transfer learning further refines sub-policies for new target areas / obstacle sizes.</mark></p>
+  </div>
+  <div class="note t-concession">
+    <span class="role">段落功能：承認泛化極限 + 給工程化補救</span>
+    <dl>
+      <dt>① 功能</dt><dd>坦承單一策略無法覆蓋所有場景，改用<b>策略庫 + 遷移學習</b>的工程手段擴大適用面。</dd>
+      <dt>② 邏輯角色</dt><dd>對「universal」宣稱的二次防禦。把「一個策略通用」務實地降級為「一套機制可快速生成所需策略」。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「便宜到幾分鐘就能補一個子策略」把泛化弱點轉化為「可運維特性」。漏洞：策略庫的<b>檢索/切換</b>機制與「子策略邊界判定」描述粗略；場景組合爆炸時策略庫規模未討論。</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">VIII-D 擴展 + 結論預告</span>
+    <p>URPlanner's conservative box expansion may limit navigation through <mark class="concession">narrow passages</mark>; remedy: approximate each link by multiple line segments. For <mark class="thesis">random obstacle layouts</mark>, obstacle info must enter the state — prior works include obstacle positions (limited when count/shape vary). We propose a <mark class="method">3D occupancy grid of fixed resolution</mark> so the state stays fixed-dimension while encoding arbitrary obstacles; the robot learns to navigate randomized configurations. <mark class="thesis">In future work, we explore URPlanner in dynamic environments with moving obstacles; a human partner may be modeled as a moving obstacle for HRC.</mark></p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：劃定邊界 + 為延伸研究鋪路</span>
+    <dl>
+      <dt>① 功能</dt><dd>明說三個限制與對策：窄通道（多線段）、隨機布局（佔據柵格狀態）、<b>動態環境（未來工作）</b>。</dd>
+      <dt>② 邏輯角色</dt><dd>論證鏈的<b>開放結尾</b>。把全文最大的未解問題（動態障礙）顯式留白——這正是碩士延伸題目的<b>官方授權入口</b>。佔據柵格的提案已暗示了動態狀態表徵的可行路線。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：用「我們已知道怎麼擴展、只是還沒做」的姿態收尾，把限制框成 roadmap 而非弱點。漏洞：佔據柵格會讓狀態維度暴增、訓練變難，作者也只說「未來進一步優化」——動態+柵格的可行性其實尚未驗證。</dd>
+    </dl>
+    <div class="flag">延伸研究的兩個官方鉤子：①3D 佔據柵格狀態表徵（處理障礙隨機/動態）②把人建模為移動障礙（HRC）。碩士題目應從「動態狀態表徵 + 預測性避障獎勵」切入。</div>
+  </div>
+</div>
+
+<!-- ============ CONCLUSION ============ -->
+<div class="section-head" id="concl">
+  <span class="eyebrow">Section IX</span>
+  <h2>結論</h2>
+</div>
+
+<div class="row">
+  <div class="orig">
+    <span class="pn">IX 結論</span>
+    <p>URPlanner is a <mark class="thesis">universal paradigm for collision-free robotic motion planning, platform-agnostic and highly cost-effective</mark> in both training and deployment, integrating parameterized task space, MD-independent UOAR, APE2, and ED2 with data compensation. <mark class="concession">One limitation: the approximation of obstacles and links may underutilize free space, as some collision-free regions are conservatively treated as unsafe.</mark> Future work: dynamic environments with moving obstacles.</p>
+  </div>
+  <div class="note t-thesis">
+    <span class="role">段落功能：回收總命題 + 誠實限制 + 未來指向</span>
+    <dl>
+      <dt>① 功能</dt><dd>重述三模組整合的總命題，承認「保守膨脹犧牲自由空間」的限制，再次點名動態環境為未來方向。</dd>
+      <dt>② 邏輯角色</dt><dd>論證閉環。與摘要首尾呼應，把「universal + cost-effective」作為最終定錨。</dd>
+      <dt>③ 技巧/漏洞</dt><dd>技巧：限制陳述具體（保守膨脹→自由空間浪費），顯示自知之明。漏洞：結論仍以「universal」收尾，但全文已證其僅限<b>靜態</b>場景——標題的宣稱與內容的邊界之間始終存在一道未完全閉合的縫隙。</dd>
+    </dl>
+  </div>
+</div>
+
+<!-- ============ SYNTHESIS ============ -->
+<section class="synth" id="synth">
+  <h2>★ 論證結構總覽</h2>
+  <div class="lead">全文邏輯骨架：問題 → 論點 → 證據 → 反駁處理 → 結論</div>
+
+  <div class="skeleton">
+    <div class="step"><div class="k">問題 PROBLEM</div><div class="v">現有 DRL 運動規劃器昂貴、難部署，源於三缺陷：依賴最小距離、探索/決策貧乏、資料取用低效</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">論點 THESIS</div><div class="v">URPlanner = 三正交藥方：UOAR（免 MD 稠密獎勵）+ APE2（多候選+混合評估）+ ED2（擴散造資料+補償）</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">證據 EVIDENCE</div><div class="v">UOAR 計算快 ~90×；APE2 套三骨幹皆提升、外推泛化 100%；整合系統在 6 規劃器中綜合分最高(4.987)</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">反駁 REBUTTAL</div><div class="v">主動收斂「universal」定義；對比並淘汰 Hybrid(BC) 選 DC；坦承窄通道/隨機/動態限制並給 roadmap</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="k">結論 CONCLUSION</div><div class="v">平台無關、訓練/部署皆低成本的通用範式；限制=保守膨脹浪費自由空間；未來=動態環境</div></div>
+  </div>
+
+  <div class="onesent">
+    <b>作者核心主張（一句話版）：</b>把「機械臂避障」從昂貴的<b>最小距離計算</b>重構為廉價的<b>線段—包圍盒重疊計算</b>，再搭配可外掛任意 DRL 的探索/評估增強與擴散式資料生成，就能得到一個<b>平台無關、訓練與部署皆低成本、免 IK 的通用無碰撞運動規劃範式</b>。
+  </div>
+
+  <div class="sw-grid">
+    <div class="sw strong">
+      <h3>◎ 論證最強處</h3>
+      <p><b>UOAR 的計算時間證據（Table II）。</b>指標單一（秒）、對照清晰（0.776s vs 72.4s）、且優勢隨障礙數放大（16 障礙時 0.861s vs 32.77s），同時成功率無損。這是「同樣好但便宜兩個數量級」的乾淨、可複現、難以反駁的論證——把抽象的「cost-effective」變成觸目驚心的具體數字。</p>
+    </div>
+    <div class="sw weak">
+      <h3>△ 論證最弱處</h3>
+      <p><b>「universal / 最小距離不可得」與正文自相張力。</b>摘要主張 MD「難以準確高效獲得」，但實驗中 PLR/CAR/COR 都能在參數空間近似算出 MD——真正優勢其實是「不經濟」而非「不可得」。加上「universal」全文以靜態障礙為前提卻未在標題/摘要設限，標題宣稱與內容邊界之間留有 over-claim 縫隙，是審稿人最可能施壓之處。</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  URPlanner 雙欄批注精讀 · 五維度邏輯分析（核心論點／關鍵概念／實證證據／讓步反駁／方法論）<br>
+  原文：Fengkang Ying, Hanwen Zhang, Haozhe Wang, Huishi Huang, Marcelo H. Ang Jr. — arXiv:2505.20175v1 (2025)
+</footer>
+
+<script>
+  // section nav active-state on scroll
+  const links=[...document.querySelectorAll('nav.sections a')];
+  const map=links.map(a=>({a,t:document.querySelector(a.getAttribute('href'))})).filter(x=>x.t);
+  const obs=new IntersectionObserver((es)=>{
+    es.forEach(e=>{if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const m=map.find(x=>x.t===e.target); if(m)m.a.classList.add('active');
+    }});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  map.forEach(x=>obs.observe(x.t));
+</script>
+</body>
+</html>

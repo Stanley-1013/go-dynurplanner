@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第六輪 · 研究藍圖：GO-DynURPlanner</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--ur:#2563b8;--key:#7c3aed;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);--maxw:1080px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .hero{max-width:var(--maxw);margin:0 auto;padding:46px 24px 14px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.6rem,3.2vw,2.5rem);line-height:1.18;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){h1{color:#dfeee7}}
+  h1 em{font-style:italic;color:var(--core)}
+  .deck{font-size:15px;color:var(--ink-soft);max-width:820px}
+  main{max-width:var(--maxw);margin:0 auto;padding:14px 24px 90px}
+  section{margin-top:50px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.3rem,2.2vw,1.85rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  h3.sub{font-family:Lora,serif;font-size:1.12rem;color:var(--navy-2);font-weight:600;margin:22px 0 7px}
+  @media (prefers-color-scheme: dark){h3.sub{color:#bcd6cb}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body,ul.body,ol.body{font-size:14.5px;line-height:1.8;max-width:820px}
+  ul.body li,ol.body li{margin-bottom:6px}
+  p.body b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){p.body b{color:#dfeee7}}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.core{border-color:var(--core);background:linear-gradient(180deg,rgba(15,157,119,.07),transparent),var(--paper-2)}
+  .card.key{border-color:var(--key);background:linear-gradient(180deg,rgba(124,58,237,.06),transparent),var(--paper-2)}
+  .card.bad{border-color:var(--bad)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.bad{background:var(--bad-bg);color:var(--bad)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  .tag.key{background:#ede6fb;color:var(--key)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox.key{border-left-color:var(--key)}
+  .verdictbox.bad{border-left-color:var(--bad)}
+  b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+  b.label.key{color:var(--key)}
+  b.label.bad{color:var(--bad)}
+  code.eq{display:block;background:#0f231f;color:#dff5ea;font-family:"IBM Plex Mono",monospace;font-size:12.5px;padding:12px 16px;border-radius:8px;overflow-x:auto;margin:10px 0;line-height:1.6}
+  code.eq .cm{color:#7fae9c}
+  a{color:var(--ur)}
+  .arch{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}
+  .arch .blk{background:var(--paper-2);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+  .arch .blk .h{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--core);margin-bottom:6px}
+  .arch .blk.k .h{color:var(--key)}
+  .arch .blk p{font-size:13px;margin:0;line-height:1.65}
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 6</span>
+    <a href="#audit">批判審計</a>
+    <a href="#keystone">拱心石</a>
+    <a href="#arch">系統設計</a>
+    <a href="#formal">形式核心</a>
+    <a href="#lemma">保守性引理</a>
+    <a href="#exp">實驗設計</a>
+    <a href="#novelty">新穎性帳本</a>
+    <a href="#phase">里程碑</a>
+    <a href="#advisor">給師兄</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="kicker">Loop 6 · Research Blueprint · Incorporating advisor's occupancy-grid directive</div>
+  <h1>GO-DynURPlanner：柵格觀測 × 解析真值 ×<em>連續時間安全</em>的完整研究藍圖</h1>
+  <p class="deck">師兄（URPlanner 一作）給了明確指令：<b>障礙區域用 occupancy grid 表徵、作為狀態觀測的一部分、與 RL 結合而非退回 search-based</b>。本輪以此為錨，對前五輪的全部積累做一次頂層整合與批判性審計——找出目前計畫的四個真實漏洞並逐一修補，其中最關鍵的修補（佔據預報輔助任務）同時成為整個系統的拱心石。產出：完整的系統設計、形式化核心（含一個可證明的保守性引理與具體數字）、以「穿隧率」為 Figure-1 的實驗設計、誠實的新穎性帳本、與分階段里程碑。</p>
+</div>
+
+<main>
+
+<section id="audit">
+  <div class="eyebrow">Critical Audit</div>
+  <h2 class="sec">批判審計：目前計畫（Loop 5 + 師兄指令）的四個真實漏洞</h2>
+  <div class="rule"></div>
+  <p class="body">把自己當成 RA-L/CoRL 審稿人來打自己的計畫，找到四個非修不可的洞。每個都附修法——其中洞①的修法會升級成整篇論文的拱心石。</p>
+
+  <div class="card bad">
+    <b class="label bad">洞① · 觀測-獎勵資訊鴻溝（最嚴重，可致訓練直接失敗）</b>
+    <p class="body" style="margin:0">計畫讓 policy 觀測 occupancy grid、但獎勵（D-UOAR-CT）依賴障礙<b>速度</b>的特權資訊。問題：<b>單幀佔據柵格不含任何速度資訊</b>——同一個柵格快照，障礙「正在逼近」與「正在遠離」完全不可分，價值函數學不出來（POMDP 崩壞，Loop 2 已引 Hart et al. 2112.12465 證明幀堆疊/LSTM 都不能穩定完全恢復缺失的速度）。若只是天真地堆疊 k 幀丟給 3D-CNN，速度資訊「原則上在裡面」但網路未必抽得出來——這正是 Hart 實證的失效模式。<b>修法見拱心石一節：用佔據預報（occupancy forecasting）輔助任務強制把運動資訊壓進潛向量。</b></p>
+  </div>
+
+  <div class="card bad">
+    <b class="label bad">洞② · τ-線性化誤差從未被定量（審稿人必問）</b>
+    <p class="body" style="margin:0">Part⑤ 的連續時間推導假設連桿端點在 [t,t+Δt] 內走直線（弦近似），但關節旋轉使真實軌跡是弧。Loop 3 誠實列了這個未決問題但沒解。<b>修法：把它變成引理而非道歉</b>——旋轉 δθ 的關節、半徑 R 處的點，弧對弦的最大偏差 = R(1−cos(δθ/2)) ≈ <b>Rδθ²/8</b>。具體數字：δθ=0.1 rad、R=1m → 單關節 1.25mm；7 關節同動保守疊加 ≈ 8.75mm。把這個界<b>加進膨脹盒的安全偏移</b>，連續時間檢查就從「近似」變成「可證明保守」（見保守性引理）。~1cm 的膨脹代價換一個定理，穩賺。</p>
+  </div>
+
+  <div class="card bad">
+    <b class="label bad">洞③ · 「柵格當狀態」本身不是新穎性（先行文獻存在）</b>
+    <p class="body" style="margin:0">本輪查證<span class="tag low">摘要層級</span>：voxel/occupancy 特徵當 manipulator RL 狀態已有先例（DexRepNet 抓取、離散規劃橋接工作等），移動機器人領域也已有「速度估計輔助任務」（MDRLAT, Sensors 2021）。<b>所以論文不能把「用了柵格」當貢獻宣稱</b>。修法：新穎性錨定在三個真正沒人做的組合點——(i) 佔據<b>預報</b>（而非速度回歸）作為 manipulator 動態避障的輔助任務；(ii) 柵格觀測與<b>解析連續時間碰撞真值</b>的師徒式耦合；(iii) 柵格由參數化空間<b>解析光柵化</b>生成、全程免模擬器（下詳）。</p>
+  </div>
+
+  <div class="card bad">
+    <b class="label bad">洞④ · 屏蔽（Shield）的部署斷層</b>
+    <p class="body" style="margin:0">訓練時屏蔽用特權 AABB+速度做區間根檢查——但部署時真實世界只有深度相機的體素/點雲，<b>沒有乾淨的盒參數與追蹤好的速度</b>，屏蔽豈不失效？修法（本輪新發現，很優雅）：<b>體素本身就是小 AABB</b>——同一套 λ(τ) 區間根數學逐體素適用，零改動；體素的「速度」不需要顯式追蹤，直接用拱心石的<b>佔據預報器輸出的未來佔據</b>做檢查對象。屏蔽從「物件級盒」平滑退化到「體素級」，部署閉環完成。廣義相位剪枝（只查臂附近體素）控制成本。</p>
+  </div>
+</section>
+
+<section id="keystone">
+  <div class="eyebrow">The Keystone</div>
+  <h2 class="sec">拱心石：佔據預報輔助任務（Occupancy Forecasting as Auxiliary Task）</h2>
+  <div class="rule"></div>
+  <div class="verdictbox key">
+    <b class="label key">一句話</b>
+    <p class="body" style="margin:0">讓柵格編碼器在輸出策略潛向量 z<sub>t</sub> 的同時，<b>被迫預測 t+Δt 的佔據柵格</b>（自監督輔助頭）。預測未來佔據的唯一途徑是從歷史幀中抽出運動資訊——所以這個輔助損失<b>以結構強制的方式</b>把速度/趨勢壓進 z<sub>t</sub>，直接治癒洞①的 POMDP 崩壞，不需要任何人工設計的速度輸入或顯式追蹤。</p>
+  </div>
+  <p class="body">為什麼這一手在 URPlanner 生態裡特別漂亮——<b>監督訊號是免費的</b>：參數化空間裡障礙是解析的 AABB+速度，把未來時刻的盒解析光柵化成柵格（盒-體素求交是純索引算術，閉式）就得到預報的 ground truth，<b>不需要模擬器、不需要感測器、不需要人工標註</b>。這延續了 URPlanner「一切解析可算」的血統：ED2 用參數空間免費驗證擴散軌跡的碰撞，我們用參數空間免費生成預報監督——同一個哲學，不同的層。</p>
+  <p class="body">新穎性邊界（誠實）：佔據預報本身在自駕領域存在（occupancy flow）；「速度估計當輔助任務」在移動機器人存在（MDRLAT）。<b>沒人做過的是</b>：manipulator 動態避障 + 佔據預報輔助 + 預報器同時服務「訓練期潛狀態」與「部署期體素屏蔽的檢查對象」這個雙重角色。一個模組同時解洞①與洞④，是本設計最強的結構之美。<span class="tag low">novelty 需在動手前再做一輪窮盡式檢索確認</span></p>
+</section>
+
+<section id="arch">
+  <div class="eyebrow">System Design</div>
+  <h2 class="sec">系統設計：五個模組，每個都有 URPlanner 的血統</h2>
+  <div class="rule"></div>
+  <div class="arch">
+    <div class="blk"><div class="h">① 觀測 Observation</div><p><b>雙通道</b>：(a) URPlanner Eq.2 原封不動的本體感知向量 [q, p_T, p_G, Δp, Δo, D]；(b) 以末端執行器工作區為中心裁剪的 k 幀佔據柵格（建議 32³×k=3，先二值、消融試距離場版本）。柵格在訓練期由參數空間<b>解析光柵化</b>生成（免模擬器），部署期由 depth/nvblox 體素化自然給出——同一種資料型態，sim-to-real 介面乾淨。</p></div>
+    <div class="blk k"><div class="h">② 編碼器 + 預報頭（拱心石）</div><p>輕量 3D-CNN（或因子化 2D+1D 卷積省算力）→ 潛向量 z_t 進 policy/critic；同一主幹分出<b>預報頭</b>預測 t+Δt 佔據柵格，以解析光柵化的未來真值算 BCE/focal 輔助損失。λ_aux 權重消融。</p></div>
+    <div class="blk"><div class="h">③ 獎勵 D-UOAR-CT</div><p>r = r_pose + ζ_c·r_UOAR(Eq.10 不變) + ζ_s·r_swept（[t,t+Δt] 掃掠重疊積分）+ ζ_t·r_TTC（連續首穿時刻 τ* 的倒數懲罰）。<b>全部由特權解析狀態算，只在訓練期存在</b>（privileged learning / learning-by-cheating 的標準正當性）。關鍵框架修正見形式核心：這不是 reward shaping，是把離散碰撞代價「修正」為它的連續時間真值。</p></div>
+    <div class="blk"><div class="h">④ 演算法 APE2 + Shield</div><p>APE2 全保留（M×N+1 候選 + V_HPE 混合評估 + η 退火）。新增：對每個候選動作解區間首穿根 τ*(a)，<b>剔除 τ*&lt;Δt 的候選再取 argmax</b>——與獎勵共用同一套根運算，額外成本近零。訓練期用物件級盒；部署期同一數學逐體素跑在預報佔據上（洞④的修法）。全部候選都不安全時的退避：解析縮步（縮放 Δq 使 τ*≥Δt——τ* 對步長單調，二分即可）。</p></div>
+    <div class="blk"><div class="h">⑤ 課程 + ED2</div><p>課程：靜態 → 慢速(0.05–0.2 m/s) → 快速(0.2–1.0) → 對抗攔截，成功率門檻自動晉級。ED2 保留並條件化於障礙運動模式；生成軌跡仍以參數空間<b>連續時間</b>檢查過濾（比原版離散過濾更嚴——順手的升級）。</p></div>
+  </div>
+  <p class="body">整條管線維持 URPlanner 的三大不變量：<b>平台無關</b>（動作仍是關節增量、免 IK）、<b>免模擬器訓練</b>（狀態、獎勵、碰撞、柵格、預報真值全部解析可算）、<b>最小距離無關</b>（一切基於重疊與首穿時刻，不算 MD）。這是對「很多精神應該能從 URPlanner 讀到」的直接回應——不是借它的名字,是延用它的全部生成原理。</p>
+</section>
+
+<section id="formal">
+  <div class="eyebrow">Formal Core</div>
+  <h2 class="sec">形式核心：一個重要的概念修正 + 問題定義</h2>
+  <div class="rule"></div>
+  <h3 class="sub">概念修正：D-UOAR-CT 不是 reward shaping,是目標修正（objective correction）</h3>
+  <p class="body">前幾輪一直把 swept 項當「塑形」討論、擔心 PBRS 政策不變性。本輪釐清：<b>這個擔心用錯了地方</b>。離散時間的 UOAR 是連續碰撞代價的<b>有偏估計</b>——障礙夠快時，兩個採樣時刻之間的真實穿透被系統性漏計（穿隧）。加入 swept 積分項不是在「不改變最優策略的前提下加速學習」（PBRS 的目標），而是<b>把目標函數修正為我們真正想優化的連續時間碰撞代價</b>——我們「就是要」它改變最優策略,改向真正安全的那個。PBRS 政策不變性只適用於可選的趨勢加速項 F（若保留）。這個一句話的框架修正會讓方法章嚴謹一個檔次,審稿人看得出作者知道自己在做什麼。</p>
+  <code class="eq"><span class="cm"># 連續時間避障代價(真值)與其離散估計:</span>
+C_true = ∫₀^Δt Σⱼ Σ_g l_jg(τ) dτ        <span class="cm"># l_jg(τ): 時刻 τ 的重疊長,τ 線性化下分段有理、閉式可積</span>
+C_disc = Δt · Σⱼ Σ_g l_jg(0)              <span class="cm"># 原 UOAR 的隱含假設:區間內重疊恆等於左端點值</span>
+bias   = C_true − C_disc  →  障礙速度↑、Δt↑ 時系統性非零 ⇒ 穿隧
+<span class="cm"># D-UOAR-CT = 用 C_true 替換 C_disc,加上首穿時刻懲罰:</span>
+r_CT = r_pose − ζ_s·C_true/ΣLⱼ − ζ_t·β/(τ*+ε)</code>
+  <h3 class="sub">問題定義（POMDP,兩行版）</h3>
+  <p class="body">完整狀態 s_t =（機器人構型 q_t、目標、全部障礙盒的位姿與速度）為馬可夫;agent 觀測 o_t =（Eq.2 向量,k 幀柵格）。獎勵與屏蔽定義在 s_t 上（特權）,policy/critic 定義在編碼後的 (Eq.2, z_t) 上。拱心石的輔助任務保證 z_t 逼近障礙運動的充分統計量——這是整個訓練成立的資訊論前提,也是論文要用消融證明的第一件事（H2）。</p>
+</section>
+
+<section id="lemma">
+  <div class="eyebrow">The Lemma</div>
+  <h2 class="sec">保守性引理：把三種誤差全部收進膨脹盒,換一個無穿隧保證</h2>
+  <div class="rule"></div>
+  <div class="card core">
+    <b class="label">引理（非正式陳述,論文中形式化）</b>
+    <p class="body" style="margin:0"><span style="background:var(--corr-bg);color:var(--corr);font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;font-weight:600">已更正 · M0 測試抓到</span> 本節初稿的 ε_lin = ΣᵢRᵢδθᵢ²/8 <b>不成立</b>——它漏掉多關節同動的 Hessian 交叉項,M0 的實證測試以反例否證(實測偏差 2.36mm &gt; 該式上界 1.99mm)。修正後的嚴謹形式(經 |∂²p/∂qᵢ∂qⱼ| ≤ 2R<sub>max(i,j)</sub> 推導,已寫入 code/godynur/panda.py 並通過 200 例隨機驗證):設膨脹盒在原安全偏移 a_o 之上再膨脹 ε_total = ε_lin + ε_acc + ε_vel,其中:<br>
+    <b>ε_lin = ¼(Σᵢ √Rᵢ·|δθᵢ|)²</b>(弦近似誤差;動作剪裁 |δθᵢ|≤0.05 rad/步時 ≤ 2cm;此界實測約 30 倍保守,以精確 Hessian 範數收緊是已知改進路徑)<br>
+    <b>ε_acc = a_max·Δt²/2</b>（障礙等速假設誤差;a_max=2 m/s²、Δt=50ms → 2.5mm;人手級 a_max=10 → 12.5mm）<br>
+    <b>ε_vel = ε_v·Δt</b>（速度估計誤差;ε_v=0.1 m/s → 5mm）<br>
+    則區間根檢查 τ*(a) ≥ Δt 蘊含真實系統在 [t,t+Δt] 內<b>無碰撞</b>——即屏蔽在有界模型誤差下可證明保守,不存在假陰性（漏放危險動作）。總膨脹預算 ≈ 1.5–2.5cm,與 URPlanner 原本 5cm 級的 a_o 同量級,可接受。</p>
+  </div>
+  <p class="body">這個引理是論文的「定理形狀物」。對照組全都給不出:DRP 無任何保證（原文承認）;PACS 有保證但需要可達集傳播機制;我們的保證<b>只花幾行代數</b>。證明骨架:弦近似偏差有界（幾何）+ 等速偏差有界（泰勒餘項）+ 誤差在盒座標系可加 → 膨脹後的盒包含真實掃掠體 → 區間不相交蘊含真實不相交。碩士生可以完整寫出的證明難度,恰到好處。</p>
+</section>
+
+<section id="exp">
+  <div class="eyebrow">Experimental Design</div>
+  <h2 class="sec">實驗設計:以「穿隧率」為 Figure-1</h2>
+  <div class="rule"></div>
+  <div class="verdictbox">
+    <b class="label">Figure-1 概念（論文的第一擊）</b>
+    <p class="body" style="margin:0">因為參數空間給了我們<b>解析的連續時間碰撞真值</b>,我們可以做一件所有對照組做不到的事:<b>測量</b>「離散檢查宣稱成功、連續真值判定其實穿了」的比例——<b>穿隧率</b>,畫成障礙速度的函數。預期曲線:低速時 ≈0,中高速時陡升。這一張圖同時完成三件事:(1) 證明問題真實存在且被全領域的離散評估系統性低估;(2) 給出「你的基準測試在快障礙下高估了所有人的安全性」這個領域級的方法論貢獻;(3) 為我們的 CT 獎勵+屏蔽提供不可辯駁的動機。<b>這是 Loop 5 RQ1 的操作化,也是最先能動手、不依賴任何訓練成功的實驗</b>——只需要任意一個現成 policy + 動態場景 + 我們的真值檢查器。</p>
+  </div>
+  <h3 class="sub">基準套件與對照</h3>
+  <table>
+    <tr><th>類別</th><th>項目</th><th>備註</th></tr>
+    <tr><td>任務（仿 DRPBench 分類）</td><td>SE 靜態（sanity,須重現 URPlanner 水準）· SAO 突現障礙 · FDO 浮動動態障礙 · GB 目標暫時被擋 · HRC 錄製人臂軌跡</td><td>速度分四級;每任務 ≥300 隨機實例</td></tr>
+    <tr><td>對照組</td><td>原 URPlanner（靜態策略+週期重規劃）· cuRobo MPC 模式 · 無 CT 項的反應式消融 · EAAI 趨勢競品復現（付費牆,盡力）· DRP 引用其公開數字（程式碼可得性待查）</td><td>cuRobo 是 Loop 5 更正後必列的誠實基線</td></tr>
+    <tr><td>消融（每項對應一個主張）</td><td>①預報輔助 on/off（驗證拱心石)②柵格 vs 物件中心 vs 混合 ③獎勵逐項加 c→+swept→+TTC ④屏蔽 on/off ⑤k 幀數 ⑥柵格解析度/二值 vs 距離場</td><td>①是 H2 的直接檢驗,對應 Hart et al. 的失效預言</td></tr>
+    <tr><td>指標</td><td>成功率 · 離散碰撞率 · <b>連續真值碰撞率</b> · <b>穿隧率(兩者之差)</b> · 最小動態間距 · 軌跡長 · 決策延遲(目標 100Hz) · 樣本效率 · 速度魯棒性曲線</td><td>連續真值碰撞率是本文獨有的誠實指標</td></tr>
+  </table>
+  <h3 class="sub">假設(可證偽陳述)</h3>
+  <ol class="body">
+    <li><b>H1(穿隧)</b><span class="tag corr">已被 M1 數據修正</span>:原預測「穿隧率隨障礙速度單調上升」<b>不成立</b>——M1 實測(Loop 7)顯示漏檢率在 0.1 m/s 也達 29%(4/14),因為穿隧由<b>相對掃掠</b>驅動、機械臂自身連桿運動貢獻常數項。修正 H1':漏檢在所有障礙速度下存在;碰撞頻率(非漏檢率)隨速度上升。此修正使主張更強:連準靜態基準都低估碰撞。</li>
+    <li><b>H2(拱心石)</b>:含佔據預報輔助的柵格編碼,在中高速動態任務上顯著優於純幀堆疊(成功率與樣本效率);且其優勢隨障礙速度增大——直接對應 Hart et al. 的速度資訊缺失理論。</li>
+    <li><b>H3(目標修正)</b>:D-UOAR-CT 相對離散 UOAR,在快障礙場景降低連續真值碰撞率,且不顯著犧牲成功率/軌跡長。</li>
+    <li><b>H4(屏蔽)</b>:APE2-Shield 使連續真值碰撞率趨近 0(受引理保護),成功率損失 &lt;5%,單步延遲增量 &lt;2ms。</li>
+    <li><b>H5(部署)</b>:體素級屏蔽(跑在預報佔據上)在真機 Franka + 移動障礙上維持 H4 的性質。<span class="tag low">Phase C,碩論選配</span></li>
+  </ol>
+</section>
+
+<section id="novelty">
+  <div class="eyebrow">Novelty Ledger</div>
+  <h2 class="sec">新穎性帳本:每條主張對誰、憑什麼站得住</h2>
+  <div class="rule"></div>
+  <table>
+    <tr><th>貢獻宣稱</th><th>最近的先行工作</th><th>差異防線</th></tr>
+    <tr><td><b>C1</b> 穿隧率:動態 manipulator 避障評估的連續時間真值方法論</td><td>NeuralSVCD(swept 僅用於偵測);各基準全用離散檢查</td><td>沒人把「離散評估系統性低估碰撞」量化成領域級發現;我們的解析空間讓它免費</td></tr>
+    <tr><td><b>C2</b> 佔據預報輔助任務治癒 manipulator 動態避障的速度盲</td><td>MDRLAT(移動機器人,顯式速度回歸);自駕 occupancy flow;DexRepNet(柵格狀態,靜態抓取)</td><td>預報≠速度回歸(免追蹤、任意形狀);manipulator 動態避障場景無先例;預報器兼任部署屏蔽檢查對象的雙角色無先例</td></tr>
+    <tr><td><b>C3</b> D-UOAR-CT:閉式連續時間碰撞代價 + 保守性引理</td><td>EAAI 2026(LSTM 學趨勢+距離獎勵);TTC-force(離散 TTC);cuRobo(swept cost 但屬優化器非 RL 獎勵)</td><td>機制錯開:解析白箱 vs 學習黑箱;帶可證明保守界的 RL 獎勵/屏蔽在此場景無先例</td></tr>
+    <tr><td><b>C4</b> APE2-Shield:候選池上的零額外求解器安全屏蔽,物件級→體素級平滑退化</td><td>iKinQP-RL(需 QP);PACS(可達集,0.2ms 已很快)</td><td>不比「更快」(PACS 已夠快),比「更簡單+可微+與訓練共用同一套根運算+無需可達集機制」;誠實承認 PACS 是強對照</td></tr>
+  </table>
+  <p class="body">投稿定位:C1+C2+C3 為第一篇主幹(RA-L/IROS→衝 CoRL),C4 融入第一篇的系統章;真機驗證(H5)視進度作為第一篇的加分章或碩論獨立章。<b>紅線:不宣稱「首個柵格狀態 manipulator RL」、不宣稱「比 PACS 快」、不宣稱「打敗 DRP 全面性能」</b>——三者都會被一擊即破,帳本裡已標明原因。</p>
+</section>
+
+<section id="phase">
+  <div class="eyebrow">Milestones</div>
+  <h2 class="sec">里程碑(碩士尺度,各階段有獨立退出價值)</h2>
+  <div class="rule"></div>
+  <table>
+    <tr><th>階段</th><th>內容</th><th>退出產物(即使後續失敗也成立)</th></tr>
+    <tr><td><b>M0(2–4週)</b></td><td>復現 URPlanner 參數空間+UOAR+APE2 靜態基線;實作解析光柵化器與連續真值檢查器(λ(τ) 根+掃掠積分,含引理的膨脹)</td><td>可復用的開源工具:任意軌跡的連續時間碰撞真值檢查器</td></tr>
+    <tr><td><b>M1(4–6週)</b></td><td><b>Figure-1 實驗</b>:對靜態訓練的 URPlanner policy + 至少一個公開反應式基線,測穿隧率-速度曲線(H1)</td><td>一個獨立成立的 workshop 級發現;整篇論文的動機圖</td></tr>
+    <tr><td><b>M2(6–10週)</b></td><td>柵格觀測+編碼器+佔據預報輔助;動態課程訓練;消融①②⑤⑥(H2)</td><td>拱心石驗證;若 H2 不成立,退回物件中心表徵仍有 C3/C4 可做——計畫不因單點失敗而崩</td></tr>
+    <tr><td><b>M3(8–12週)</b></td><td>D-UOAR-CT + APE2-Shield 全系統;全基準對照含 cuRobo;消融③④(H3/H4);寫作、投 RA-L/IROS</td><td>第一篇投稿</td></tr>
+    <tr><td><b>M4(選配)</b></td><td>Franka 真機 + 移動障礙;體素級屏蔽(H5);HRC 前導</td><td>期刊延伸版/碩論真機章</td></tr>
+  </table>
+</section>
+
+<section id="advisor">
+  <div class="eyebrow">For the Advisor Meeting</div>
+  <h2 class="sec">帶去見師兄的三個確認問題 + 三個待查證事項</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li><b>柵格的語義</b>:師兄設想的是純二值佔據,還是可接受距離場/多值編碼?(影響②⑥消融的優先序;我們的建議:先二值打通,距離場當升級)</li>
+    <li><b>特權訓練的接受度</b>:訓練期用參數空間的解析真值算獎勵與屏蔽、部署期只靠柵格觀測——這個 privileged learning 架構是否符合組裡對「與 RL 結合」的想像?(它正是讓「柵格觀測」與「URPlanner 解析精神」不打架的關鍵)</li>
+    <li><b>算力與真機資源</b>:M2 的柵格編碼訓練需要 GPU 數量級預估(單卡 4090 應足夠,32³ 柵格很小);M4 真機 Franka 檔期。</li>
+  </ol>
+  <p class="body">待查證(動手前必須關掉,延續本系列的查證紀律):(a) DRP 程式碼/DRPBench 是否開源<span class="tag low">未決</span>;(b) 「occupancy forecasting as auxiliary task for manipulator RL」的窮盡式新穎性檢索(本輪僅摘要層級確認無直接先例)<span class="tag low">未決</span>;(c) EAAI 2026 競品全文(付費牆)以精確界定 C3 的重疊邊界<span class="tag low">未決,自 Loop 3 遺留</span>。</p>
+</section>
+
+</main>
+<footer>GO-DynURPlanner 研究藍圖 · Loop 6 · 整合師兄 occupancy-grid 指令 + 前五輪全部查證積累 · 拱心石 = 佔據預報輔助任務 · 定理形狀物 = 保守性引理 · Figure-1 = 穿隧率 · 2026-07</footer>
+</body>
+</html>

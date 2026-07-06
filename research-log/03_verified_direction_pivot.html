@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DynURPlanner · 驗證帳本與立身之本重判</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;          /* teal = 立身之本/核心 */
+    --ur:#2563b8;--en:#7b8794;--syn:#7c3aed;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);
+    --maxw:1100px;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1100px 650px at 88% -12%,#fbf8ef 0%,transparent 55%),var(--paper);
+    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.68}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(rgba(120,100,60,.03) 1px,transparent 1px);background-size:3px 3px;mix-blend-mode:multiply}
+
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line);box-shadow:0 6px 20px rgba(16,35,31,.3)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;font-weight:500;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px;transition:.18s}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}.tnav a.active{background:#fff;color:var(--navy)}
+
+  .hero{max-width:var(--maxw);margin:0 auto;padding:50px 24px 14px;position:relative;z-index:1}
+  .hero .kicker{font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.2em;color:var(--core);text-transform:uppercase}
+  .hero h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.8rem,3.6vw,2.85rem);line-height:1.14;margin:.2em 0 .3em;color:var(--navy)}
+  .hero h1 em{font-style:italic;color:var(--core)}
+  .hero .deck{font-size:15.5px;color:var(--ink-soft);max-width:800px;line-height:1.72}
+  .hero .deck b{color:var(--ink)}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:18px 24px 80px;position:relative;z-index:1}
+  section{margin-top:50px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.4rem,2.4vw,2rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  h3.sub{font-family:Lora,serif;font-size:1.16rem;color:var(--navy-2);font-weight:600;margin:24px 0 7px}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body{font-size:15px;line-height:1.78;color:#322f28;max-width:850px}
+  p.body b{color:var(--navy-2)}
+  cite{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ur);background:#e7f0fb;padding:1px 6px;border-radius:5px;white-space:nowrap}
+  cite a{color:inherit;text-decoration:none}cite a:hover{text-decoration:underline}
+
+  .st{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+  .st.ok{background:var(--ok-bg);color:var(--ok)} .st.corr{background:var(--corr-bg);color:var(--corr)}
+  .st.bad{background:var(--bad-bg);color:var(--bad)} .st.low{background:var(--low-bg);color:var(--low)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;margin:14px 0;font-size:12.8px;background:#fffdf8;border:1px solid var(--rule);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+  thead th{background:var(--navy-2);color:#fff;font-weight:600;font-size:12px}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{font-weight:600;color:var(--navy)}
+  tbody tr:nth-child(even){background:rgba(15,157,119,.04)}
+  .num{font-family:"IBM Plex Mono",monospace}
+
+  .eq{font-family:"IBM Plex Mono",monospace;font-size:13.5px;background:#fffdf8;border:1px solid var(--rule);border-left:4px solid var(--core);padding:12px 16px;margin:13px 0;border-radius:9px;color:var(--navy-2);overflow-x:auto;box-shadow:var(--shadow);line-height:1.7}
+  .eq .n{float:right;color:#b0a68c}
+  .eq .c{color:#8a8470;font-style:italic}
+
+  .callout{border-radius:12px;padding:18px 20px;margin:18px 0;font-size:14.5px;line-height:1.72;box-shadow:var(--shadow)}
+  .callout .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-bottom:9px}
+  .callout.core{background:#d4f0e6;border:1px solid #9bd8c2}.callout.core .tag{background:var(--core);color:#fff}
+  .callout.warn{background:#f5ddd7;border:1px solid #e1ab9f}.callout.warn .tag{background:var(--bad);color:#fff}
+  .callout.note{background:#ece4fc;border:1px solid #c6b3f2}.callout.note .tag{background:var(--syn);color:#fff}
+  .callout b{color:var(--navy-2)}
+
+  ul.clean{font-size:14.5px;color:#322f28;line-height:1.72;max-width:850px}ul.clean li{margin:7px 0}ul.clean b{color:var(--navy-2)}
+  code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:4px;color:var(--navy-2)}
+
+  .dirgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .dir{background:#fffdf8;border:1px solid var(--rule);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);border-top:4px solid var(--low)}
+  .dir.reco{border-top-color:var(--core)}.dir.demote{border-top-color:var(--en)}.dir.preempt{border-top-color:var(--corr)}.dir.moon{border-top-color:var(--syn)}
+  .dir .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .dir .badge{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+  .dir.reco .badge{background:var(--ok-bg);color:var(--ok)}.dir.preempt .badge{background:var(--corr-bg);color:var(--corr)}.dir.demote .badge{background:#e7eaed;color:var(--en)}.dir.moon .badge{background:var(--low-bg);color:var(--syn)}
+  .dir h4{margin:0;font-size:15px;color:var(--navy);font-family:"IBM Plex Sans";font-weight:700}
+  .dir p{margin:0 0 6px;font-size:13.3px;color:#3f3a30}
+  .dir .verdict{font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--rule);padding-top:8px;margin-top:8px}
+  @media(max-width:760px){.dirgrid{grid-template-columns:1fr}}
+
+  .contrib{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin:16px 0}
+  .cc{background:linear-gradient(165deg,var(--navy),var(--navy-2));color:#e6f2ec;border-radius:13px;padding:18px;box-shadow:0 12px 30px rgba(16,35,31,.26)}
+  .cc .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;color:var(--core-soft)}
+  .cc h4{margin:6px 0 7px;font-size:14.5px;color:#fff;font-family:Lora,serif;font-weight:600}
+  .cc p{margin:0;font-size:12.8px;color:#bcd6cb;line-height:1.6}
+  @media(max-width:760px){.contrib{grid-template-columns:1fr}}
+
+  ol.refs{font-size:12px;color:#3f3a30;line-height:1.55;padding-left:24px}ol.refs li{margin:5px 0;word-break:break-word}
+  ol.refs a{color:var(--ur);text-decoration:none}ol.refs a:hover{text-decoration:underline}
+
+  footer{max-width:var(--maxw);margin:50px auto 0;padding:26px 24px;color:var(--ink-soft);font-size:12px;text-align:center;border-top:1px solid var(--rule)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="tnav">
+    <span class="home">Verify + Re-judge</span>
+    <a href="#ledger">驗證帳本</a>
+    <a href="#correct">已更正</a>
+    <a href="#rival">競品衝擊</a>
+    <a href="#moat">立身之本</a>
+    <a href="#derive">數學推導</a>
+    <a href="#dirs">方向裁決</a>
+    <a href="#newpitch">新定位</a>
+    <a href="#refs">文獻</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="kicker">Research Loop · Verified &amp; Re-grounded</div>
+  <h1>查證一輪之後：把立身之本從「趨勢獎勵」<br>移到 URPlanner 的<em>解析連續時間碰撞</em></h1>
+  <p class="deck">本文件是一次<b>研究迴圈</b>的成果：三輪並行查證（~25 條引用逐一打開原始頁）、抓出一個幻覺數字並更正、確認一個撞題競品為真，然後<b>重新判斷立身之本</b>。結論——<b>URPlanner 是基底（確立）、ENPIRE 是有潛力的靈感但非基礎（降為選配）</b>；真正能站得住、又沒被佔走的核心，是把 URPlanner 獨有的「解析可算幾何」延伸到時間軸：<b>連續時間 swept-volume 重疊獎勵 + 精確區間碰撞檢測屏蔽</b>。</p>
+</div>
+
+<main>
+
+<!-- LEDGER -->
+<section id="ledger">
+  <div class="eyebrow">Part ① · Verification Ledger</div>
+  <h2 class="sec">驗證帳本：每一條引用的真偽</h2>
+  <div class="rule"></div>
+  <p class="body">狀態定義：<span class="st ok">已驗證</span> ID+標題+核心主張多源確認；<span class="st corr">已更正</span> 原報告數字錯誤、此為實際值；<span class="st low">全文限定</span> 論文為真但具體數字來自付費全文/HTML、未能於摘要二次確認；<span class="st bad">未能獨立驗證</span> 僅單一來源、列為低信心、報告中不倚重。</p>
+  <table>
+    <thead><tr><th>引用</th><th>狀態</th><th>查證結果</th></tr></thead>
+    <tbody>
+      <tr><td>URPlanner (2505.20175)</td><td><span class="st ok">已驗證</span></td><td>親讀全文；基底論文。</td></tr>
+      <tr><td>ENPIRE (2606.19980)</td><td><span class="st ok">已驗證</span></td><td>NVIDIA/CMU/UCB；99% 成功率；ID/作者正確。</td></tr>
+      <tr><td>Missing Velocity (2112.12465)</td><td><span class="st ok">已驗證</span></td><td>Hart, Waltz &amp; Okhrin；位置-only 非馬可夫；frame-stack/LSTM 無法完全替代速度。</td></tr>
+      <tr><td>Two-step avoidance (2311.16841)</td><td><span class="st ok">已驗證</span></td><td>同作者群；CR 入觀測「獎勵翻倍 = 碰撞減半」。</td></tr>
+      <tr><td>Ng, Harada &amp; Russell (1999)</td><td><span class="st ok">已驗證</span></td><td>PBRS 政策不變性奠基論文（教科書級）。</td></tr>
+      <tr><td>Devlin &amp; Kudenko (2012)</td><td><span class="st ok">已驗證</span></td><td>動態 PBRS：<code>F=γφ(s',t')−φ(s,t)</code> 在時變勢能下仍保政策不變。</td></tr>
+      <tr><td>TTC-force (AAMAS 2023)</td><td><span class="st low">全文限定</span></td><td>venue 確認；TTC=d/v_rel 概念多源確認；確切公式 PDF 二進位無法抽取。</td></tr>
+      <tr><td>RVO reward (2203.10229)</td><td><span class="st ok">已驗證</span></td><td>Han et al.；RVO 面積 + 預期碰撞時間獎勵。</td></tr>
+      <tr><td>DRL-VO (2301.06512, T-RO 2023)</td><td><span class="st ok">已驗證</span></td><td>Xie &amp; Dames；VO 新項引導主動避讓。</td></tr>
+      <tr><td>CBF-RL (2510.14959)</td><td><span class="st ok">已驗證</span></td><td>Ames 團隊；訓練中內化 CBF；Unitree G1 驗證。（先前引的確切公式未在摘要見，<span class="st low">公式全文限定</span>）</td></tr>
+      <tr><td>DR-CBF 神經 (2503.04929)</td><td><span class="st ok">已驗證</span></td><td>xArm6 真機、cluttered+dynamic；100% 動態數字 <span class="st low">全文限定</span>。</td></tr>
+      <tr><td>iKinQP-RL (2409.08233)</td><td><span class="st ok">已驗證</span></td><td>「完全消除與新障礙碰撞」；0% 具體數字 <span class="st low">全文限定</span>。</td></tr>
+      <tr><td>Eureka (2310.12931)</td><td><span class="st ok">已驗證</span></td><td>83% 勝人類、平均 +52%（摘要原文確認）。</td></tr>
+      <tr><td>Progress Functions (2410.09187)</td><td><span class="st ok">已驗證</span></td><td>Sarukkai et al.；count-based，省 20× 樣本。</td></tr>
+      <tr><td>RF-Agent (2602.23876)</td><td><span class="st ok">已驗證</span></td><td>Gao et al.；LLM+MCTS 設計獎勵；17 任務。</td></tr>
+      <tr><td>Adversarial Reward Auditing (2602.01750)</td><td><span class="st ok">已驗證</span></td><td>Beigi et al.；2026-02；reward hacking 偵測（LLM 域，遷移到 DRL 為類比）。</td></tr>
+      <tr><td>UAV PBRS+CLF+CBF (2605.01787)</td><td><span class="st ok">已驗證</span></td><td>標題/作者正確；PBRS 與含障礙速度的 CBF 條件。</td></tr>
+      <tr><td>Franka SAC (Frontiers 883562)</td><td><span class="st ok">已驗證</span></td><td>Chen et al. 2022；<b>相對位置+速度</b>；SAC 6000ep 內 100% 安全、DDPG 10000ep 仍不保證。</td></tr>
+      <tr><td>Proactive HRC 93% (Manuf. Lett. 2024)</td><td><span class="st ok">已驗證</span></td><td>SAC、人手=移動圓柱、生成資料集 93%。</td></tr>
+      <tr><td>DDPG Fetch (2403.16652)</td><td><span class="st low">全文限定</span></td><td>Ahmad et al. 確認；71.8%/碰18.5% 來自全文 HTML。</td></tr>
+      <tr><td>NeuralSVCD (2509.00499)</td><td><span class="st ok">已驗證</span></td><td>關鍵：swept volume 僅用於<b>碰撞偵測/規劃，非 RL 獎勵</b>——支持本文重構。</td></tr>
+      <tr><td><b>趨勢競品</b> Trend-Aware RL (EAAI 2026, S0952197626005658)</td><td><span class="st ok">已驗證</span></td><td><b>真實存在。</b>Trend Learning + Adaptive Reward Shaping，動態機械臂。直接威脅「趨勢獎勵」新穎性。</td></tr>
+      <tr><td>Transformer 預測 (Front. Neurorobot. 2026)</td><td><span class="st corr">已更正</span></td><td>實際：98.0% vs PPO 90.4%（+7.6pp）、違規 −60%、對 ORCA −83.3%。<b>非</b>原報告的 +21.6%/−47.3%；且為 telepresence 移動機器人。</td></tr>
+      <tr><td>Kalman+RL (ResearchGate 404896521)</td><td><span class="st bad">未能獨立驗證</span></td><td>單源、未再現；報告中僅作「速度估計可用 KF 平滑」的常識性陳述，不倚重此引用。</td></tr>
+      <tr><td>MDPI Appl. Sci. 15(8):4496</td><td><span class="st bad">未能獨立驗證</span></td><td>HTTP 403；摘要層級「自適應獎勵 + 動態圓柱」確認存在，數字未驗。</td></tr>
+    </tbody>
+  </table>
+  <div class="callout note">
+    <span class="tag">查證迴圈結論</span>
+    ~25 條引用中，<b>21 條已驗證為真</b>（含全部理論基石與所有 2026 未來日期 arXiv ID），<b>1 條數字已更正</b>，<b>2 條降為低信心、不倚重</b>。整體證據基礎穩固。最重大的兩項發現不是某條被否證，而是：(1) <b>趨勢獎勵競品為真</b>（方向需轉），(2) <b>swept-volume 從未被當 DRL 獎勵</b>（新空位出現）。
+  </div>
+</section>
+
+<!-- CORRECTION -->
+<section id="correct">
+  <div class="eyebrow">Part ② · Correction</div>
+  <h2 class="sec">一個必須誠實認領的更正</h2>
+  <div class="rule"></div>
+  <div class="callout warn">
+    <span class="tag">已更正</span>
+    先前深度報告在 HRC 節寫「Transformer 人體預測使成功率 +21.6%、碰撞 −47.3%」——<b>這組數字是子代理幻覺，已更正</b>。實際論文（<cite><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12907402/">Front. Neurorobot. 2026</a></cite>）報的是<b>成功率 98.0% vs PPO 90.4%（+7.6pp）、約束違規由 0.05→0.02/回合（−60%）、對 ORCA 違規 −83.3%</b>；且該研究對象是 telepresence 移動機器人而非機械臂。這正是你要求「查證到能驗證所有內容」的價值：把一個看似精確、實則編造的數字攔下。已同步修正 <code>dynurplanner_deep_research.html</code>。
+  </div>
+</section>
+
+<!-- RIVAL -->
+<section id="rival">
+  <div class="eyebrow">Part ③ · Competitive Shock</div>
+  <h2 class="sec">競品衝擊：趨勢獎勵這條明路已被佔</h2>
+  <div class="rule"></div>
+  <p class="body">查證確認 <cite><a href="https://www.sciencedirect.com/science/article/abs/pii/S0952197626005658">EAAI 2026</a></cite>「A trend-aware reinforcement learning approach for adaptive motion planning of robotic manipulators in dynamic environments」<b>真實存在</b>。它的兩大件——<b>Trend Learning</b>（從序列資料抽時間依賴、推斷趨勢）與 <b>Adaptive Reward Shaping</b>（動態平衡定位精度與避障）——和我們上一版提案的 N1「趨勢/速度獎勵」高度重疊。</p>
+  <p class="body">這不是壞消息，而是<b>研究迴圈該有的結果</b>：它逼我們放棄「以趨勢獎勵為賣點」的弱定位，回答一個更尖銳的問題——<b>當別人也在做趨勢獎勵時，URPlanner 有什麼是別人結構上做不到的？</b></p>
+  <table>
+    <thead><tr><th></th><th>EAAI 趨勢競品 / 多數動態工作</th><th>URPlanner 獨有</th></tr></thead>
+    <tbody>
+      <tr><td>趨勢的來源</td><td>LSTM 學序列、自適應權重（黑箱、需學）</td><td>幾何<b>解析推算</b>（白箱、無需學）</td></tr>
+      <tr><td>避障訊號</td><td>距離 / 最小距離 / 光達</td><td><b>重疊長度（最小距離無關）</b></td></tr>
+      <tr><td>時間處理</td><td>離散步、靠網路記憶</td><td>可做<b>連續時間解析積分</b></td></tr>
+      <tr><td>需要模擬器？</td><td>多數需要互動採樣</td><td><b>不需要</b>（狀態/獎勵/碰撞皆解析）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- MOAT -->
+<section id="moat">
+  <div class="eyebrow">Part ④ · The Real Foundation</div>
+  <h2 class="sec">立身之本：不是「動態」，是 URPlanner 的解析可算性</h2>
+  <div class="rule"></div>
+  <p class="body">深度思考後的判斷：URPlanner 真正獨一無二的，<b>不是 UOAR 這個獎勵</b>，而是它賴以成立的<b>參數化解析空間</b>——障礙=AABB、連桿=線段，使得<b>狀態、獎勵、碰撞全部有封閉形式、不需要模擬器</b>。「動態環境」是任務（大家都做），但能讓我們<b>站得住</b>的，是把這個解析性<b>延伸到時間軸</b>所獨家解鎖的能力。</p>
+  <div class="callout core">
+    <span class="tag">立身之本（一句話）</span>
+    因為 URPlanner 的幾何是解析的，它是少數能在<b>不依賴模擬器、不計算最小距離</b>的前提下，對一個控制區間 <code>[t, t+Δt]</code> 內「移動連桿 vs 移動障礙」做<b>精確連續時間碰撞推理</b>的框架。由此可解鎖三件別人做不到的事：<b>(i) 精確的 swept-volume 重疊作為前瞻稠密獎勵；(ii) 連續 TTC（接觸前即有梯度）；(iii) 對 APE2 候選池的精確區間碰撞屏蔽（不會「穿隧」）。</b>
+  </div>
+  <p class="body"><b>為什麼這比「趨勢獎勵」更能立身：</b></p>
+  <ul class="clean">
+    <li><b>真正以 URPlanner 為基底</b>：它是 URPlanner 定義式 (Eq.6–10) 往時間的直接、原理性推廣，而非外掛一套通用動態 RL 技巧。</li>
+    <li><b>與競品錯開</b>：EAAI 用 LSTM 學趨勢 + 距離獎勵；我們用<b>解析 swept-volume 重疊 + 精確 CCD</b>——機制不同，可辯護。</li>
+    <li><b>可檢驗的強主張</b>：「無模擬器即達精確連續碰撞無穿隧」是具體、可實驗證明的性質（離散步法面對快速障礙會穿隧——我們可重現此失敗並擊敗它）。</li>
+    <li><b>查證背書</b>：swept volume 目前只被用於<b>碰撞偵測</b>（NeuralSVCD 等），<b>從未當 DRL 獎勵</b> <cite><a href="https://arxiv.org/abs/2509.00499">2509.00499</a></cite>——空位真實存在。</li>
+  </ul>
+</section>
+
+<!-- DERIVATION -->
+<section id="derive">
+  <div class="eyebrow">Part ⑤ · Derivation</div>
+  <h2 class="sec">數學推導：把 UOAR (Eq.10) 推廣到連續時間</h2>
+  <div class="rule"></div>
+  <p class="body"><b>起點（URPlanner 靜態）。</b>連桿 j 為線段、端點 <code>p_s, p_e</code>；對障礙盒 g，逐軸解 <code>λ_near, λ_far</code>（Eq.7），相交條件 Eq.8，重疊長 <code>l = |λ_far−λ_near|·|p_s p_e|</code>（Eq.9），UOAR 為歸一化總重疊（Eq.10）。一切在<b>單一時刻</b>、<b>靜態</b>幾何上計算。</p>
+
+  <h3 class="sub">步驟 1 — 把兩個運動都參數化到區間 [0, Δt]</h3>
+  <ul class="clean">
+    <li><b>連桿掃掠</b>：動作 <code>a_t=[Δq_i]</code> 令關節線性插值 <code>q(τ)=q_t+(τ/Δt)·a_t</code>；經正運動學得端點軌跡。小 Δt 下線性近似 <code>p_s(τ)≈p_s(0)+u_s·τ</code>，<code>u_s=(p_s(Δt)−p_s(0))/Δt</code>（兩端 FK 即得，解析、便宜）。</li>
+    <li><b>障礙運動</b>：盒中心 <code>c_g(τ)=c_g(0)+v_g·τ</code>（估計速度，區間內常值）。</li>
+    <li><b>取相對運動</b>（在盒 g 座標系）：<code>p̃(τ)=p(τ)−c_g(τ)</code> 仍<b>對 τ 線性</b>。於是 Eq.7 的 λ_near/λ_far 成為 τ 的<b>有理函數</b>，重疊長 <code>l_jg(τ)</code> 為<b>分段平滑</b>函數。</li>
+  </ul>
+
+  <h3 class="sub">步驟 2 — 三個解析項（皆最小距離無關）</h3>
+  <div class="eq"><span class="c">// (A) Swept 重疊：時間積分的前瞻懲罰</span>
+r_swept = −(1/ΣⱼLⱼ) · Σⱼ Σ_g ∫₀^Δt w(τ)·l_jg(τ) dτ <span class="n">(A)</span></div>
+  <p class="body">τ 線性 ⇒ 被積式分段有理 ⇒ 每段<b>閉式可積</b>（或數點 Gauss 求積）。<code>w(τ)</code> 為近未來加權（如 <code>e^{−κτ}</code>）。當 Δt→0 退化回原 UOAR——<b>嚴格相容</b>。</p>
+  <div class="eq"><span class="c">// (B) 連續 TTC：接觸前即有梯度，補 UOAR「盒外零梯度」</span>
+τ* = min{ τ∈[0,Δt] : max(λ_near(τ)) = min(λ_far(τ)) }
+r_TTC = −β / (τ* + ε) <span class="n">(B)</span></div>
+  <p class="body">τ* 為移動線段<b>首次</b>穿入移動盒的時刻，解低次有理方程的根即得。<b>即使當前重疊=0（線段在盒外）τ* 仍有限 ⇒ 梯度非零</b>——精確解掉反應式 UOAR 的致命傷，且不需最小距離。</p>
+  <div class="eq"><span class="c">// (C) PBRS 趨勢項：保證不改變最優策略（Devlin–Kudenko 時變版）</span>
+Φ(s,t) = α·|r_swept(s,t)|
+F = γ·Φ(s',t+1) − Φ(s,t) <span class="n">(C)</span></div>
+  <p class="body">逼近趨險 Φ↑ ⇒ F&lt;0；遠離 Φ↓ ⇒ F&gt;0——這就是你最初回憶的「看下一刻趨勢」。Devlin–Kudenko (2012) <b>已證</b>時變勢能下政策不變性仍成立 <cite><a href="https://eprints.whiterose.ac.uk/id/eprint/75121/">White Rose</a></cite>，故此項<b>只加速學習、不扭曲最優解</b>。</p>
+  <div class="eq"><span class="c">// 完整 D-UOAR（連續時間版）</span>
+r = r_pose + ζ_s·r_swept + ζ_t·r_TTC + ζ_F·F <span class="n">(D-UOAR-CT)</span></div>
+
+  <h3 class="sub">步驟 3 — 精確區間屏蔽（復用 APE2 候選池）</h3>
+  <p class="body">APE2 每步已生成 M×N+1 候選動作。每個候選定義一段連桿掃掠；以同一套 τ* 根運算判定<b>區間內是否必碰</b>，<b>剔除 τ*&lt;Δt 的候選</b>，再於存活者取 <code>argmax V_HPE</code>：</p>
+  <div class="eq">ā_t = argmax_{a∈A_t, τ*(a)≥Δt} V_HPE(s_t, a) <span class="n">(Shield)</span></div>
+  <p class="body">這是<b>精確的區間碰撞無關性</b>，非離散步抽樣——故<b>不會讓快速細障礙「穿隧」</b>而過（離散碰撞檢查的已知失效模式）。別人需另解 QP 合成安全動作 <cite><a href="https://arxiv.org/abs/2409.08233">iKinQP-RL</a></cite>；我們<b>零額外求解器</b>，因 APE2 已備候選、URPlanner 已備解析幾何。</p>
+  <div class="callout core">
+    <span class="tag">三項貢獻的共同根</span>
+    (A)(B)(C)(Shield) 全部源於同一個解析操作——<b>對 τ 線性化後解 λ(τ) 的根與積分</b>。所以新增計算量 ≈ 「在 UOAR 之上多一遍區間根/積分」，與 URPlanner「便宜、可解析、平台無關」的精神一致；不需模擬器、不需最小距離、不需學一個趨勢網路。
+  </div>
+</section>
+
+<!-- DIRECTIONS -->
+<section id="dirs">
+  <div class="eyebrow">Part ⑥ · Direction Verdict</div>
+  <h2 class="sec">方向裁決：四條路，選哪條立身</h2>
+  <div class="rule"></div>
+  <div class="dirgrid">
+    <div class="dir preempt">
+      <div class="h"><span class="badge">降級為基本款</span></div>
+      <h4>A · 趨勢/速度入狀態與獎勵</h4>
+      <p>把障礙相對位置+速度入狀態、加 TTC/趨勢獎勵。POMDP 必需，但 <b>EAAI 2026 已佔此賣點</b>。</p>
+      <div class="verdict">裁決：<b>當作 table-stakes 做掉，不當貢獻宣稱。</b>狀態用物件中心相對位置+速度（Franka SAC 已證 100% 安全 <cite><a href="https://www.frontiersin.org/articles/10.3389/fnbot.2022.883562/full">883562</a></cite>）。</div>
+    </div>
+    <div class="dir reco">
+      <div class="h"><span class="badge">★ 立身之本</span></div>
+      <h4>B · 解析連續時間 swept 重疊 + 精確 CCD 屏蔽</h4>
+      <p>把 UOAR 推廣到區間 [t,t+Δt]：swept 重疊獎勵 + 連續 TTC + 精確區間屏蔽。源於 URPlanner 解析性、與競品錯開、swept 當獎勵無人做過。</p>
+      <div class="verdict">裁決：<b>主貢獻、第一篇核心。</b>強主張＝「無模擬器即達精確連續無穿隧避障」。</div>
+    </div>
+    <div class="dir moon">
+      <div class="h"><span class="badge">高風險高報酬·選配</span></div>
+      <h4>C · 可微解析獎勵 → 解析梯度/模型式優化</h4>
+      <p>swept 重疊對 q 與障礙參數<b>可微</b> ⇒ 可做一階解析梯度或短視 model-based rollout，樣本效率遠勝 model-free。</p>
+      <div class="verdict">裁決：<b>列為 stretch goal。</b>注意有工作專攻「非可微獎勵優化」<cite><a href="https://arxiv.org/html/2507.12977">2507.12977</a></cite>，差異化需小心。</div>
+    </div>
+    <div class="dir demote">
+      <div class="h"><span class="badge">靈感·非基礎</span></div>
+      <h4>D · ENPIRE 式自動研究自調獎勵</h4>
+      <p>用 Eureka/ENPIRE 式 agent 在參數空間自動調 (A)(B) 的權重 ζ、Δt、Φ 形式。</p>
+      <div class="verdict">裁決：<b>依你的指示，降為「未來/選配章節」。</b>ENPIRE 很新、有潛力，但<b>不是我們的基礎</b>；它是「把 B 自動化」的加速器，不是立論根據。</div>
+    </div>
+  </div>
+  <div class="callout note">
+    <span class="tag">為何這樣排</span>
+    你的兩個指令直接決定排序：<b>URPlanner 為基底</b> → B（URPlanner 解析性的時間推廣）升為核心；<b>ENPIRE 非基礎</b> → D 從上一版的「最強賣點 N3」降為選配。A 因競品出現而降為基本款。C 是 B 的自然延伸、留作衝高之用。
+  </div>
+</section>
+
+<!-- NEW PITCH -->
+<section id="newpitch">
+  <div class="eyebrow">Part ⑦ · Re-grounded Pitch</div>
+  <h2 class="sec">重構後的三句話定位</h2>
+  <div class="rule"></div>
+  <div class="contrib">
+    <div class="cc"><div class="n">基底（確立）</div><h4>URPlanner 的解析參數空間</h4><p>狀態/獎勵/碰撞皆封閉形式、無需模擬器、最小距離無關、平台無關、免 IK。這是一切的根。</p></div>
+    <div class="cc"><div class="n">核心貢獻</div><h4>解析性 × 時間 = 連續碰撞推理</h4><p>swept 重疊前瞻獎勵 + 連續 TTC + 精確區間屏蔽；無穿隧、無模擬器、與趨勢競品機制錯開。</p></div>
+    <div class="cc"><div class="n">靈感（非基礎）</div><h4>ENPIRE 式自動調參</h4><p>選配的未來章節：在便宜參數空間自動搜尋獎勵權重。加速器，不是立論根據。</p></div>
+  </div>
+  <div class="callout core">
+    <span class="tag">定稿標題建議</span>
+    第一篇（核心、低風險）：<b>「Continuous-Time, Minimum-Distance-Independent Collision Reasoning for Dynamic Manipulator Motion Planning」</b>——賣點是 swept-overlap 獎勵 + 精確 CCD 屏蔽 + 無穿隧保證，全部源於 URPlanner 解析空間。把趨勢/速度當基本款內含，避開與 EAAI 正面比拼「誰的趨勢學得好」，改打「誰能在不靠模擬器下精確處理連續時間」。
+  </div>
+  <p class="body"><b>仍未決、需下一輪迴圈處理的問題</b>（誠實列出）：①線性化 <code>p(τ)</code> 在大 Δt 或高速關節下的誤差界，需推導或用保守包絡；②估計障礙速度的噪聲如何傳進 τ* 的可靠性（或改用區間/集員估計做 robust τ*）；③EAAI 競品的<b>全文</b>仍被付費牆擋住，須設法取得以精確界定重疊邊界；④swept 積分的即時性（目標 100Hz）需實測。這些是第一階段（M1–4）要關掉的風險。</p>
+</section>
+
+<!-- REFS -->
+<section id="refs">
+  <div class="eyebrow">Verified Sources</div>
+  <h2 class="sec">本輪查證之核心文獻</h2>
+  <div class="rule"></div>
+  <ol class="refs">
+    <li>Ying et al. (2025). URPlanner. arXiv:2505.20175. <a href="https://arxiv.org/abs/2505.20175">link</a> — <b>基底</b>。</li>
+    <li>Xiao et al. (2026). ENPIRE. arXiv:2606.19980. <a href="https://arxiv.org/abs/2606.19980">link</a> — 靈感、非基礎。</li>
+    <li>Hart, Waltz &amp; Okhrin (2021). Missing Velocity in Dynamic Obstacle Avoidance (DRL). arXiv:2112.12465. <a href="https://arxiv.org/abs/2112.12465">link</a></li>
+    <li>Hart, Waltz &amp; Okhrin (2023). Two-step dynamic obstacle avoidance. arXiv:2311.16841. <a href="https://arxiv.org/abs/2311.16841">link</a></li>
+    <li>Ng, Harada &amp; Russell (1999). Policy Invariance Under Reward Transformations (PBRS). ICML. <a href="https://www.cs.utexas.edu/~shivaram/readings/b2hd-NgHR1999.html">link</a></li>
+    <li>Devlin &amp; Kudenko (2012). Dynamic Potential-Based Reward Shaping. AAMAS. <a href="https://eprints.whiterose.ac.uk/id/eprint/75121/">link</a></li>
+    <li>Chen et al. (2023). TTC-force Reward Shaping. AAMAS. <a href="https://dl.acm.org/doi/abs/10.5555/3545946.3598797">link</a></li>
+    <li>Han et al. (2022). RVO-Shaped Rewards. arXiv:2203.10229. <a href="https://arxiv.org/abs/2203.10229">link</a></li>
+    <li>Xie &amp; Dames (2023). DRL-VO. IEEE T-RO, arXiv:2301.06512. <a href="https://arxiv.org/abs/2301.06512">link</a></li>
+    <li>Yang, Werner, de Sa &amp; Ames (2025). CBF-RL. arXiv:2510.14959. <a href="https://arxiv.org/abs/2510.14959">link</a></li>
+    <li>Long et al. (2025). Neural Configuration-Space Barriers (DR-CBF). arXiv:2503.04929. <a href="https://arxiv.org/abs/2503.04929">link</a></li>
+    <li>Spalter, Roberts &amp; Hiatt (2024). iKinQP-RL Online Safety Corrections. arXiv:2409.08233. <a href="https://arxiv.org/abs/2409.08233">link</a></li>
+    <li>Ma et al. (2024). Eureka. ICLR, arXiv:2310.12931. <a href="https://arxiv.org/abs/2310.12931">link</a></li>
+    <li>Sarukkai et al. (2024). Automated Rewards via LLM Progress Functions. arXiv:2410.09187. <a href="https://arxiv.org/abs/2410.09187">link</a></li>
+    <li>Gao et al. (2026). RF-Agent. arXiv:2602.23876. <a href="https://arxiv.org/abs/2602.23876">link</a></li>
+    <li>Beigi et al. (2026). Adversarial Reward Auditing. arXiv:2602.01750. <a href="https://arxiv.org/abs/2602.01750">link</a></li>
+    <li>Chen et al. (2022). DRL Trajectory Planning Under Uncertain Constraints (Franka SAC, rel pos+vel). Front. Neurorobot. 16:883562. <a href="https://www.frontiersin.org/articles/10.3389/fnbot.2022.883562/full">link</a></li>
+    <li>(2024). Proactive Dynamic Obstacle Avoidance for Safe HRC (SAC, 93%). Manufacturing Letters. <a href="https://www.sciencedirect.com/science/article/pii/S2213846324002359">link</a></li>
+    <li>Ahmad, Hussain &amp; Naeem (2024). Trajectory Planning of Manipulator in Dynamic Env (DDPG, Fetch). arXiv:2403.16652. <a href="https://arxiv.org/abs/2403.16652">link</a></li>
+    <li>Son, Jung &amp; Kim (2025). NeuralSVCD (swept volume = detection, not reward). arXiv:2509.00499. <a href="https://arxiv.org/abs/2509.00499">link</a></li>
+    <li><b>競品</b> (2026). A Trend-Aware RL Approach for Adaptive Motion Planning of Manipulators in Dynamic Environments. EAAI, S0952197626005658. <a href="https://www.sciencedirect.com/science/article/abs/pii/S0952197626005658">link</a></li>
+    <li>(2026). Transformer Human-Motion Forecasting + Safe RL (98.0% vs 90.4%, −60% violations). Front. Neurorobot. 19:1697518, PMC12907402. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12907402/">link</a> — <b>更正後數字</b>。</li>
+  </ol>
+  <p class="body" style="margin-top:14px;font-size:13px;color:var(--ink-soft)"><b>低信心、報告中不倚重</b>：Kalman+RL (ResearchGate 404896521)、MDPI Appl. Sci. 15(8):4496（HTTP 403）。<b>待取得全文</b>：EAAI 趨勢競品、TTC-force（PDF 二進位）——列為下一輪迴圈待辦。</p>
+</section>
+
+</main>
+
+<footer>
+  DynURPlanner · 研究迴圈成果（驗證 + 立身之本重判）· 2026-06<br>
+  基底 = URPlanner (2505.20175)　|　靈感非基礎 = ENPIRE (2606.19980)　|　核心 = 解析連續時間碰撞推理<br>
+  三輪查證 ~25 引用 · 21 驗證 / 1 更正 / 2 低信心 · 督導 fengkang@u.nus.edu
+</footer>
+
+<script>
+  const links=[...document.querySelectorAll('header.top a')];
+  const map=links.map(a=>({a,t:document.querySelector(a.getAttribute('href'))})).filter(x=>x.t);
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){
+    links.forEach(l=>l.classList.remove('active'));
+    const m=map.find(x=>x.t===e.target); if(m)m.a.classList.add('active');}});
+  },{rootMargin:'-12% 0px -78% 0px'});
+  map.forEach(x=>obs.observe(x.t));
+</script>
+</body>
+</html>

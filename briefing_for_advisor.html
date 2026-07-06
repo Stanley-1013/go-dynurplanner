@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>進度簡報 · 動態環境 DRL 運動規劃(給師兄)</title>
+<style>
+  :root{
+    --navy:#10231f;--paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--ur:#2563b8;--corr:#b5871a;--corr-bg:#f6e8c6;--ok:#1f8a54;--ok-bg:#d6ecdd;
+    --maxw:920px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7;font-size:14.5px}
+  header{background:linear-gradient(180deg,#10231f,#16322b);color:#e6f2ec;padding:34px 24px 26px}
+  header .wrap{max-width:var(--maxw);margin:0 auto}
+  header .k{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;color:#3fc79b;text-transform:uppercase}
+  header h1{font-family:Lora,serif;font-size:clamp(1.4rem,2.6vw,2rem);margin:.3em 0 .2em}
+  header p{color:#bcd6cb;max-width:760px;font-size:13.5px;margin:.2em 0 0}
+  main{max-width:var(--maxw);margin:0 auto;padding:26px 24px 70px}
+  h2{font-family:Lora,serif;font-size:1.25rem;color:var(--navy);margin:34px 0 6px}
+  @media (prefers-color-scheme: dark){h2{color:#dfeee7}}
+  .rule{height:3px;width:52px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:2px 0 12px}
+  p,ul,ol{max-width:800px}
+  ul li,ol li{margin-bottom:5px}
+  b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){b{color:#dfeee7}}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin:12px 0}
+  .card.q{border-color:var(--corr)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.5px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase}
+  tr:last-child td{border-bottom:none}
+  img.fig{max-width:100%;border:1px solid var(--rule);border-radius:8px;background:#fff}
+  code,pre{font-family:"IBM Plex Mono",monospace;font-size:12px}
+  code.i{background:var(--paper-2);padding:1px 6px;border-radius:5px}
+  pre{background:#0f231f;color:#dff5ea;padding:12px 16px;border-radius:8px;overflow-x:auto;line-height:1.6}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.06em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.q{background:var(--corr-bg);color:var(--corr)}
+  a{color:var(--ur)}
+  footer{max-width:var(--maxw);margin:0 auto;padding:18px 24px;border-top:1px solid var(--rule);font-size:11px;color:var(--ink-soft);font-family:"IBM Plex Mono",monospace;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="k">Progress Briefing · 2026-07-07</div>
+    <h1>動態環境 DRL 運動規劃:方向落地 + 兩個實證結果 + 四個待拍板</h1>
+    <p>遵照你的兩個指令(障礙區域用 occupancy grid 進狀態;與 RL 結合、不走 search-based;精神承接 URPlanner)。以下是可行性驗證的數據、可直接跑的代碼、以及需要你決定的四件事。10 分鐘可讀完;代碼三行跑起來。</p>
+  </div>
+</header>
+<main>
+
+<h2>① 核心實證發現:離散碰撞檢查在動態場景系統性漏檢(擬作論文 Figure-1)</h2>
+<div class="rule"></div>
+<p>我們把 URPlanner 的解析幾何(線段 vs AABB,Eq.6–10)推廣到<b>連續時間</b>:對控制區間 [t, t+Δt] 內「運動連桿 vs 運動障礙」解出精確首次接觸時刻 τ*(斷點枚舉法,非採樣,不會漏)。拿它當真值,去稽核標準 RL 訓練迴圈用的「逐步端點碰撞檢查」——<b>764 次真實碰撞、3 seeds、Wilson 95% CI</b>:</p>
+<img class="fig" src="code/experiments/results/m1_hardened/figure1_hardened.png" alt="Figure 1">
+<ul>
+  <li><b>標準檢查漏掉 19.0% [16.4%, 21.9%] 的真實碰撞</b>;16 倍子採樣仍漏 0.8%,且已比我們的精確稽核慢(1.92 vs 1.50 ms/步)</li>
+  <li><b>反直覺:低速最糟</b>——0.1 m/s 時漏 45.6%(高速 2.0 m/s 反而只漏 13.9%)。機制:低速碰撞由機械臂<b>自身連桿掃掠</b>主導(擦掠式、碰了就分開,端點看不見);快障礙撞進來會停留,端點看得見。<b>即準靜態基準也在高估安全性</b></li>
+  <li><b>漏掉的不都是輕微擦碰</b>:漏檢事件的最大重疊長中位數 1.4cm,但 q75 = 3.6cm、最大 25.1cm(深接觸,協議全程不可見)</li>
+</ul>
+<p>這組結果同時給了論文三樣東西:動機圖、對「多插幾個採樣點就好」的成本曲線反駁、以及一個領域級的方法論主張(動態 manipulator 基準的碰撞記帳應該用連續時間真值)。</p>
+
+<h2>② 你的柵格指令的落地 + 速度盲問題的解法(已通過 kill test)</h2>
+<div class="rule"></div>
+<ul>
+  <li><b>柵格生成是解析的</b>:AABB→32³ 佔據柵格為純索引算術(0.074 ms/次)——訓練期柵格由參數化空間直接光柵化,<b>全程免模擬器</b>,保住 URPlanner 的血統;部署期同一資料型態自然來自 depth/nvblox</li>
+  <li><b>柵格天生速度盲</b>(單幀無運動資訊;Hart et al. 2112.12465 證明幀堆疊/LSTM 不能穩定補回)。解法:<b>佔據預報輔助任務</b>——編碼器輸出策略潛向量的同時,被迫預測 0.2s 後的佔據柵格;監督標籤由參數空間解析光柵化<b>免費生成</b>。預測未來的唯一途徑是從歷史抽運動 ⇒ 運動資訊被結構性壓入潛向量</li>
+  <li><b>Kill test 已通過</b><span class="tag ok">兩輪對照實驗</span>:預報器在 0.5/1.0/2.0 m/s 同時贏過 persistence(複製最後一幀)與 velocity-blind(k=1)兩個對照(1.0 m/s 時 2.5× persistence);且 k=3 &gt; k=1 於<b>所有</b>速度成立。檢索確認此組合(manipulator 避障 + 預報輔助任務)無先例,最接近工作(arXiv:2508.20457)用的是凍結預測器,界線乾淨</li>
+</ul>
+
+<h2>③ 可直接跑的代碼(介面跟你的棧同源)</h2>
+<div class="rule"></div>
+<p>看了莫烦那個系列——我們把所有機器包成了同一個介面形狀的環境類 <code class="i">DynArmEnv</code>:<code class="i">reset() → s</code>、<code class="i">step(a) → (s, r, done)</code>、關節增量動作、免模擬器。你現有的 DDPG/TD3/APE2 訓練代碼理論上可以直接掛上來。</p>
+<pre>cd code && python3 -m pytest tests/ -q   # 32 項測試(幾何 vs 暴力採樣、FK 結構性質、穿隧回歸案例)
+python3 demo.py                          # 30 秒 demo,輸出如下</pre>
+<pre># demo 摘錄:同場景、機械臂靜止、障礙逼近——兩種獎勵模式逐步對比
+  t= 10: r_uoar= -0.3961   r_ct= -0.3961
+  t= 11: r_uoar= -0.3961   r_ct= -1.5947  &lt;- CT 在接觸前兩步就有預期性懲罰
+  t= 12: r_uoar= -0.8446   r_ct= -6.2982
+  t= 13: r_uoar= -5.8547   r_ct=-11.3183  [碰撞,episode 結束]</pre>
+<table>
+  <tr><th>模組</th><th>內容</th></tr>
+  <tr><td><code class="i">godynur/panda.py</code></td><td>Panda modified-DH FK(同 URPlanner Eq.4 convention)、四段連桿合併((1,2),(3,4),(5,6),(7,法蘭))、弦誤差保守界(供無穿隧保證引理)</td></tr>
+  <tr><td><code class="i">godynur/geometry.py</code></td><td>Eq.6–10 靜態重疊 + UOAR(對暴力採樣驗證)</td></tr>
+  <tr><td><code class="i">godynur/continuous.py</code></td><td>連續時間核心:精確 τ*、掃掠重疊積分、保守膨脹——D-UOAR-CT 獎勵與安全屏蔽共用同一套根運算</td></tr>
+  <tr><td><code class="i">godynur/voxelizer.py / forecast.py</code></td><td>解析光柵化(0.074ms)+ U-Net 佔據預報器(輔助頭)</td></tr>
+  <tr><td><code class="i">godynur/env.py</code></td><td><b>DynArmEnv</b>:移動障礙、連續時間精確碰撞記帳(不可穿隧的 env)、獎勵模式一鍵切換 <code class="i">'uoar'</code>/<code class="i">'ct'</code>(消融軸)、<code class="i">grid_history()</code> 出 (k,32³) 柵格觀測</td></tr>
+</table>
+
+<h2>④ 需要你拍板的四件事</h2>
+<div class="rule"></div>
+<div class="card q">
+  <ol style="margin:0">
+    <li><span class="tag q">Q1</span><b>連桿包覆圓柱半徑 a_r 的數值</b>:論文文字裡沒找到具體值,我們暫用 0.06m——你們實際用多少?(a_o=5cm 已從論文對齊)</li>
+    <li><span class="tag q">Q2</span><b>柵格語義</b>:你設想的是純二值佔據,還是可接受距離場/多值編碼?我們建議先二值打通、距離場當消融升級。</li>
+    <li><span class="tag q">Q3</span><b>特權訓練架構的認可</b>:policy 只觀測柵格(部署現實),但訓練期的獎勵/屏蔽用參數空間的解析真值(盒+速度)計算——標準 privileged learning。這樣「柵格觀測」與「URPlanner 解析精神」不打架。這個架構 OK 嗎?</li>
+    <li><span class="tag q">Q4</span><b>資源</b>:M2 訓練需要 GPU(實驗室 4090?我筆電的 3070 可跑小規模);之後真機 Franka 檔期;另外我們想對 DRP(CoRL 2025,程式碼已開源)的權重做同樣的連續時間稽核,它的環境需要 py3.8+CUDA pointnet2,建議用實驗室機器。</li>
+  </ol>
+</div>
+
+<h2>⑤ 建議的投稿切法(供討論)</h2>
+<div class="rule"></div>
+<table>
+  <tr><th>第一篇(紮實,RA-L / IROS)</th><th>第二篇(高賣點,CoRL / ICRA,需第一篇先成)</th></tr>
+  <tr><td>連續時間碰撞推理:穿隧率方法論(Figure-1)+ D-UOAR-CT 獎勵(把 UOAR 的碰撞代價修正為連續時間真值)+ APE2 候選屏蔽 + 無穿隧保證引理。全部源於 URPlanner 解析空間的時間推廣。</td><td>GO-DynURPlanner 完整系統:柵格觀測 + 佔據預報輔助任務(治速度盲)+ 課程學習,對照 DRP/cuRobo/EAAI 趨勢競品,真機驗證。</td></tr>
+</table>
+
+<p style="font-size:12.5px;color:var(--ink-soft)">完整研究過程(七輪迴圈:交叉分析→深度展開→查證修正→宏觀重判→更正扎根→藍圖→執行)記錄在 <code class="i">index.html</code>,含每一輪的驗證帳本與被數據推翻的假設——選讀。</p>
+
+</main>
+<footer>briefing for fengkang@u.nus.edu · GO-DynURPlanner · 2026-07-07 · 資料/代碼:papper-research/(index.html 為總覽)</footer>
+</body>
+</html>
