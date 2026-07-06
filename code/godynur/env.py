@@ -55,9 +55,12 @@ class DynArmEnv:
         zeta_c: float = 1.0,   # current-overlap weight (URPlanner zeta)
         zeta_s: float = 1.0,   # swept-integral weight (CT mode)
         zeta_t: float = 0.1,   # continuous-TTC weight (CT mode)
+        task: str = "random",  # 'random' | 'tabletop' (URPlanner-style)
         seed: int = 0,
     ):
         assert reward_mode in ("uoar", "ct")
+        assert task in ("random", "tabletop")
+        self.task = task
         self.kin = PandaKinematics()
         self.speed = speed
         self.n_obstacles = n_obstacles
@@ -68,6 +71,9 @@ class DynArmEnv:
         self.k_frames = k_frames
         self.spec = GridSpec(lo=WS_LO, hi=WS_HI, n=grid_n)
         self.rng = np.random.default_rng(seed)
+        # Fixed obstacle slots (zero-padded): curriculum can lower the LIVE
+        # obstacle count without changing the network's input width.
+        self.n_obstacles_max = n_obstacles
         # 7 q + 3 flange + 3 goal + 3 delta + 1 dwell flag
         self.state_dim = 17 + (6 * n_obstacles if obstacles_in_state else 0)
         # Episode stats maintained for Figure-1-style instrumentation.
@@ -76,12 +82,39 @@ class DynArmEnv:
 
     # ---- Morvan interface -------------------------------------------------
 
-    def reset(self) -> np.ndarray:
+    # Franka 'ready' pose (standard home configuration).
+    Q_HOME = np.array([0.0, -0.3, 0.0, -2.2, 0.0, 2.0, 0.79])
+    # Table-top goal region (URPlanner-style: goals above the table in
+    # front of the robot).
+    GOAL_LO = np.array([0.25, -0.35, 0.15])
+    GOAL_HI = np.array([0.70, 0.35, 0.70])
+
+    def set_difficulty(self, n_obstacles: int, speed: float) -> None:
+        """Curriculum hook: takes effect at the next reset(). The live
+        obstacle count may not exceed n_obstacles_max (state slots are
+        fixed at construction; absent obstacles are zero-padded)."""
+        assert n_obstacles <= self.n_obstacles_max
+        self.n_obstacles = n_obstacles
+        self.speed = speed
+
+    def _sample_start_goal(self):
+        if self.task == "tabletop":
+            q = self.Q_HOME + self.rng.normal(0.0, 0.05, 7)
+            q = np.clip(q, Q_MIN, Q_MAX)
+            for _ in range(500):
+                goal = self.kin.flange(Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN))
+                if np.all(goal >= self.GOAL_LO) and np.all(goal <= self.GOAL_HI):
+                    return q, goal
+            # Fallback: nearest reachable sample to the region center.
+            return q, self.kin.flange(Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN))
         for _ in range(200):
-            self.q = Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN)
-            if self.kin.flange(self.q)[2] > 0.15:
+            q = Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN)
+            if self.kin.flange(q)[2] > 0.15:
                 break
-        self.goal = self.kin.flange(Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN))
+        return q, self.kin.flange(Q_MIN + self.rng.random(7) * (Q_MAX - Q_MIN))
+
+    def reset(self) -> np.ndarray:
+        self.q, self.goal = self._sample_start_goal()
         margin = self.a_r + self.a_o
         for _ in range(100):
             self.scene: DynamicScene = sample_scene(
@@ -182,6 +215,8 @@ class DynArmEnv:
             for ob in self.scene.obstacles:
                 parts.append(ob.center - flange)
                 parts.append(ob.vel)
+            for _ in range(self.n_obstacles_max - len(self.scene.obstacles)):
+                parts.append(np.zeros(6))
         return np.concatenate(parts).astype(np.float32)
 
     # ---- internals -----------------------------------------------------------
