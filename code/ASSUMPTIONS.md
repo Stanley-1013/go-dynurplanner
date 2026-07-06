@@ -55,7 +55,16 @@ that WILL need a value/decision from the lab.
   (`tests/test_panda.py`), but **cross-check numerically against the lab's
   FK or CoppeliaSim model when available**.
 
-## 7. Training hyperparameters (Table I, for later APE2 reproduction)
+## 7. Pose reward phi_aux — APPROXIMATED
+- URPlanner Eq.(11): r_pose = -(e_p + e_o) + phi_aux + phi_G. phi_aux's
+  exact form is in their ref [9] Eqs.(12-13) (not obtained). Implemented as
+  0.5*exp(-err/0.08); phi_G = 1 inside tolerance; orientation error e_o
+  dropped for now (position goals). Verified empirically: stage-0 reaching
+  goes from unlearnable (0.2 rolling success @1600 eps with bare -err +
+  dwell-5) to 0.73 @500 eps. **Swap in the exact phi_aux when [9]/lab code
+  arrives.**
+
+## 8. Training hyperparameters (Table I, for later APE2 reproduction)
 - lr 1e-3, memory 6e4, soft update 0.01, batch 64, ξ=0.98, ζ=1,
   M=2, N=3 (→ 7 candidates), T=2e5, H=1, ω1=0.6, ω2=0.1, N_D=80, φ=0.1,
   T_B=2e3. Our TD3 baseline uses its own standard hypers; APE2

@@ -69,7 +69,8 @@ def run_one(reward_mode: str, episodes: int, seed: int):
         task="tabletop", n_obstacles=3, reward_mode=reward_mode, seed=10_000 + seed
     )
     agent = TD3(
-        env.state_dim, env.action_dim, action_scale=env.action_bound[1], seed=seed
+        env.state_dim, env.action_dim, action_scale=env.action_bound[1],
+        expl_noise=0.25, seed=seed,
     )
     stage_idx = 0
     env.set_difficulty(*STAGES[stage_idx])

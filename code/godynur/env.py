@@ -39,7 +39,7 @@ class DynArmEnv:
     action_bound = [-0.05, 0.05]  # rad per step per joint (lemma budget)
     action_dim = 7
     goal_tol = 0.05  # m
-    goal_dwell = 5  # consecutive in-goal steps to finish (Morvan's on_goal)
+    goal_dwell = 1  # reach = success (URPlanner phi_G semantics)
     max_steps = 100
 
     def __init__(
@@ -152,7 +152,6 @@ class DynArmEnv:
         err = np.linalg.norm(self.kin.flange(self.q) - self.goal)
         if err < self.goal_tol:
             self.on_goal += 1
-            r += 1.0
         else:
             self.on_goal = 0
         done = collided or self.on_goal >= self.goal_dwell or self.t >= self.max_steps
@@ -273,7 +272,14 @@ class DynArmEnv:
 
     def _reward(self, dq) -> float:
         flange = self.kin.flange(self.q + dq)
-        r_pose = -np.linalg.norm(flange - self.goal)
+        err = np.linalg.norm(flange - self.goal)
+        # URPlanner Eq.(11): r_pose = -(e_p + e_o) + phi_aux + phi_G.
+        # Position-only for now (ASSUMPTIONS.md item 2). phi_aux's exact form
+        # lives in their ref [9] (Eqs.12-13, not obtained); implemented as an
+        # exponential proximity bonus — swap when the lab code arrives.
+        phi_aux = 0.5 * np.exp(-err / 0.08)
+        phi_g = 1.0 if err < self.goal_tol else 0.0
+        r_pose = -err + phi_aux + phi_g
         margin = self.a_r + self.a_o
         segs_now = self.kin.segments(self.q + dq)
         r_current = uoar(segs_now, self._boxes(margin))  # <= 0
