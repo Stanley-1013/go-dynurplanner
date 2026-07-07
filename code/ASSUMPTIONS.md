@@ -1,4 +1,11 @@
-# Interface Assumptions — to be reconciled when 師兄's code arrives
+# Interface Assumptions
+
+> **2026-07-08: advisor's real code arrived (0801pretrain.zip, kept OUT of
+> git per .gitignore — unpublished lab code). Reconciliation against
+> `Franka_Env_Scene2.py`, `panda_fk.py`, `Ray_Box_Intersection.py`,
+> `main.py` below. Full catalog of E3AC variants / dual-memory / ED2 /
+> CoppeliaSim interface files delegated to a subagent — see item 9.**
+ — to be reconciled when 師兄's code arrives
 
 > **2026-07-07 advisor reply (partial reconciliation)**: URPlanner code
 > arriving tonight. a_o = 5 cm confirmed (matches item as extracted).
@@ -16,7 +23,74 @@ paper full text). Each item lists: what we assumed, the evidence, and what
 to do when the lab's actual code arrives. Items marked ⚠ are placeholders
 that WILL need a value/decision from the lab.
 
-## 1. Environment interface (Morvan-style) — HIGH CONFIDENCE
+## 0. REAL CODE RECONCILIATION (2026-07-08) — supersedes items below where noted
+
+- **FK: VERIFIED EXACT.** Numerically compared `panda.py.joint_origins()`
+  against `panda_fk.py`/`Franka_Env_Scene2.get_fk_solution()` for
+  q=[0,0,0,-90,0,90,45]deg: joint2/joint4/joint6 positions match to full
+  float precision (both go through the same 7-row DH table, same
+  a/d/alpha values). **Only the final tool offset differs by design**:
+  theirs = joint7 + 0.207m(135° twist) + 0.05m (task-specific
+  gripper/tool TCP, only in the ENV class's 9-row table — the standalone
+  `panda_fk.py` module has just the 8-row/0.207m version, itself
+  inconsistent with the env — sloppy but harmless since env is what's
+  used); mine = joint7 + 0.107m (bare standard Panda flange). Not a bug —
+  a config choice. Swap-in point: replace `panda.py`'s last `_MDH` row
+  with `[0, 0.257, 0]` (net) if exact TCP matching is ever needed.
+- **Collision geometry: VERIFIED SAME ALGORITHM.**
+  `Ray_Box_Intersection.Box.get_intersect_length` is the identical slab
+  method as `geometry.segment_box_overlap` (t0/t1 clamped to [0,1],
+  near/far intersection points) — line-for-line equivalent logic.
+- **Env interface: WRONG, must fix.** Real `step()` returns a **5-tuple**
+  `(next_state, reward, done, pose_error, orient_error)`, not the 3-tuple
+  I assumed. `reset()` still returns `s` alone. No `sample_action()` on
+  the class itself in the clean sense (there's one but it buggily
+  references a module-global `env` — don't replicate that bug).
+- **Action scale: WRONG, must fix.** `action_bound = [-1.5, 1.5]` in
+  **degrees**, converted via `action * pi/180` — i.e. real per-step joint
+  change is **≤0.02618 rad**, roughly HALF my 0.05 rad assumption. Also:
+  algorithm is called **E3AC** (one of the three backbones URPlanner's
+  APE2 wraps — DDPG/TD3/E3AC per the paper), implemented as class methods
+  `extensive_exploration_strategy` (candidate generation) and
+  `evaluate_and_choose_optimal_action` (hybrid eval) directly on the E3AC
+  class — this IS APE2's mechanism, just named/organized differently.
+  Framework is **TensorFlow 1.x** (`tf.set_random_seed`,
+  `tf.compat.v1`-era), not PyTorch — a real stack mismatch with our
+  code (see item 9 for how to handle).
+- **State: WRONG, must fix.** Real state is **20-D**: `[q(7), TCP_pos(3,
+  /3), goal_pos(3, /3), Δpos(3), Δorient(3, /180), on_goal_flag(1)]` —
+  **includes orientation** (I dropped it). Confirms URPlanner Eq.(2)'s
+  Δo term is real and used; my position-only simplification should be
+  flagged explicitly as a scope-reduction in any writeup, not silently
+  matched to the paper's state definition.
+- **Reward: WRONG, must fix — and this is the real find.** The actual
+  φ_aux-equivalent is NOT a smooth exponential proximity bonus (my
+  guess) — it's a **discrete step-improvement PBRS**: `+0.05` if
+  distance-to-goal decreased this step else `-0.05`; separately `+0.03`/
+  `-0.03` for orientation improvement/worsening. Plus base pose term
+  `-Δpos_norm - Δorient_norm`, plus `-total_intersection_length /
+  total_link_length` (their name for our UOAR term — confirms UOAR's
+  real form: normalize by `total_link_length = 0.9101`, no ζ weighting
+  visible at this call site), plus `+1` per step while inside tolerance.
+  **`goal_dwell` = 50 consecutive in-tolerance steps for `done=True`**
+  (Morvan's original value) — I had changed this to 1; WRONG, revert to
+  50 (or re-verify why I thought 1 was closer to "URPlanner phi_G
+  semantics" — the real code says otherwise: φ_G is a per-step +1, not
+  the termination condition itself).
+- **Obstacle model: scene-specific, not general.** `Franka_Env_Scene2.py`
+  (their STATIC baseline reproduction of URPlanner, no dynamic obstacles
+  at all) hardcodes exactly 4 fixed AABBs and checks only **3 link
+  segments** (joint2→joint4, joint4→joint6, joint6→end — link1
+  base→joint2 is never checked, presumably provably clear of their fixed
+  boxes in that scene). My 4-segment convention
+  `[(0,2),(2,4),(4,6),(6,8)]` is the paper's general recommendation and
+  fine to keep for a general dynamic-obstacle env — just note the
+  baseline reproduction target uses fewer segments.
+- **CoppeliaSim confirmed a second way**: `sim.py`/`simConst.py` present
+  (classic V-REP/CoppeliaSim legacy remote API bindings) — matches Loop 7
+  full-text finding.
+
+
 - **Assumed**: `env.reset() -> s`, `env.step(a) -> (s, r, done)` (3-tuple,
   no gym `info`), class attrs `state_dim` / `action_dim` / `action_bound`,
   `sample_action()`. Hand-rolled analytic env, no gym dependency.

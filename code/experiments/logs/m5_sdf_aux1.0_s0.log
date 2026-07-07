@@ -1,3 +1,19 @@
 /home/han/claude_project/papper-research/code/godynur/grid_td3.py:217: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
 Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:838.)
   self.last_aux_loss = float(aux)
+[aux1 seed0] ep 122: ADVANCE to (2, 0.1)
+[aux1 seed0] ep  200 | stage 1 | roll 0.13 | final succ 0.30 coll 0.57 | aux 0.0256 | 799.1s
+[aux1 seed0] ep  400 | stage 1 | roll 0.35 | final succ 0.23 coll 0.63 | aux 0.0110 | 2714.8s
+[aux1 seed0] ep  600 | stage 1 | roll 0.64 | final succ 0.27 coll 0.43 | aux 0.0259 | 4329.9s
+[aux1 seed0] ep  800 | stage 1 | roll 0.58 | final succ 0.47 coll 0.40 | aux 0.0514 | 6144.6s
+[aux1 seed0] ep 1000 | stage 1 | roll 0.66 | final succ 0.53 coll 0.43 | aux 0.0261 | 7953.8s
+[aux1 seed0] ep 1041: ADVANCE to (3, 0.25)
+[aux1 seed0] ep 1200 | stage 2 | roll 0.67 | final succ 0.70 coll 0.23 | aux 0.0259 | 9337.2s
+[aux1 seed0] ep 1400 | stage 2 | roll 0.63 | final succ 0.47 coll 0.50 | aux 0.0498 | 10502.1s
+[aux1 seed0] ep 1600 | stage 2 | roll 0.59 | final succ 0.67 coll 0.33 | aux 0.0225 | 11902.9s
+[aux1 seed0] ep 1800 | stage 2 | roll 0.67 | final succ 0.60 coll 0.33 | aux 0.0580 | 13271.0s
+[aux1 seed0] ep 2000 | stage 2 | roll 0.77 | final succ 0.80 coll 0.03 | aux 0.0285 | 14626.1s
+[aux1 seed0] ep 2200 | stage 2 | roll 0.73 | final succ 0.67 coll 0.20 | aux 0.0572 | 15899.5s
+[aux1 seed0] ep 2400 | stage 2 | roll 0.76 | final succ 0.73 coll 0.17 | aux 0.0697 | 17260.4s
+[aux1 seed0] ep 2500 | stage 2 | roll 0.73 | final succ 0.70 coll 0.27 | aux 0.0696 | 18017.3s
+   aux1 final: succ 0.70 | true-coll 0.27
