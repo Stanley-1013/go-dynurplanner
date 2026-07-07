@@ -65,6 +65,7 @@
     <a href="#h2-first-read">H2 首讀</a>
     <a href="#advisor-directives">師兄指令落地</a>
     <a href="#next">下一步</a>
+    <a href="#h2b">H2二讀</a>
   </nav>
 </header>
 <div class="hero">
@@ -121,6 +122,24 @@
   <div class="card core">
     <b class="label">概念疏理</b>
     <p class="body" style="margin:0">MD 特徵進觀測不與 URPlanner 的 MD-independent 獎勵主張衝突。<b>SDF-16³ + closest-point 四臂(aux on/off × 2 seeds)已開跑</b>。</p>
+  </div>
+</section>
+
+<section id="h2b">
+  <div class="eyebrow">H2 Second Read</div>
+  <h2 class="sec">H2 二讀:binary-32 vs SDF-16+closest-point(師兄配置對照)</h2>
+  <div class="rule"></div>
+  <table>
+    <tr><th>設定</th><th>succ(均值±std, n)</th><th>coll</th></tr>
+    <tr><td>向量參考線(obstacles_in_state)</td><td>0.65</td><td>0.25</td></tr>
+    <tr><td>binary-32, aux=1</td><td>0.506±0.25 (n=4)</td><td>0.394</td></tr>
+    <tr><td>binary-32, aux=0</td><td>0.622±0.10 (n=4)</td><td>0.311</td></tr>
+    <tr><td>sdf-16+closest, aux=1</td><td>0.478±0.22 (n=2)</td><td>0.394</td></tr>
+    <tr><td><b>sdf-16+closest, aux=0</b></td><td><b>0.700±0.07 (n=2)</b></td><td><b>0.250</b></td></tr>
+  </table>
+  <div class="card core">
+    <b class="label">誠實記錄:一個實驗設計 confound,而非明確的 SDF 優勢</b>
+    <p class="body" style="margin:0">SDF+closest-point 的 aux=0 臂(0.70/0.25)打平向量參考線,是目前最佳柵格結果——但 <b>aux=1 臂的失敗模式在 binary 與 SDF 之間幾乎逐位重複</b>:seed1 在 binary(succ 0.26/coll 0.66)與 SDF(succ 0.26/coll 0.58)兩種柵格下數字幾乎相同、都卡在 stage 1。這強烈暗示 <b>seed=1 本身是難的初始化/課程路徑,與柵格模式或 aux 開關無關</b>——目前的 n=2 設計讓不同 arm 共用同一組 seed 數值,不是真正獨立抽樣,污染了 A/B 比較的效度。結論:SDF 是否真的比二值好、aux 是否真的有幫助,<b>目前證據不足以下判斷</b>;下一輪需要 seed 與 arm 解耦(每個 arm 用獨立隨機種子而非共用 0/1)、且 n≥4。這個 confound 本身是寫進論文方法論章節的誠實材料。</p>
   </div>
 </section>
 

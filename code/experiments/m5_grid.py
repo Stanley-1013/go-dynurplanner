@@ -158,6 +158,8 @@ def main():
     ap.add_argument("--grid-mode", type=str, default="binary")
     ap.add_argument("--grid-n", type=int, default=32)
     ap.add_argument("--closest-point", action="store_true")
+    ap.add_argument("--seed-salt", type=int, default=0,
+                    help="added to seed so arms don't share seed values (confound found in Loop 9 H2)")
     ap.add_argument("--out", type=str, default="experiments/results/m5_grid")
     args = ap.parse_args()
 
@@ -168,8 +170,8 @@ def main():
         key = f"aux{lam:g}"
         results[key] = {}
         for seed in range(args.seed_offset, args.seed_offset + args.seeds):
-            results[key][seed] = run_one(lam, args.episodes, seed, args.device,
-                                         args.learn_every, args.grid_mode,
+            results[key][seed] = run_one(lam, args.episodes, seed + args.seed_salt,
+                                         args.device, args.learn_every, args.grid_mode,
                                          args.grid_n, args.closest_point)
     tag = f"{args.arms.replace(',','-')}_s{args.seed_offset}_{args.grid_mode}{args.grid_n}"
     with open(out_dir / f"m5_{tag}.json", "w") as f:
