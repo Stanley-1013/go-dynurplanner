@@ -214,7 +214,7 @@ class GridTD3:
                     reduction="none",
                 ).mean(dim=(1, 2, 3), keepdim=True)
             aux = (per_vox * fmask).sum() / fmask.sum()
-            self.last_aux_loss = float(aux)
+            self.last_aux_loss = float(aux.detach())
             loss = loss + self.lambda_aux * aux
         self.opt_c.zero_grad()
         loss.backward()
