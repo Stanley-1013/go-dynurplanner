@@ -249,3 +249,14 @@ worklist to clear before these numbers/claims go into the paper:
     percentages are paywalled-full-text single-source.
 16. Bricher & Mueller (2025). ISO/TS 15066. arXiv:2511.19094. —
     single-source, untagged.
+
+## Addendum (added by lead — direct evidence outside the log files)
+
+- Morvan Zhou. train-robot-arm-from-scratch. GitHub (repo tree + final/env.py
+  read directly 2026-07-07). [VERIFIED] — lab code lineage; Morvan env
+  interface contract. https://github.com/MorvanZhou/train-robot-arm-from-scratch
+- cuRoboV2: Dynamics-Aware Motion Generation... arXiv:2603.05493.
+  [ABSTRACT-ONLY] — depth-fused distance fields; GPU-planner evolution.
+- MDRLAT-type velocity-regression auxiliary for mobile robots (Sensors 2021).
+  [UNVERIFIED — re-locate exact citation before use] — prior art boundary
+  for the forecasting-auxiliary novelty claim.
