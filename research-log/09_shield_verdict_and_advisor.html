@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop 9 · H4 屏蔽判定、H2 首讀、師兄指令落地</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--ur:#2563b8;--key:#7c3aed;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);--maxw:1080px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .hero{max-width:var(--maxw);margin:0 auto;padding:46px 24px 14px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.6rem,3.2vw,2.5rem);line-height:1.18;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){h1{color:#dfeee7}}
+  h1 em{font-style:italic;color:var(--core)}
+  .deck{font-size:15px;color:var(--ink-soft);max-width:820px}
+  main{max-width:var(--maxw);margin:0 auto;padding:14px 24px 90px}
+  section{margin-top:50px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.3rem,2.2vw,1.85rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body,ul.body,ol.body{font-size:14.5px;line-height:1.8;max-width:820px}
+  ul.body li,ol.body li{margin-bottom:6px}
+  p.body b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){p.body b{color:#dfeee7}}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.core{border-color:var(--core)}
+  .card.corr{border-color:var(--corr)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox.corr{border-left-color:var(--corr)}
+  b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+  b.label.corr{color:var(--corr)}
+  a{color:var(--ur)}
+  img.fig{max-width:100%;border:1px solid var(--rule);border-radius:10px;background:#fff}
+  code.inline{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--paper-2);padding:1px 6px;border-radius:5px}
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 9</span>
+    <a href="#h4-shield">H4 屏蔽判定</a>
+    <a href="#h2-first-read">H2 首讀</a>
+    <a href="#advisor-directives">師兄指令落地</a>
+    <a href="#next">下一步</a>
+  </nav>
+</header>
+<div class="hero">
+  <div class="kicker">Loop 9 · Shield Verdict & Advisor Directives</div>
+  <h1>H4:<em>屏蔽判定成立</em>,H2 首讀不可判,師兄指令全面落地</h1>
+  <p class="deck">本輪把 M4 從「被動階梯困死絕境 episode」修正為「主動閃避」,承重實驗顯示屏蔽把碰撞轉換為誠實可計數的 no_safe 事件——H4 判定成立。同時 M5 二值柵格首讀因 n=2 seeds 方差過大而不可判,但柵格觀測本身可用的結論站住。師兄 2026-07-07 回覆的四項指令(URPlanner 代碼、a_o 確認、SDF 柵格、最近障礙點特徵)已全部落地,SDF-16³ 四臂已開跑。</p>
+</div>
+<main>
+
+<section id="h4-shield">
+  <div class="eyebrow">H4 · Shield Verdict</div>
+  <h2 class="sec">H4:認證屏蔽成立(承重實驗過關)</h2>
+  <div class="rule"></div>
+  <p class="body">M4-v2(部署語義評估:actor 動作 + 認證階梯;η 退火 150k;tabletop 課程)訓練後,發現被動階梯(只會沿 actor 方向減速/停住)會困死被逼入絕境的 episode——shield 平均 succ 0.53/碰撞 0.34。改為「主動閃避」:actor 動作認證失敗時先在候選池搜尋已認證的替代動作(仍是硬保證)。用已存權重直接重評估(免重訓,<code class="inline">experiments/m4_reeval.py</code>):</p>
+  <table>
+    <tr><th>設置</th><th>seed0 succ / coll</th><th>seed1 succ / coll</th><th>平均 succ / coll</th></tr>
+    <tr><td>shield</td><td>0.68 / 0.20</td><td>0.67 / 0.28</td><td>0.675 / 0.24</td></tr>
+    <tr><td>noshield</td><td>0.05 / 0.65</td><td>0.30 / 0.52</td><td>0.175 / 0.585</td></tr>
+  </table>
+  <div class="verdictbox">
+    <b class="label">結果:成功率近 4 倍、碰撞減半以上</b>
+    <p class="body" style="margin:0">關鍵語義:<b>認證動作零碰撞</b>(性質測試 + 訓練全程成立);殘餘碰撞每一筆都對應 <code class="inline">no_safe</code> 事件(當下動作族內不存在安全動作,誠實計數:seed0 23 次、seed1 39 次)。論文主張形狀:<b>「shield converts collisions from policy mistakes into certified-unavoidable events」</b>。</p>
+  </div>
+</section>
+
+<section id="h2-first-read">
+  <div class="eyebrow">H2 · Binary Grid First Read</div>
+  <h2 class="sec">H2 首讀:不可判(seed 方差壓過處理效應)</h2>
+  <div class="rule"></div>
+  <p class="body">M5(binary 32³ 柵格、<code class="inline">obstacles_in_state=False</code>、n=2 seeds):</p>
+  <table>
+    <tr><th>設置</th><th>succ / coll</th><th>備註</th></tr>
+    <tr><td>aux1 (seed a)</td><td>0.81 / 0.13</td><td>最好的一臂</td></tr>
+    <tr><td>aux1 (seed b)</td><td>0.26 / 0.66</td><td>最差,卡在 stage 1</td></tr>
+    <tr><td>aux0 (seed a)</td><td>0.61 / 0.28</td><td>中間</td></tr>
+    <tr><td>aux0 (seed b)</td><td>0.48 / 0.47</td><td>中間</td></tr>
+  </table>
+  <div class="verdictbox corr">
+    <b class="label corr">判定</b>
+    <p class="body" style="margin:0">aux1 出了最好與最差的兩臂,aux0 落在中間——<b>n=2 不可判</b>,誠實記錄;binary 柵格整體與向量參考(0.65/0.25)相當——「柵格觀測本身可用」成立,師兄「二值難學」的直覺在無噪聲解析柵格上未顯現(其直覺可能來自真實感測柵格,SDF 對照將直接檢驗)。</p>
+  </div>
+</section>
+
+<section id="advisor-directives">
+  <div class="eyebrow">Advisor Directives</div>
+  <h2 class="sec">師兄指令落地(2026-07-07 回覆)</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li><s>URPlanner 代碼</s> 今晚送達(<code class="inline">ASSUMPTIONS.md</code> 對賬時刻)</li>
+    <li><s>a_o=5cm</s> 確認(與論文抽取值一致)</li>
+    <li><b>柵格改 SDF + 粗解析度(16³)</b>——已實作 <code class="inline">rasterize_sdf</code>(盒聯集符號距離、±0.5m 裁剪)、預報頭改 Huber 回歸</li>
+    <li><b>向量觀測加最近障礙點特徵</b>——segment-AABB 最近點為凸問題,三分搜索精確解(brute-force 驗證誤差 &lt;1e-4),新增 [距離, 單位方向, 相對法蘭位置] 7 維</li>
+  </ol>
+  <div class="card core">
+    <b class="label">概念疏理</b>
+    <p class="body" style="margin:0">MD 特徵進觀測不與 URPlanner 的 MD-independent 獎勵主張衝突。<b>SDF-16³ + closest-point 四臂(aux on/off × 2 seeds)已開跑</b>。</p>
+  </div>
+</section>
+
+<section id="next">
+  <div class="eyebrow">Next</div>
+  <h2 class="sec">下一步</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li>SDF 臂結果 → H2 二讀(含師兄直覺對照)</li>
+    <li>URPlanner 代碼對賬(<code class="inline">ASSUMPTIONS.md</code> 8 項逐條)</li>
+    <li>M1 用最終 a_r 重跑</li>
+    <li>論文一(<code class="inline">paper/PAPER1_PLAN.md</code>)數字凍結</li>
+  </ol>
+</section>
+
+</main>
+<footer>Loop 9 執行紀錄 · H4 屏蔽判定成立(0.675/0.24 vs 0.175/0.585)· H2 首讀不可判 · 師兄指令四項落地,SDF 四臂開跑 · 2026-07-08</footer>
+</body>
+</html>

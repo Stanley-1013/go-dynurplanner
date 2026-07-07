@@ -101,9 +101,14 @@
     <div><div class="t">RL 訓練線：負結果三連發（Loop 8）</div><div class="d"><b>平坦協議不可學</b>：flat M3（全隨機起點/終點＋3 障礙 @0.25m/s）TD3 訓練 0% 成功（uoar/ct 兩模式皆然），證成課程必要性。<b>Eq.11 獎勵考古</b>：stage-0 純追近獎勵原本學不動（rolling 0.2 @1600 eps），補上 URPlanner phi_aux 輔助項後 0.73 @500 eps（3.5×）。<b>H3 首輪</b>：課程訓練下 uoar 兩 seed 到達 stage 2（成功 0.65），ct 兩 seed 卡在 stage 1（成功 0.17）——診斷為 TTC 項無界化摧毀 critic，修正為有界形式後 ct-v2 重跑中</div><div class="meta">2026-07-07 · 三次誠實負結果 · 立場：失敗被診斷，不被隱藏</div></div>
   </a>
 
+  <a class="item" href="research-log/09_shield_verdict_and_advisor.html">
+    <div class="n">12</div>
+    <div><div class="t">H4 屏蔽成立 + 師兄指令落地（Loop 9）</div><div class="d">主動閃避屏蔽承重實驗過關：shield 0.675 succ / 0.24 coll vs noshield 0.175 / 0.585（近 4 倍成功率、碰撞減半以上），殘餘碰撞皆為誠實 no_safe 事件；H2 二值柵格首讀 n=2 不可判；師兄四項指令落地，柵格轉向 SDF + 最近障礙點特徵，SDF-16³ 四臂已開跑</div><div class="meta">2026-07-08 · H4 判定成立 · 立場：屏蔽把碰撞轉為可證的不可避免事件</div></div>
+  </a>
+
   <div class="lane">Next</div>
   <div class="item" style="opacity:.75">
-    <div class="n">12</div>
+    <div class="n">13</div>
     <div><div class="t">見師兄（關鍵路徑）→ M2-full 訓練（待辦）</div><div class="d">帶 Loop 7 數據 + DynArmEnv demo；確認 a_r、柵格語義、特權訓練、資源；回來後在 DynArmEnv 上跑 DDPG/SAC 基線 → 接柵格編碼器＋預報輔助頭（GPU）</div></div>
   </div>
 </main>
