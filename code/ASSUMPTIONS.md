@@ -90,16 +90,59 @@ that WILL need a value/decision from the lab.
   (classic V-REP/CoppeliaSim legacy remote API bindings) — matches Loop 7
   full-text finding.
 
+## 0.5 Catalog of remaining files (2026-07-08, full report in
+`advisor_code_catalog.md`, produced by a cataloging subagent, spot-checked)
+
+- **Our eta-annealed hybrid evaluation design is independently validated.**
+  The paper's APE2 mechanism is only actually LIVE in one file
+  (`main_E3AC_foresee.py`): `eta_1 = clip(counter/200000, 0, 1)` blends a
+  one-step lookahead reward (computed by literally stepping their env and
+  restoring state — cheap since it's a closed-form math env) with the
+  critic Q-value. This is exactly what our `env.peek_reward()` +
+  `APE2Shield`'s eta-anneal does, just implemented more cleanly (stateless
+  peek vs. step-then-restore). No change needed to `ape2.py` — this
+  confirms the design, doesn't correct it.
+- **Candidate generation differs**: real code uses **3 distinct noise
+  distributions** (Gaussian σ=0.1, Gaussian σ=0.05, OU θ=0.05/σ=0.1) × N
+  repeats + 1 raw action, not our M-scales-of-Gaussian-only simplification.
+  Documented simplification, not urgent to match exactly.
+- **Critic ensemble**: real code hardcodes **5 critics** (not a generic K),
+  loss = `Eta_1(0.4)*td_error_avg + Eta_2(0.6)*td_critic_i +
+  Omiga(0.1)*(Q_i-Q_avg)^2`. We use TD3's twin-critic-min instead — a
+  legitimate, more modern alternative; note the difference, don't chase it.
+- **ED2/DC mechanism confirmed, with a caveat**: two real memories
+  (interaction + expert `.npy` file) with a step-counter schedule
+  controlling the sampling ratio — this IS the paper's DC design. BUT the
+  "Diffusion" variant does NOT run a diffusion model online — it just
+  loads a pre-generated `diffusion_expert_memory.npy`. If we ever build
+  ED2, the online-diffusion-generator is NOT in this handoff to port from.
+  Also: **the lab's own files disagree on schedule direction** (grow-
+  expert-from-0% vs. decay-expert-from-~67%-to-0%) — ask the advisor which
+  is canonical before implementing, don't infer from filenames/dates.
+- **"2step" ≠ dynamic obstacles** — confirmed it's a two-phase
+  fill-buffer-then-train procedure, unrelated to motion prediction. Rules
+  out a possible false lead.
+- **CoppeliaSim confirmed concretely**: `sim.simxStart('127.0.0.1', 19999,
+  ...)` — legacy V-REP remote API, localhost:19999. Useful for the later
+  real-robot/verification section.
+- **Lab-code footguns to remember, not fix (not our code)**: save/restore
+  path strings are hand-edited per run and drift out of sync in at least 2
+  files; one file undersamples ~5% of its expert memory due to an index
+  bound bug. Don't trust any specific checkpoint-name -> script mapping
+  without checking the live `save()` call.
+
+## 1. Environment interface (Morvan-style) — SUPERSEDED, see item 0
 
 - **Assumed**: `env.reset() -> s`, `env.step(a) -> (s, r, done)` (3-tuple,
   no gym `info`), class attrs `state_dim` / `action_dim` / `action_bound`,
   `sample_action()`. Hand-rolled analytic env, no gym dependency.
 - **Evidence**: 師兄 explicitly pointed to Morvan's
   train-robot-arm-from-scratch (BV1nW411a7Qg); read its `final/env.py`.
-- **On code arrival**: diff `DynArmEnv` against the lab env's exact
-  signature (does their step return 4-tuple? do they normalize state the
-  same way?) and adapt `godynur/env.py` — all internals are
-  interface-independent.
+- **Corrected by item 0**: the real training env's `step()` returns a
+  5-tuple `(s, r, done, pose_error, orient_error)`. The Morvan lineage was
+  the right ancestor to look at, but the group's actual code extended the
+  interface — this item is kept for the paper trail, item 0 is the current
+  truth.
 
 ## 2. State vector composition — MEDIUM CONFIDENCE
 - **Assumed**: `[q_norm(7), flange(3), goal(3), goal-flange(3), dwell(1)]`
