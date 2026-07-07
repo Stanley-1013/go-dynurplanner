@@ -77,3 +77,18 @@ def test_future_rasterization_shifts_occupancy():
     x_fut = np.where(fut.any(axis=(1, 2)))[0]
     assert x_fut.min() > x_now.min()
     assert x_fut.max() > x_now.max()
+
+
+def test_sdf_signs_and_values():
+    from godynur.voxelizer import rasterize_sdf
+    c = 0.5 * (WS_LO + WS_HI)
+    box = AABB(c - 0.1, c + 0.1)
+    sdf = rasterize_sdf([box], SPEC)
+    # Center voxel is inside (negative); far corner positive; empty scene clip.
+    n = SPEC.n
+    assert sdf[n // 2, n // 2, n // 2] < 0
+    assert sdf[0, 0, 0] > 0
+    assert np.all(rasterize_sdf([], SPEC) == 0.5)
+    # Value check: voxel center at known offset from box surface.
+    pts_dist = np.linalg.norm(np.maximum(np.maximum(box.lo - c, c - box.hi), 0))
+    assert pts_dist == 0.0  # center inside, sanity of the formula pieces

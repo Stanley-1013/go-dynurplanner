@@ -34,7 +34,9 @@ class OccupancyForecaster(nn.Module):
 
     def __init__(self, k_frames: int = 3, latent_dim: int = 256, n: int = 32):
         super().__init__()
+        assert n % 8 == 0, "spatial dims must survive three stride-2 stages"
         self.n = n
+        m = n // 8
         c1, c2, c3 = 16, 32, 64
         self.enc1 = nn.Sequential(
             nn.Conv3d(k_frames, c1, 3, stride=2, padding=1), nn.SiLU()
@@ -46,7 +48,7 @@ class OccupancyForecaster(nn.Module):
             nn.Conv3d(c2, c3, 3, stride=2, padding=1), nn.SiLU()
         )  # 8 -> 4
         self.to_latent = nn.Sequential(
-            nn.Flatten(), nn.Linear(c3 * 4 * 4 * 4, latent_dim), nn.SiLU()
+            nn.Flatten(), nn.Linear(c3 * m * m * m, latent_dim), nn.SiLU()
         )
         self.dec3 = nn.Sequential(
             nn.ConvTranspose3d(c3, c2, 4, stride=2, padding=1), nn.SiLU()
@@ -82,6 +84,12 @@ def forecast_loss(
         target,
         pos_weight=torch.tensor(pos_weight, device=logits.device),
     )
+
+
+def forecast_loss_sdf(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Regression loss for SDF-mode grids (advisor directive): Huber on the
+    signed distance values — BCE semantics do not apply to SDF."""
+    return nn.functional.huber_loss(pred, target, delta=0.1)
 
 
 @torch.no_grad()

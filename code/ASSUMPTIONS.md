@@ -1,5 +1,16 @@
 # Interface Assumptions — to be reconciled when 師兄's code arrives
 
+> **2026-07-07 advisor reply (partial reconciliation)**: URPlanner code
+> arriving tonight. a_o = 5 cm confirmed (matches item as extracted).
+> Grid semantics ANSWERED: binary is hard to learn — use SDF, coarse
+> resolution first (implemented: grid_mode='sdf', grid_n=16), plus
+> closest-obstacle-point distance/direction features in the vector state
+> (implemented: closest_point_in_state -> [d, unit direction, point rel
+> flange], analytic segment-box closest point via convex ternary search).
+> Note: MD-features in the OBSERVATION do not conflict with URPlanner's
+> MD-independent REWARD claim; in the parameterized space the closest
+> point is closed-form cheap.
+
 Everything below is INFERRED (from the Morvan video lineage + the URPlanner
 paper full text). Each item lists: what we assumed, the evidence, and what
 to do when the lab's actual code arrives. Items marked ⚠ are placeholders

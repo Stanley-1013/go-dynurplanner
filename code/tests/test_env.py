@@ -85,3 +85,16 @@ def test_episode_terminates_on_goal_dwell_or_timeout():
         if done:
             break
     assert done
+
+
+def test_closest_point_and_sdf_observation():
+    env = DynArmEnv(task="tabletop", grid_mode="sdf", grid_n=16,
+                    closest_point_in_state=True, obstacles_in_state=False,
+                    seed=12)
+    s = env.reset()
+    assert s.shape == (17 + 7,)
+    d = s[17]
+    assert 0.0 <= d <= 0.5
+    g = env.grid_history()
+    assert g.shape == (3, 16, 16, 16)
+    assert g.min() < 0.5  # SDF values, not binary (obstacles present)

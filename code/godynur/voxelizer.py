@@ -65,6 +65,34 @@ def rasterize(boxes: list[AABB], spec: GridSpec) -> np.ndarray:
     return grid
 
 
+def _voxel_centers(spec: GridSpec) -> np.ndarray:
+    cell = spec.cell
+    axes = [spec.lo[k] + (np.arange(spec.n) + 0.5) * cell[k] for k in range(3)]
+    gx, gy, gz = np.meshgrid(*axes, indexing="ij")
+    return np.stack([gx, gy, gz], axis=-1)  # (n, n, n, 3)
+
+
+def rasterize_sdf(boxes: list[AABB], spec: GridSpec, clip: float = 0.5) -> np.ndarray:
+    """Signed distance field to the union of boxes, evaluated at voxel
+    centers: positive outside (distance to nearest box surface), negative
+    inside. Advisor directive (2026-07-07): binary occupancy is hard to
+    learn from; SDF carries gradient information. Union via min over boxes
+    (exact outside; standard approximation inside overlaps). Clipped to
+    +/- `clip` meters — empty scenes give a constant +clip field.
+    """
+    pts = _voxel_centers(spec)
+    sdf = np.full(pts.shape[:3], clip, dtype=np.float32)
+    for box in boxes:
+        d_lo = box.lo - pts
+        d_hi = pts - box.hi
+        outside = np.maximum(np.maximum(d_lo, d_hi), 0.0)
+        d_out = np.linalg.norm(outside, axis=-1)
+        inside_depth = np.minimum(pts - box.lo, box.hi - pts).min(axis=-1)
+        d_signed = np.where(d_out > 0.0, d_out, -inside_depth)
+        sdf = np.minimum(sdf, d_signed.astype(np.float32))
+    return np.clip(sdf, -clip, clip)
+
+
 def rasterize_future(
     obstacles, spec: GridSpec, dt: float, margin: float = 0.0
 ) -> np.ndarray:

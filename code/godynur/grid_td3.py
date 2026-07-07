@@ -24,34 +24,45 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .forecast import OccupancyForecaster, forecast_loss
+from .forecast import OccupancyForecaster, forecast_loss, forecast_loss_sdf
 from .geometry import AABB
 from .scenes import WS_HI, WS_LO
 from .td3 import mlp
-from .voxelizer import GridSpec, rasterize
+from .voxelizer import GridSpec, rasterize, rasterize_sdf
 
-_SPEC = GridSpec(lo=WS_LO, hi=WS_HI, n=32)
 _DUMMY_THRESHOLD = 10.0  # slots with |center| beyond this rasterize to nothing
 
 
-def params_to_grid(frame_params: np.ndarray) -> np.ndarray:
-    """(n_slots, 9) obstacle params -> (32, 32, 32) occupancy grid."""
+def make_spec(grid_n: int = 32) -> GridSpec:
+    return GridSpec(lo=WS_LO, hi=WS_HI, n=grid_n)
+
+
+def params_to_grid(
+    frame_params: np.ndarray, spec: GridSpec | None = None, mode: str = "binary"
+) -> np.ndarray:
+    """(n_slots, 9) obstacle params -> (n, n, n) grid (binary or SDF)."""
+    spec = spec or make_spec()
     boxes = []
     for row in frame_params:
         c, h = row[0:3], row[3:6]
         if np.abs(c).max() > _DUMMY_THRESHOLD:
             continue
         boxes.append(AABB(c - h, c + h))
-    return rasterize(boxes, _SPEC)
+    if mode == "sdf":
+        return rasterize_sdf(boxes, spec)
+    return rasterize(boxes, spec)
 
 
-def rasterize_batch(params: np.ndarray) -> np.ndarray:
-    """(B, k, n_slots, 9) -> (B, k, 32, 32, 32) float32."""
+def rasterize_batch(
+    params: np.ndarray, spec: GridSpec | None = None, mode: str = "binary"
+) -> np.ndarray:
+    """(B, k, n_slots, 9) -> (B, k, n, n, n) float32."""
+    spec = spec or make_spec()
     B, k = params.shape[:2]
-    out = np.empty((B, k, _SPEC.n, _SPEC.n, _SPEC.n), dtype=np.float32)
+    out = np.empty((B, k, spec.n, spec.n, spec.n), dtype=np.float32)
     for b in range(B):
         for j in range(k):
-            out[b, j] = params_to_grid(params[b, j])
+            out[b, j] = params_to_grid(params[b, j], spec, mode)
     return out
 
 
@@ -102,6 +113,8 @@ class GridTD3:
         k_frames: int = 3,
         n_slots: int = 3,
         latent_dim: int = 256,
+        grid_n: int = 32,
+        grid_mode: str = "binary",
         lambda_aux: float = 1.0,  # 0 => the no-aux ablation arm (H2 control)
         gamma: float = 0.98,
         tau: float = 0.01,
@@ -122,10 +135,11 @@ class GridTD3:
         self.gamma, self.tau, self.policy_delay = gamma, tau, policy_delay
         self.expl_noise, self.target_noise = expl_noise, target_noise
         self.noise_clip, self.lambda_aux = noise_clip, lambda_aux
+        self.spec, self.grid_mode = make_spec(grid_n), grid_mode
 
         d = self.device
-        self.enc = OccupancyForecaster(k_frames, latent_dim).to(d)
-        self.enc_t = OccupancyForecaster(k_frames, latent_dim).to(d)
+        self.enc = OccupancyForecaster(k_frames, latent_dim, n=grid_n).to(d)
+        self.enc_t = OccupancyForecaster(k_frames, latent_dim, n=grid_n).to(d)
         self.enc_t.load_state_dict(self.enc.state_dict())
         sd = vec_dim + latent_dim
         self.actor = mlp([sd, hidden, hidden, action_dim], nn.Tanh()).to(d)
@@ -150,7 +164,9 @@ class GridTD3:
 
     @torch.no_grad()
     def act(self, vec: np.ndarray, hist_params: np.ndarray, explore=True):
-        g = torch.from_numpy(rasterize_batch(hist_params[None])).to(self.device)
+        g = torch.from_numpy(
+            rasterize_batch(hist_params[None], self.spec, self.grid_mode)
+        ).to(self.device)
         z, _ = self.enc(g)
         v = torch.from_numpy(vec[None].astype(np.float32)).to(self.device)
         a = self.actor(torch.cat([v, z], 1))[0].cpu().numpy()
@@ -166,9 +182,9 @@ class GridTD3:
         t = lambda x: torch.from_numpy(x).to(d)  # noqa: E731
         vec, a, r, vec2, dn, fmask = map(t, (vec, a, r, vec2, dn, fmask))
         a = a / self.action_scale
-        g = t(rasterize_batch(hist))
-        g2 = t(rasterize_batch(hist2))
-        fut_grid = t(rasterize_batch(fut))[:, 0]
+        g = t(rasterize_batch(hist, self.spec, self.grid_mode))
+        g2 = t(rasterize_batch(hist2, self.spec, self.grid_mode))
+        fut_grid = t(rasterize_batch(fut, self.spec, self.grid_mode))[:, 0]
 
         z, logits = self.enc(g)
         with torch.no_grad():
@@ -188,10 +204,15 @@ class GridTD3:
             self.q2(sa), y
         )
         if self.lambda_aux > 0 and fmask.sum() > 0:
-            per_vox = nn.functional.binary_cross_entropy_with_logits(
-                logits, fut_grid, pos_weight=torch.tensor(20.0, device=d),
-                reduction="none",
-            ).mean(dim=(1, 2, 3), keepdim=True)
+            if self.grid_mode == "sdf":
+                per_vox = nn.functional.huber_loss(
+                    logits, fut_grid, delta=0.1, reduction="none"
+                ).mean(dim=(1, 2, 3), keepdim=True)
+            else:
+                per_vox = nn.functional.binary_cross_entropy_with_logits(
+                    logits, fut_grid, pos_weight=torch.tensor(20.0, device=d),
+                    reduction="none",
+                ).mean(dim=(1, 2, 3), keepdim=True)
             aux = (per_vox * fmask).sum() / fmask.sum()
             self.last_aux_loss = float(aux)
             loss = loss + self.lambda_aux * aux

@@ -64,18 +64,22 @@ def evaluate(env, agent):
 
 
 def run_one(lambda_aux: float, episodes: int, seed: int, device: str | None,
-            learn_every: int = 2):
+            learn_every: int = 2, grid_mode: str = "binary", grid_n: int = 32,
+            closest_point: bool = False):
     env = DynArmEnv(
         task="tabletop", n_obstacles=N_SLOTS, reward_mode="uoar",
-        obstacles_in_state=False, seed=seed,
+        obstacles_in_state=False, grid_mode=grid_mode, grid_n=grid_n,
+        closest_point_in_state=closest_point, seed=seed,
     )
     eval_env = DynArmEnv(
         task="tabletop", n_obstacles=N_SLOTS, reward_mode="uoar",
-        obstacles_in_state=False, seed=10_000 + seed,
+        obstacles_in_state=False, grid_mode=grid_mode, grid_n=grid_n,
+        closest_point_in_state=closest_point, seed=10_000 + seed,
     )
     agent = GridTD3(
         vec_dim=env.state_dim, action_dim=env.action_dim,
         action_scale=env.action_bound[1], k_frames=K_FRAMES, n_slots=N_SLOTS,
+        grid_n=grid_n, grid_mode=grid_mode,
         lambda_aux=lambda_aux, device=device, seed=seed,
     )
     tag = f"aux{lambda_aux:g}"
@@ -151,6 +155,9 @@ def main():
     ap.add_argument("--device", type=str, default=None)
     ap.add_argument("--learn-every", type=int, default=2)
     ap.add_argument("--seed-offset", type=int, default=0)
+    ap.add_argument("--grid-mode", type=str, default="binary")
+    ap.add_argument("--grid-n", type=int, default=32)
+    ap.add_argument("--closest-point", action="store_true")
     ap.add_argument("--out", type=str, default="experiments/results/m5_grid")
     args = ap.parse_args()
 
@@ -162,8 +169,9 @@ def main():
         results[key] = {}
         for seed in range(args.seed_offset, args.seed_offset + args.seeds):
             results[key][seed] = run_one(lam, args.episodes, seed, args.device,
-                                         args.learn_every)
-    tag = f"{args.arms.replace(',','-')}_s{args.seed_offset}"
+                                         args.learn_every, args.grid_mode,
+                                         args.grid_n, args.closest_point)
+    tag = f"{args.arms.replace(',','-')}_s{args.seed_offset}_{args.grid_mode}{args.grid_n}"
     with open(out_dir / f"m5_{tag}.json", "w") as f:
         json.dump({"config": vars(args), "stages": STAGES, "results": results}, f, indent=2)
     for key in results:

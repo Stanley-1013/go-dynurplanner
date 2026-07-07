@@ -65,3 +65,19 @@ def test_uoar_sign_and_normalization():
     r = uoar(segs, [box])
     assert np.isclose(r, -0.5)  # overlap 1 / total length 2
     assert uoar(segs[1:], [box]) == 0.0
+
+
+def test_segment_box_closest_matches_bruteforce():
+    from godynur.geometry import segment_box_closest
+    rng2 = np.random.default_rng(7)
+    for _ in range(50):
+        c = rng2.uniform(-1, 1, 3)
+        half = rng2.uniform(0.05, 0.5, 3)
+        box = AABB(c - half, c + half)
+        p_s, p_e = rng2.uniform(-2, 2, 3), rng2.uniform(-2, 2, 3)
+        d, p_arm, p_box = segment_box_closest(p_s, p_e, box)
+        lam = np.linspace(0, 1, 20001)
+        pts = p_s[None] + lam[:, None] * (p_e - p_s)[None]
+        d_bf = np.linalg.norm(pts - np.clip(pts, box.lo, box.hi), axis=1).min()
+        assert abs(d - d_bf) < 1e-4, (d, d_bf)
+        assert np.allclose(p_box, np.clip(p_arm, box.lo, box.hi))

@@ -72,3 +72,36 @@ def uoar(segments: np.ndarray, boxes: list[AABB]) -> float:
             l, _, _ = segment_box_overlap(seg[0], seg[1], box)
             overlap += l
     return -overlap / total_len
+
+
+def segment_box_closest(
+    p_s: np.ndarray, p_e: np.ndarray, box: AABB
+) -> tuple[float, np.ndarray, np.ndarray]:
+    """Closest approach between segment [p_s, p_e] and `box`.
+
+    Returns (distance, closest_point_on_segment, closest_point_on_box).
+    dist(p(lam), box) is convex in lam (distance to a convex set along a
+    line), so ternary search is exact up to tolerance. Inside the box the
+    distance is 0 and the two points coincide.
+    """
+    p_s = np.asarray(p_s, float)
+    p_e = np.asarray(p_e, float)
+
+    def point_box_dist(p):
+        q = np.clip(p, box.lo, box.hi)
+        return float(np.linalg.norm(p - q)), q
+
+    lo_l, hi_l = 0.0, 1.0
+    for _ in range(60):
+        m1 = lo_l + (hi_l - lo_l) / 3.0
+        m2 = hi_l - (hi_l - lo_l) / 3.0
+        d1, _ = point_box_dist(p_s + m1 * (p_e - p_s))
+        d2, _ = point_box_dist(p_s + m2 * (p_e - p_s))
+        if d1 <= d2:
+            hi_l = m2
+        else:
+            lo_l = m1
+    lam = 0.5 * (lo_l + hi_l)
+    p_arm = p_s + lam * (p_e - p_s)
+    d, p_box = point_box_dist(p_arm)
+    return d, p_arm, p_box

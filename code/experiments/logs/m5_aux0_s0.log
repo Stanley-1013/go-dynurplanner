@@ -1,0 +1,4 @@
+[aux0 seed0] ep 145: ADVANCE to (2, 0.1)
+[aux0 seed0] ep  200 | stage 1 | roll 0.89 | final succ 0.70 coll 0.27 | aux nan | 1198.7s
+[aux0 seed0] ep 245: ADVANCE to (3, 0.25)
+[aux0 seed0] ep  400 | stage 2 | roll 0.68 | final succ 0.73 coll 0.27 | aux nan | 2022.3s

@@ -1,0 +1,40 @@
+[shield seed0] ep 100: ADVANCE to stage 1 (2, 0.1)
+[shield seed0] ep 200: ADVANCE to stage 2 (3, 0.25)
+[shield seed0] ep  200 | stage 2 | succ 0.17 | true-coll 0.67 | no_safe 16 | 74.2s
+[shield seed0] ep  400 | stage 2 | succ 0.23 | true-coll 0.50 | no_safe 112 | 178.7s
+[shield seed0] ep  600 | stage 2 | succ 0.17 | true-coll 0.50 | no_safe 200 | 260.3s
+[shield seed0] ep  800 | stage 2 | succ 0.30 | true-coll 0.57 | no_safe 268 | 343.0s
+[shield seed0] ep 1000 | stage 2 | succ 0.33 | true-coll 0.53 | no_safe 357 | 416.9s
+[shield seed0] ep 1200 | stage 2 | succ 0.47 | true-coll 0.43 | no_safe 402 | 476.8s
+[shield seed0] ep 1400 | stage 2 | succ 0.30 | true-coll 0.50 | no_safe 463 | 531.2s
+[shield seed0] ep 1600 | stage 2 | succ 0.37 | true-coll 0.50 | no_safe 521 | 590.0s
+[shield seed0] ep 1800 | stage 2 | succ 0.47 | true-coll 0.43 | no_safe 592 | 649.7s
+[shield seed0] ep 2000 | stage 2 | succ 0.67 | true-coll 0.27 | no_safe 647 | 702.2s
+[shield seed0] ep 2200 | stage 2 | succ 0.63 | true-coll 0.23 | no_safe 694 | 756.4s
+[shield seed0] ep 2400 | stage 2 | succ 0.70 | true-coll 0.27 | no_safe 736 | 800.7s
+[shield seed0] ep 2600 | stage 2 | succ 0.40 | true-coll 0.40 | no_safe 785 | 847.1s
+[shield seed0] ep 2800 | stage 2 | succ 0.50 | true-coll 0.47 | no_safe 813 | 886.8s
+[shield seed0] ep 3000 | stage 2 | succ 0.53 | true-coll 0.23 | no_safe 838 | 932.2s
+[shield seed1] ep 100: ADVANCE to stage 1 (2, 0.1)
+[shield seed1] ep 200: ADVANCE to stage 2 (3, 0.25)
+[shield seed1] ep  200 | stage 2 | succ 0.23 | true-coll 0.50 | no_safe 26 | 62.9s
+[shield seed1] ep  400 | stage 2 | succ 0.17 | true-coll 0.57 | no_safe 88 | 127.0s
+[shield seed1] ep  600 | stage 2 | succ 0.20 | true-coll 0.57 | no_safe 151 | 193.9s
+[shield seed1] ep  800 | stage 2 | succ 0.20 | true-coll 0.47 | no_safe 254 | 269.6s
+[shield seed1] ep 1000 | stage 2 | succ 0.23 | true-coll 0.50 | no_safe 341 | 344.4s
+[shield seed1] ep 1200 | stage 2 | succ 0.27 | true-coll 0.47 | no_safe 443 | 420.1s
+[shield seed1] ep 1400 | stage 2 | succ 0.23 | true-coll 0.47 | no_safe 513 | 488.4s
+[shield seed1] ep 1600 | stage 2 | succ 0.27 | true-coll 0.60 | no_safe 571 | 553.2s
+[shield seed1] ep 1800 | stage 2 | succ 0.53 | true-coll 0.37 | no_safe 632 | 604.6s
+[shield seed1] ep 2000 | stage 2 | succ 0.40 | true-coll 0.40 | no_safe 696 | 664.4s
+[shield seed1] ep 2200 | stage 2 | succ 0.63 | true-coll 0.30 | no_safe 751 | 720.0s
+[shield seed1] ep 2400 | stage 2 | succ 0.60 | true-coll 0.33 | no_safe 811 | 770.7s
+[shield seed1] ep 2600 | stage 2 | succ 0.60 | true-coll 0.23 | no_safe 857 | 818.6s
+[shield seed1] ep 2800 | stage 2 | succ 0.50 | true-coll 0.43 | no_safe 907 | 873.5s
+[shield seed1] ep 3000 | stage 2 | succ 0.67 | true-coll 0.27 | no_safe 958 | 921.2s
+[noshield seed0] ep 100: ADVANCE to stage 1 (2, 0.1)
+[noshield seed0] ep 200: ADVANCE to stage 2 (3, 0.25)
+[noshield seed0] ep  200 | stage 2 | succ 0.03 | true-coll 0.77 | no_safe 0 | 65.0s
+[noshield seed0] ep  400 | stage 2 | succ 0.13 | true-coll 0.60 | no_safe 0 | 148.7s
+[noshield seed0] ep  600 | stage 2 | succ 0.27 | true-coll 0.57 | no_safe 0 | 232.1s
+[noshield seed0] ep  800 | stage 2 | succ 0.23 | true-coll 0.63 | no_safe 0 | 320.4s

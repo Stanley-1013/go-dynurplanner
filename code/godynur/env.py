@@ -28,10 +28,10 @@ from __future__ import annotations
 import numpy as np
 
 from .continuous import MovingSegment, first_contact_time, swept_overlap_integral
-from .geometry import AABB, segment_box_overlap, uoar
+from .geometry import AABB, segment_box_closest, segment_box_overlap, uoar
 from .panda import PandaKinematics, Q_MAX, Q_MIN
 from .scenes import WS_HI, WS_LO, DynamicScene, sample_scene
-from .voxelizer import GridSpec, rasterize
+from .voxelizer import GridSpec, rasterize, rasterize_sdf
 
 
 class DynArmEnv:
@@ -56,11 +56,16 @@ class DynArmEnv:
         zeta_s: float = 1.0,   # swept-integral weight (CT mode)
         zeta_t: float = 0.5,   # continuous-TTC weight (CT mode, bounded form)
         task: str = "random",  # 'random' | 'tabletop' (URPlanner-style)
+        grid_mode: str = "binary",  # 'binary' | 'sdf' (advisor: SDF learns better)
+        closest_point_in_state: bool = False,  # advisor: d, direction, point
         seed: int = 0,
     ):
         assert reward_mode in ("uoar", "ct")
         assert task in ("random", "tabletop")
+        assert grid_mode in ("binary", "sdf")
         self.task = task
+        self.grid_mode = grid_mode
+        self.closest_point_in_state = closest_point_in_state
         self.kin = PandaKinematics()
         self.speed = speed
         self.n_obstacles = n_obstacles
@@ -75,7 +80,11 @@ class DynArmEnv:
         # obstacle count without changing the network's input width.
         self.n_obstacles_max = n_obstacles
         # 7 q + 3 flange + 3 goal + 3 delta + 1 dwell flag
-        self.state_dim = 17 + (6 * n_obstacles if obstacles_in_state else 0)
+        self.state_dim = (
+            17
+            + (6 * n_obstacles if obstacles_in_state else 0)
+            + (7 if closest_point_in_state else 0)
+        )
         # Episode stats maintained for Figure-1-style instrumentation.
         self.last_tau_star: float | None = None
         self.last_discrete_missed: bool = False
@@ -235,12 +244,33 @@ class DynArmEnv:
                 parts.append(ob.vel)
             for _ in range(self.n_obstacles_max - len(self.scene.obstacles)):
                 parts.append(np.zeros(6))
+        if self.closest_point_in_state:
+            d, p_arm, p_box = self.closest_obstacle_point()
+            direction = (p_box - p_arm) / max(d, 1e-6) if d > 1e-6 else np.zeros(3)
+            parts.append([d])
+            parts.append(direction)
+            parts.append(p_box - flange)
         return np.concatenate(parts).astype(np.float32)
 
     # ---- internals -----------------------------------------------------------
 
     def _rasterize_now(self) -> np.ndarray:
-        return rasterize(self.scene.static_aabbs(margin=0.0), self.spec)
+        boxes = self.scene.static_aabbs(margin=0.0)
+        if self.grid_mode == "sdf":
+            return rasterize_sdf(boxes, self.spec)
+        return rasterize(boxes, self.spec)
+
+    def closest_obstacle_point(self):
+        """Global closest approach between any arm segment and any obstacle:
+        (distance, point_on_arm, point_on_obstacle). Analytic (convex
+        ternary search per pair). (0.5, zeros, zeros) when no obstacles."""
+        best = (0.5, np.zeros(3), np.zeros(3))
+        for seg in self.kin.segments(self.q):
+            for box in self._boxes(0.0):
+                d, p_arm, p_box = segment_box_closest(seg[0], seg[1], box)
+                if d < best[0]:
+                    best = (d, p_arm, p_box)
+        return best
 
     def _boxes(self, margin: float) -> list[AABB]:
         return self.scene.static_aabbs(margin=margin)
