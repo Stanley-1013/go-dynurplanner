@@ -181,17 +181,20 @@ class DynArmEnv:
         None = certified interval-collision-free (under the inflation)."""
         dq = np.clip(np.asarray(action, float), *self.action_bound)
         dq = np.clip(self.q + dq, Q_MIN, Q_MAX) - self.q
-        taus = [
-            t
-            for seg in self._moving_segments(dq)
-            for ob in self.scene.obstacles
-            if (
-                t := first_contact_time(
+        taus = []
+        for seg in self._moving_segments(dq):
+            seg_lo = np.minimum(seg.a0, seg.b0)
+            seg_hi = np.maximum(seg.a0, seg.b0)
+            for ob in self.scene.obstacles:
+                if not self._pair_can_contact(
+                    seg_lo, seg_hi, ob, self.a_r + inflation
+                ):
+                    continue
+                t = first_contact_time(
                     seg, ob.moving_box(self.a_r + inflation), self.dt
                 )
-            )
-            is not None
-        ]
+                if t is not None:
+                    taus.append(t)
         return min(taus) if taus else None
 
     # ---- observations ------------------------------------------------------
@@ -245,14 +248,34 @@ class DynArmEnv:
             for a, b in zip(s0, s1)
         ]
 
+
+    def _pair_can_contact(self, seg_lo, seg_hi, ob, margin: float) -> bool:
+        """Conservative broad-phase: False only if the pair provably cannot
+        touch within dt. Segment AABB vs obstacle box gap (L2 lower bound
+        via per-axis gaps) compared against max closure = (|v_obs| +
+        v_seg_max) * dt, where v_seg_max bounds link-point speed by total
+        arm length * max joint speed... we use the action-clip kinematic
+        bound: |dq|_1 * R_max / dt with R_max ~ 1.2 m, plus margin slack."""
+        import numpy as _np
+        lo = ob.center - ob.half - margin
+        hi = ob.center + ob.half + margin
+        gap = _np.maximum(lo - seg_hi, 0.0) + _np.maximum(seg_lo - hi, 0.0)
+        dist_lb = float(_np.linalg.norm(gap))
+        v_obs = float(_np.linalg.norm(ob.vel))
+        v_seg = 1.2 * 7 * self.action_bound[1] / self.dt  # conservative
+        return dist_lb <= (v_obs + v_seg) * self.dt + 1e-9
+
     def _first_contact(self, dq) -> float | None:
-        taus = [
-            t
-            for seg in self._moving_segments(dq)
-            for ob in self.scene.obstacles
-            if (t := first_contact_time(seg, ob.moving_box(self.a_r), self.dt))
-            is not None
-        ]
+        taus = []
+        for seg in self._moving_segments(dq):
+            seg_lo = np.minimum(seg.a0, seg.b0)
+            seg_hi = np.maximum(seg.a0, seg.b0)
+            for ob in self.scene.obstacles:
+                if not self._pair_can_contact(seg_lo, seg_hi, ob, self.a_r):
+                    continue
+                t = first_contact_time(seg, ob.moving_box(self.a_r), self.dt)
+                if t is not None:
+                    taus.append(t)
         return min(taus) if taus else None
 
     def _endpoint_overlaps(self, q_new) -> bool:
