@@ -4,3 +4,8 @@ code/.venv*/
 **/__pycache__/
 *.pt
 *.pyc
+
+# Advisor's unpublished lab code (received 2026-07-08) — never commit someone
+# else's unpublished research code, even privately, without explicit consent.
+advisor_code/
+0801pretrain.zip
