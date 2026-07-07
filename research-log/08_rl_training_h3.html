@@ -121,7 +121,8 @@
   </div>
   <div class="card core">
     <b class="label">修正</b>
-    <p class="body" style="margin:0">改用<b>有界形式</b> <code class="inline">-(1 - tau*/dt) ∈ [-1, 0]</code>、<code class="inline">zeta_t = 0.5</code>。ct 臂目前<b>重跑中</b>。</p>
+    <p class="body" style="margin:0">改用<b>有界形式</b> <code class="inline">-(1 - tau*/dt) ∈ [-1, 0]</code>、<code class="inline">zeta_t = 0.5</code>。</p>
+    <p class="body" style="margin:10px 0 0"><b>ct-v2 結果(二審定案)</b>:有界化救回可學性——兩個 seed 都爬完課程到 stage 2(ep 2000,比 uoar 的 1200/1600 慢)——但最終階段仍全面落後:<b>succ 0.47 vs 0.65、真實碰撞 0.40 vs 0.25</b>。機制:預期性懲罰形成的保守先驗拖慢課程進度、壓低成功率,卻沒有換來更低碰撞。<b>H3 判定:於受測權重下不支持</b>(兩輪、兩次機制診斷;權重掃描或可翻案但已降優先)。這個負結果收斂出更乾淨的論文主線:<b>連續時間機器的價值在度量(穿隧率)與認證(屏蔽),不在獎勵塑形</b>——「試了目標修正,測量說認證勝過塑形」本身即為有數據的可發表論點,由 M4 完成驗證。</p>
   </div>
   <p class="body"><span class="tag low">未支持</span> H3(CT 獎勵優於/等於 UOAR 獎勵)在本輪數據下<b>不成立</b>,誠實記錄而非隱藏。若有界版重跑後 ct 仍輸給 uoar,結論將轉向:<b>「CT 資訊的貢獻應該由屏蔽(shield)機制承擔,而非塞進獎勵函數裡」</b>——這個轉向本身就是可發表的 finding,而不是一個需要掩蓋的失敗。</p>
 </section>
@@ -131,7 +132,7 @@
   <h2 class="sec">下一步</h2>
   <div class="rule"></div>
   <ol class="body">
-    <li><b>ct-v2 重跑中</b>:有界 TTC 形式(<code class="inline">-(1-tau*/dt)</code>、zeta_t=0.5)下,ct 臂能否追上 uoar 臂的課程進度與最終成功率</li>
+    <li><s>ct-v2 重跑</s> 已完成,H3 二審不支持(見上)——CT 貢獻正式改由屏蔽承擔</li>
     <li><b>M4(APE2-Shield on/off,uoar 獎勵)佇列中</b>:同一套課程協議下比較屏蔽開/關,驗證 H4(屏蔽能否把真實碰撞率壓到接近 0,同時成功率代價有界)</li>
     <li><b>M2-full(柵格 + 預報輔助)</b>在 H3/H4 之後排入:把已存活的拱心石(佔據預報輔助任務)接上柵格編碼器,進入完整訓練</li>
   </ol>
