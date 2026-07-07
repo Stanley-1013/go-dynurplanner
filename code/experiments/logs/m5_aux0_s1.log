@@ -1,2 +1,16 @@
 [aux0 seed1] ep 128: ADVANCE to (2, 0.1)
 [aux0 seed1] ep  200 | stage 1 | roll 0.57 | final succ 0.60 coll 0.27 | aux nan | 1339.8s
+[aux0 seed1] ep  400 | stage 1 | roll 0.59 | final succ 0.40 coll 0.37 | aux nan | 2607.6s
+[aux0 seed1] ep 476: ADVANCE to (3, 0.25)
+[aux0 seed1] ep  600 | stage 2 | roll 0.59 | final succ 0.70 coll 0.27 | aux nan | 3512.9s
+[aux0 seed1] ep  800 | stage 2 | roll 0.68 | final succ 0.80 coll 0.20 | aux nan | 4381.3s
+[aux0 seed1] ep 1000 | stage 2 | roll 0.68 | final succ 0.50 coll 0.37 | aux nan | 5295.0s
+[aux0 seed1] ep 1200 | stage 2 | roll 0.47 | final succ 0.53 coll 0.43 | aux nan | 6392.7s
+[aux0 seed1] ep 1400 | stage 2 | roll 0.47 | final succ 0.57 coll 0.40 | aux nan | 7435.7s
+[aux0 seed1] ep 1600 | stage 2 | roll 0.53 | final succ 0.50 coll 0.43 | aux nan | 8426.2s
+[aux0 seed1] ep 1800 | stage 2 | roll 0.61 | final succ 0.57 coll 0.33 | aux nan | 9394.3s
+[aux0 seed1] ep 2000 | stage 2 | roll 0.55 | final succ 0.60 coll 0.30 | aux nan | 10443.8s
+[aux0 seed1] ep 2200 | stage 2 | roll 0.48 | final succ 0.50 coll 0.47 | aux nan | 11452.3s
+[aux0 seed1] ep 2400 | stage 2 | roll 0.52 | final succ 0.47 coll 0.43 | aux nan | 12269.7s
+[aux0 seed1] ep 2500 | stage 2 | roll 0.51 | final succ 0.47 coll 0.50 | aux nan | 12650.4s
+   aux0 final: succ 0.47 | true-coll 0.50

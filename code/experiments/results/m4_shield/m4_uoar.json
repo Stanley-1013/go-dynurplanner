@@ -23,156 +23,156 @@
     "shield": {
       "0": [
         {
-          "success": 0.0,
-          "collision": 0.6333333333333333,
-          "mean_steps": 61.86666666666667,
+          "success": 0.16666666666666666,
+          "collision": 0.6666666666666666,
+          "mean_steps": 46.7,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 47
+            "no_safe": 44
           },
           "episode": 200,
-          "stage": 1,
-          "train_rolling_succ": 0.78125,
-          "wall_s": 78.3,
+          "stage": 2,
+          "train_rolling_succ": 0.0,
+          "wall_s": 74.2,
           "train_shield_stats": {
-            "steps": 6317,
-            "rejected": 37,
-            "scaled": 67,
-            "no_safe": 15
+            "steps": 6120,
+            "rejected": 44,
+            "scaled": 103,
+            "no_safe": 16
           }
         },
         {
-          "success": 0.1,
-          "collision": 0.6333333333333333,
-          "mean_steps": 53.63333333333333,
+          "success": 0.23333333333333334,
+          "collision": 0.5,
+          "mean_steps": 50.166666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 39
+            "no_safe": 29
           },
           "episode": 400,
           "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 146.0,
+          "train_rolling_succ": 0.64,
+          "wall_s": 178.7,
           "train_shield_stats": {
-            "steps": 11253,
-            "rejected": 101,
-            "scaled": 107,
-            "no_safe": 67
+            "steps": 13238,
+            "rejected": 159,
+            "scaled": 197,
+            "no_safe": 112
           }
         },
         {
-          "success": 0.36666666666666664,
-          "collision": 0.4666666666666667,
-          "mean_steps": 45.53333333333333,
+          "success": 0.16666666666666666,
+          "collision": 0.5,
+          "mean_steps": 60.56666666666667,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 35
+            "no_safe": 27
           },
           "episode": 600,
           "stage": 2,
-          "train_rolling_succ": 0.87,
-          "wall_s": 207.7,
-          "train_shield_stats": {
-            "steps": 15675,
-            "rejected": 187,
-            "scaled": 207,
-            "no_safe": 125
-          }
-        },
-        {
-          "success": 0.26666666666666666,
-          "collision": 0.5,
-          "mean_steps": 52.63333333333333,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 35
-          },
-          "episode": 800,
-          "stage": 2,
           "train_rolling_succ": 0.78,
-          "wall_s": 271.7,
+          "wall_s": 260.3,
           "train_shield_stats": {
-            "steps": 20257,
-            "rejected": 256,
-            "scaled": 280,
-            "no_safe": 186
+            "steps": 18531,
+            "rejected": 303,
+            "scaled": 298,
+            "no_safe": 200
           }
         },
         {
           "success": 0.3,
-          "collision": 0.6,
-          "mean_steps": 40.46666666666667,
+          "collision": 0.5666666666666667,
+          "mean_steps": 49.333333333333336,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 34
+          },
+          "episode": 800,
+          "stage": 2,
+          "train_rolling_succ": 0.83,
+          "wall_s": 343.0,
+          "train_shield_stats": {
+            "steps": 24051,
+            "rejected": 404,
+            "scaled": 379,
+            "no_safe": 268
+          }
+        },
+        {
+          "success": 0.3333333333333333,
+          "collision": 0.5333333333333333,
+          "mean_steps": 48.96666666666667,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 34
+          },
+          "episode": 1000,
+          "stage": 2,
+          "train_rolling_succ": 0.69,
+          "wall_s": 416.9,
+          "train_shield_stats": {
+            "steps": 29032,
+            "rejected": 537,
+            "scaled": 489,
+            "no_safe": 357
+          }
+        },
+        {
+          "success": 0.4666666666666667,
+          "collision": 0.43333333333333335,
+          "mean_steps": 41.266666666666666,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 33
+          },
+          "episode": 1200,
+          "stage": 2,
+          "train_rolling_succ": 0.83,
+          "wall_s": 476.8,
+          "train_shield_stats": {
+            "steps": 33105,
+            "rejected": 589,
+            "scaled": 573,
+            "no_safe": 402
+          }
+        },
+        {
+          "success": 0.3,
+          "collision": 0.5,
+          "mean_steps": 43.93333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 36
           },
-          "episode": 1000,
-          "stage": 2,
-          "train_rolling_succ": 0.77,
-          "wall_s": 340.9,
-          "train_shield_stats": {
-            "steps": 25279,
-            "rejected": 358,
-            "scaled": 371,
-            "no_safe": 274
-          }
-        },
-        {
-          "success": 0.3333333333333333,
-          "collision": 0.43333333333333335,
-          "mean_steps": 49.46666666666667,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 35
-          },
-          "episode": 1200,
-          "stage": 2,
-          "train_rolling_succ": 0.69,
-          "wall_s": 417.9,
-          "train_shield_stats": {
-            "steps": 30790,
-            "rejected": 528,
-            "scaled": 514,
-            "no_safe": 371
-          }
-        },
-        {
-          "success": 0.23333333333333334,
-          "collision": 0.5666666666666667,
-          "mean_steps": 45.9,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 38
-          },
           "episode": 1400,
           "stage": 2,
-          "train_rolling_succ": 0.72,
-          "wall_s": 482.8,
+          "train_rolling_succ": 0.81,
+          "wall_s": 531.2,
           "train_shield_stats": {
-            "steps": 35508,
-            "rejected": 640,
-            "scaled": 607,
-            "no_safe": 427
+            "steps": 36568,
+            "rejected": 674,
+            "scaled": 713,
+            "no_safe": 463
           }
         },
         {
-          "success": 0.4,
-          "collision": 0.5333333333333333,
-          "mean_steps": 30.166666666666668,
+          "success": 0.36666666666666664,
+          "collision": 0.5,
+          "mean_steps": 34.3,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -182,293 +182,293 @@
           "episode": 1600,
           "stage": 2,
           "train_rolling_succ": 0.8,
-          "wall_s": 546.6,
+          "wall_s": 590.0,
           "train_shield_stats": {
-            "steps": 40234,
-            "rejected": 768,
-            "scaled": 697,
-            "no_safe": 519
-          }
-        },
-        {
-          "success": 0.43333333333333335,
-          "collision": 0.4,
-          "mean_steps": 44.333333333333336,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 20
-          },
-          "episode": 1800,
-          "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 602.4,
-          "train_shield_stats": {
-            "steps": 44215,
-            "rejected": 876,
-            "scaled": 788,
-            "no_safe": 586
-          }
-        },
-        {
-          "success": 0.6333333333333333,
-          "collision": 0.2,
-          "mean_steps": 36.93333333333333,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 12
-          },
-          "episode": 2000,
-          "stage": 2,
-          "train_rolling_succ": 0.81,
-          "wall_s": 651.3,
-          "train_shield_stats": {
-            "steps": 47738,
-            "rejected": 1002,
-            "scaled": 871,
-            "no_safe": 640
-          }
-        },
-        {
-          "success": 0.7333333333333333,
-          "collision": 0.16666666666666666,
-          "mean_steps": 31.633333333333333,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 12
-          },
-          "episode": 2200,
-          "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 705.7,
-          "train_shield_stats": {
-            "steps": 51709,
-            "rejected": 1122,
-            "scaled": 976,
-            "no_safe": 705
-          }
-        },
-        {
-          "success": 0.5333333333333333,
-          "collision": 0.26666666666666666,
-          "mean_steps": 39.53333333333333,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 13
-          },
-          "episode": 2400,
-          "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 758.6,
-          "train_shield_stats": {
-            "steps": 55502,
-            "rejected": 1191,
-            "scaled": 1055,
-            "no_safe": 766
-          }
-        },
-        {
-          "success": 0.6333333333333333,
-          "collision": 0.26666666666666666,
-          "mean_steps": 34.96666666666667,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 20
-          },
-          "episode": 2600,
-          "stage": 2,
-          "train_rolling_succ": 0.92,
-          "wall_s": 798.0,
-          "train_shield_stats": {
-            "steps": 58311,
-            "rejected": 1242,
-            "scaled": 1105,
-            "no_safe": 799
+            "steps": 40615,
+            "rejected": 762,
+            "scaled": 773,
+            "no_safe": 521
           }
         },
         {
           "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 36.333333333333336,
+          "collision": 0.43333333333333335,
+          "mean_steps": 38.6,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 24
+            "no_safe": 25
           },
-          "episode": 2800,
+          "episode": 1800,
           "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 846.9,
+          "train_rolling_succ": 0.82,
+          "wall_s": 649.7,
           "train_shield_stats": {
-            "steps": 61890,
-            "rejected": 1315,
-            "scaled": 1148,
-            "no_safe": 827
+            "steps": 44615,
+            "rejected": 862,
+            "scaled": 843,
+            "no_safe": 592
           }
         },
         {
-          "success": 0.6,
-          "collision": 0.3,
-          "mean_steps": 41.63333333333333,
+          "success": 0.6666666666666666,
+          "collision": 0.26666666666666666,
+          "mean_steps": 27.833333333333332,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 17
+            "no_safe": 16
+          },
+          "episode": 2000,
+          "stage": 2,
+          "train_rolling_succ": 0.86,
+          "wall_s": 702.2,
+          "train_shield_stats": {
+            "steps": 47962,
+            "rejected": 977,
+            "scaled": 906,
+            "no_safe": 647
+          }
+        },
+        {
+          "success": 0.6333333333333333,
+          "collision": 0.23333333333333334,
+          "mean_steps": 33.3,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 20
+          },
+          "episode": 2200,
+          "stage": 2,
+          "train_rolling_succ": 0.88,
+          "wall_s": 756.4,
+          "train_shield_stats": {
+            "steps": 51664,
+            "rejected": 1075,
+            "scaled": 945,
+            "no_safe": 694
+          }
+        },
+        {
+          "success": 0.7,
+          "collision": 0.26666666666666666,
+          "mean_steps": 27.333333333333332,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 18
+          },
+          "episode": 2400,
+          "stage": 2,
+          "train_rolling_succ": 0.92,
+          "wall_s": 800.7,
+          "train_shield_stats": {
+            "steps": 54643,
+            "rejected": 1149,
+            "scaled": 1003,
+            "no_safe": 736
+          }
+        },
+        {
+          "success": 0.4,
+          "collision": 0.4,
+          "mean_steps": 40.36666666666667,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 32
+          },
+          "episode": 2600,
+          "stage": 2,
+          "train_rolling_succ": 0.89,
+          "wall_s": 847.1,
+          "train_shield_stats": {
+            "steps": 57717,
+            "rejected": 1196,
+            "scaled": 1035,
+            "no_safe": 785
+          }
+        },
+        {
+          "success": 0.5,
+          "collision": 0.4666666666666667,
+          "mean_steps": 32.7,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 32
+          },
+          "episode": 2800,
+          "stage": 2,
+          "train_rolling_succ": 0.89,
+          "wall_s": 886.8,
+          "train_shield_stats": {
+            "steps": 60376,
+            "rejected": 1243,
+            "scaled": 1086,
+            "no_safe": 813
+          }
+        },
+        {
+          "success": 0.5333333333333333,
+          "collision": 0.23333333333333334,
+          "mean_steps": 47.5,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 18
           },
           "episode": 3000,
           "stage": 2,
-          "train_rolling_succ": 0.91,
-          "wall_s": 887.3,
+          "train_rolling_succ": 0.92,
+          "wall_s": 932.2,
           "train_shield_stats": {
-            "steps": 64700,
-            "rejected": 1366,
-            "scaled": 1206,
-            "no_safe": 862
+            "steps": 63274,
+            "rejected": 1300,
+            "scaled": 1166,
+            "no_safe": 838
           }
         }
       ],
       "1": [
         {
-          "success": 0.16666666666666666,
-          "collision": 0.4666666666666667,
-          "mean_steps": 60.333333333333336,
+          "success": 0.23333333333333334,
+          "collision": 0.5,
+          "mean_steps": 50.63333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 42
+            "no_safe": 50
           },
           "episode": 200,
-          "stage": 1,
-          "train_rolling_succ": 0.8762886597938144,
-          "wall_s": 62.3,
+          "stage": 2,
+          "train_rolling_succ": 0.0,
+          "wall_s": 62.9,
           "train_shield_stats": {
-            "steps": 4937,
-            "rejected": 27,
-            "scaled": 14,
-            "no_safe": 17
+            "steps": 4681,
+            "rejected": 14,
+            "scaled": 34,
+            "no_safe": 26
           }
         },
         {
-          "success": 0.3,
-          "collision": 0.5333333333333333,
-          "mean_steps": 47.166666666666664,
+          "success": 0.16666666666666666,
+          "collision": 0.5666666666666667,
+          "mean_steps": 52.93333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 35
+            "no_safe": 34
           },
           "episode": 400,
           "stage": 2,
-          "train_rolling_succ": 0.7,
-          "wall_s": 131.4,
+          "train_rolling_succ": 0.8,
+          "wall_s": 127.0,
           "train_shield_stats": {
-            "steps": 10037,
-            "rejected": 121,
-            "scaled": 153,
-            "no_safe": 96
+            "steps": 9304,
+            "rejected": 80,
+            "scaled": 83,
+            "no_safe": 88
           }
         },
         {
-          "success": 0.23333333333333334,
-          "collision": 0.5333333333333333,
-          "mean_steps": 50.733333333333334,
+          "success": 0.2,
+          "collision": 0.5666666666666667,
+          "mean_steps": 51.63333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 36
+            "no_safe": 38
           },
           "episode": 600,
           "stage": 2,
-          "train_rolling_succ": 0.72,
-          "wall_s": 202.8,
+          "train_rolling_succ": 0.76,
+          "wall_s": 193.9,
           "train_shield_stats": {
-            "steps": 15281,
-            "rejected": 235,
-            "scaled": 224,
-            "no_safe": 185
+            "steps": 14111,
+            "rejected": 157,
+            "scaled": 129,
+            "no_safe": 151
           }
         },
         {
-          "success": 0.13333333333333333,
-          "collision": 0.5,
-          "mean_steps": 57.1,
+          "success": 0.2,
+          "collision": 0.4666666666666667,
+          "mean_steps": 56.96666666666667,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 27
+            "no_safe": 33
           },
           "episode": 800,
           "stage": 2,
-          "train_rolling_succ": 0.84,
-          "wall_s": 252.8,
+          "train_rolling_succ": 0.74,
+          "wall_s": 269.6,
           "train_shield_stats": {
-            "steps": 18774,
-            "rejected": 290,
-            "scaled": 285,
-            "no_safe": 229
+            "steps": 19291,
+            "rejected": 272,
+            "scaled": 255,
+            "no_safe": 254
           }
         },
         {
           "success": 0.23333333333333334,
           "collision": 0.5,
-          "mean_steps": 49.0,
+          "mean_steps": 52.666666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 30
+            "no_safe": 28
           },
           "episode": 1000,
           "stage": 2,
-          "train_rolling_succ": 0.8,
-          "wall_s": 311.1,
+          "train_rolling_succ": 0.77,
+          "wall_s": 344.4,
           "train_shield_stats": {
-            "steps": 22963,
-            "rejected": 361,
-            "scaled": 394,
-            "no_safe": 279
+            "steps": 24558,
+            "rejected": 402,
+            "scaled": 354,
+            "no_safe": 341
           }
         },
         {
-          "success": 0.43333333333333335,
-          "collision": 0.43333333333333335,
-          "mean_steps": 43.46666666666667,
+          "success": 0.26666666666666666,
+          "collision": 0.4666666666666667,
+          "mean_steps": 49.333333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 31
+            "no_safe": 25
           },
           "episode": 1200,
           "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 365.3,
+          "train_rolling_succ": 0.72,
+          "wall_s": 420.1,
           "train_shield_stats": {
-            "steps": 26879,
-            "rejected": 416,
-            "scaled": 447,
-            "no_safe": 318
+            "steps": 29802,
+            "rejected": 517,
+            "scaled": 506,
+            "no_safe": 443
           }
         },
         {
-          "success": 0.5666666666666667,
-          "collision": 0.36666666666666664,
-          "mean_steps": 44.166666666666664,
+          "success": 0.23333333333333334,
+          "collision": 0.4666666666666667,
+          "mean_steps": 55.6,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -477,166 +477,166 @@
           },
           "episode": 1400,
           "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 417.9,
+          "train_rolling_succ": 0.77,
+          "wall_s": 488.4,
           "train_shield_stats": {
-            "steps": 30723,
-            "rejected": 483,
-            "scaled": 505,
-            "no_safe": 361
+            "steps": 34523,
+            "rejected": 610,
+            "scaled": 624,
+            "no_safe": 513
           }
         },
         {
-          "success": 0.4,
-          "collision": 0.36666666666666664,
-          "mean_steps": 45.266666666666666,
+          "success": 0.26666666666666666,
+          "collision": 0.6,
+          "mean_steps": 46.333333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 23
+            "no_safe": 41
           },
           "episode": 1600,
           "stage": 2,
-          "train_rolling_succ": 0.87,
-          "wall_s": 468.4,
+          "train_rolling_succ": 0.75,
+          "wall_s": 553.2,
           "train_shield_stats": {
-            "steps": 34269,
-            "rejected": 573,
-            "scaled": 551,
-            "no_safe": 418
+            "steps": 39062,
+            "rejected": 728,
+            "scaled": 725,
+            "no_safe": 571
           }
         },
         {
-          "success": 0.3,
-          "collision": 0.43333333333333335,
-          "mean_steps": 54.9,
+          "success": 0.5333333333333333,
+          "collision": 0.36666666666666664,
+          "mean_steps": 35.96666666666667,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 32
+            "no_safe": 18
           },
           "episode": 1800,
           "stage": 2,
           "train_rolling_succ": 0.85,
-          "wall_s": 512.4,
+          "wall_s": 604.6,
           "train_shield_stats": {
-            "steps": 37246,
-            "rejected": 646,
-            "scaled": 608,
-            "no_safe": 472
+            "steps": 42683,
+            "rejected": 825,
+            "scaled": 804,
+            "no_safe": 632
           }
         },
         {
-          "success": 0.43333333333333335,
+          "success": 0.4,
           "collision": 0.4,
-          "mean_steps": 43.86666666666667,
+          "mean_steps": 47.233333333333334,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 26
+          },
+          "episode": 2000,
+          "stage": 2,
+          "train_rolling_succ": 0.73,
+          "wall_s": 664.4,
+          "train_shield_stats": {
+            "steps": 46929,
+            "rejected": 922,
+            "scaled": 850,
+            "no_safe": 696
+          }
+        },
+        {
+          "success": 0.6333333333333333,
+          "collision": 0.3,
+          "mean_steps": 32.833333333333336,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 22
+          },
+          "episode": 2200,
+          "stage": 2,
+          "train_rolling_succ": 0.79,
+          "wall_s": 720.0,
+          "train_shield_stats": {
+            "steps": 50775,
+            "rejected": 1030,
+            "scaled": 980,
+            "no_safe": 751
+          }
+        },
+        {
+          "success": 0.6,
+          "collision": 0.3333333333333333,
+          "mean_steps": 30.833333333333332,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 18
+          },
+          "episode": 2400,
+          "stage": 2,
+          "train_rolling_succ": 0.87,
+          "wall_s": 770.7,
+          "train_shield_stats": {
+            "steps": 54330,
+            "rejected": 1126,
+            "scaled": 1028,
+            "no_safe": 811
+          }
+        },
+        {
+          "success": 0.6,
+          "collision": 0.23333333333333334,
+          "mean_steps": 34.93333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 17
           },
-          "episode": 2000,
+          "episode": 2600,
           "stage": 2,
-          "train_rolling_succ": 0.88,
-          "wall_s": 558.5,
+          "train_rolling_succ": 0.89,
+          "wall_s": 818.6,
           "train_shield_stats": {
-            "steps": 40508,
-            "rejected": 716,
-            "scaled": 643,
-            "no_safe": 513
+            "steps": 57451,
+            "rejected": 1191,
+            "scaled": 1100,
+            "no_safe": 857
           }
         },
         {
           "success": 0.5,
-          "collision": 0.4,
-          "mean_steps": 38.1,
+          "collision": 0.43333333333333335,
+          "mean_steps": 37.333333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
             "scaled": 0,
-            "no_safe": 23
+            "no_safe": 31
           },
-          "episode": 2200,
+          "episode": 2800,
           "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 604.0,
+          "train_rolling_succ": 0.88,
+          "wall_s": 873.5,
           "train_shield_stats": {
-            "steps": 43753,
-            "rejected": 808,
-            "scaled": 743,
-            "no_safe": 564
-          }
-        },
-        {
-          "success": 0.7,
-          "collision": 0.16666666666666666,
-          "mean_steps": 30.4,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 16
-          },
-          "episode": 2400,
-          "stage": 2,
-          "train_rolling_succ": 0.82,
-          "wall_s": 646.6,
-          "train_shield_stats": {
-            "steps": 46786,
-            "rejected": 909,
-            "scaled": 782,
-            "no_safe": 605
+            "steps": 61026,
+            "rejected": 1267,
+            "scaled": 1175,
+            "no_safe": 907
           }
         },
         {
           "success": 0.6666666666666666,
-          "collision": 0.3,
-          "mean_steps": 25.4,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 21
-          },
-          "episode": 2600,
-          "stage": 2,
-          "train_rolling_succ": 0.81,
-          "wall_s": 698.1,
-          "train_shield_stats": {
-            "steps": 50525,
-            "rejected": 999,
-            "scaled": 845,
-            "no_safe": 663
-          }
-        },
-        {
-          "success": 0.6333333333333333,
-          "collision": 0.3,
-          "mean_steps": 36.56666666666667,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 15
-          },
-          "episode": 2800,
-          "stage": 2,
-          "train_rolling_succ": 0.8,
-          "wall_s": 746.0,
-          "train_shield_stats": {
-            "steps": 54007,
-            "rejected": 1062,
-            "scaled": 898,
-            "no_safe": 711
-          }
-        },
-        {
-          "success": 0.6333333333333333,
-          "collision": 0.23333333333333334,
-          "mean_steps": 33.766666666666666,
+          "collision": 0.26666666666666666,
+          "mean_steps": 26.633333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -645,13 +645,13 @@
           },
           "episode": 3000,
           "stage": 2,
-          "train_rolling_succ": 0.88,
-          "wall_s": 793.1,
+          "train_rolling_succ": 0.84,
+          "wall_s": 921.2,
           "train_shield_stats": {
-            "steps": 57316,
-            "rejected": 1145,
-            "scaled": 966,
-            "no_safe": 762
+            "steps": 64128,
+            "rejected": 1353,
+            "scaled": 1234,
+            "no_safe": 958
           }
         }
       ]
@@ -660,8 +660,8 @@
       "0": [
         {
           "success": 0.03333333333333333,
-          "collision": 0.6666666666666666,
-          "mean_steps": 49.5,
+          "collision": 0.7666666666666667,
+          "mean_steps": 51.4,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -671,18 +671,18 @@
           "episode": 200,
           "stage": 2,
           "train_rolling_succ": 0.0,
-          "wall_s": 54.5,
+          "wall_s": 65.0,
           "train_shield_stats": {
-            "steps": 4896,
+            "steps": 5060,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.1,
-          "collision": 0.7666666666666667,
-          "mean_steps": 47.56666666666667,
+          "success": 0.13333333333333333,
+          "collision": 0.6,
+          "mean_steps": 50.833333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -691,19 +691,19 @@
           },
           "episode": 400,
           "stage": 2,
-          "train_rolling_succ": 0.77,
-          "wall_s": 117.9,
+          "train_rolling_succ": 0.65,
+          "wall_s": 148.7,
           "train_shield_stats": {
-            "steps": 10662,
+            "steps": 11769,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.23333333333333334,
-          "collision": 0.5333333333333333,
-          "mean_steps": 46.96666666666667,
+          "success": 0.26666666666666666,
+          "collision": 0.5666666666666667,
+          "mean_steps": 53.733333333333334,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -712,10 +712,10 @@
           },
           "episode": 600,
           "stage": 2,
-          "train_rolling_succ": 0.82,
-          "wall_s": 173.6,
+          "train_rolling_succ": 0.64,
+          "wall_s": 232.1,
           "train_shield_stats": {
-            "steps": 15779,
+            "steps": 18227,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
@@ -723,8 +723,8 @@
         },
         {
           "success": 0.23333333333333334,
-          "collision": 0.5333333333333333,
-          "mean_steps": 43.9,
+          "collision": 0.6333333333333333,
+          "mean_steps": 52.93333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -733,19 +733,19 @@
           },
           "episode": 800,
           "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 223.6,
+          "train_rolling_succ": 0.57,
+          "wall_s": 320.4,
           "train_shield_stats": {
-            "steps": 20275,
+            "steps": 25286,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.26666666666666666,
-          "collision": 0.6333333333333333,
-          "mean_steps": 40.733333333333334,
+          "success": 0.06666666666666667,
+          "collision": 0.6666666666666666,
+          "mean_steps": 53.333333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -754,19 +754,19 @@
           },
           "episode": 1000,
           "stage": 2,
-          "train_rolling_succ": 0.77,
-          "wall_s": 260.9,
+          "train_rolling_succ": 0.46,
+          "wall_s": 417.5,
           "train_shield_stats": {
-            "steps": 23671,
+            "steps": 33212,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.26666666666666666,
-          "collision": 0.5333333333333333,
-          "mean_steps": 45.766666666666666,
+          "success": 0.2,
+          "collision": 0.6666666666666666,
+          "mean_steps": 44.0,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -775,19 +775,19 @@
           },
           "episode": 1200,
           "stage": 2,
-          "train_rolling_succ": 0.79,
-          "wall_s": 303.9,
+          "train_rolling_succ": 0.27,
+          "wall_s": 519.3,
           "train_shield_stats": {
-            "steps": 27491,
+            "steps": 41953,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 37.2,
+          "success": 0.06666666666666667,
+          "collision": 0.7666666666666667,
+          "mean_steps": 51.9,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -796,19 +796,19 @@
           },
           "episode": 1400,
           "stage": 2,
-          "train_rolling_succ": 0.8,
-          "wall_s": 347.7,
+          "train_rolling_succ": 0.2,
+          "wall_s": 628.4,
           "train_shield_stats": {
-            "steps": 31445,
+            "steps": 51728,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 34.86666666666667,
+          "success": 0.03333333333333333,
+          "collision": 0.7666666666666667,
+          "mean_steps": 48.4,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -817,19 +817,19 @@
           },
           "episode": 1600,
           "stage": 2,
-          "train_rolling_succ": 0.87,
-          "wall_s": 385.5,
+          "train_rolling_succ": 0.14,
+          "wall_s": 737.0,
           "train_shield_stats": {
-            "steps": 34904,
+            "steps": 61423,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.43333333333333335,
-          "collision": 0.4,
-          "mean_steps": 40.03333333333333,
+          "success": 0.03333333333333333,
+          "collision": 0.7333333333333333,
+          "mean_steps": 50.06666666666667,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -838,19 +838,19 @@
           },
           "episode": 1800,
           "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 423.8,
+          "train_rolling_succ": 0.06,
+          "wall_s": 864.7,
           "train_shield_stats": {
-            "steps": 38310,
+            "steps": 72599,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 44.233333333333334,
+          "success": 0.03333333333333333,
+          "collision": 0.7333333333333333,
+          "mean_steps": 54.166666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -859,19 +859,19 @@
           },
           "episode": 2000,
           "stage": 2,
-          "train_rolling_succ": 0.89,
-          "wall_s": 458.1,
+          "train_rolling_succ": 0.09,
+          "wall_s": 993.5,
           "train_shield_stats": {
-            "steps": 41314,
+            "steps": 83814,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.8666666666666667,
-          "collision": 0.13333333333333333,
-          "mean_steps": 26.266666666666666,
+          "success": 0.1,
+          "collision": 0.4666666666666667,
+          "mean_steps": 72.7,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -880,19 +880,19 @@
           },
           "episode": 2200,
           "stage": 2,
-          "train_rolling_succ": 0.88,
-          "wall_s": 493.5,
+          "train_rolling_succ": 0.11,
+          "wall_s": 1127.6,
           "train_shield_stats": {
-            "steps": 44553,
+            "steps": 95407,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.5,
-          "collision": 0.3333333333333333,
-          "mean_steps": 43.06666666666667,
+          "success": 0.06666666666666667,
+          "collision": 0.5,
+          "mean_steps": 68.6,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -901,19 +901,19 @@
           },
           "episode": 2400,
           "stage": 2,
-          "train_rolling_succ": 0.88,
-          "wall_s": 525.5,
+          "train_rolling_succ": 0.05,
+          "wall_s": 1256.4,
           "train_shield_stats": {
-            "steps": 47321,
+            "steps": 106645,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.5666666666666667,
-          "collision": 0.3333333333333333,
-          "mean_steps": 31.166666666666668,
+          "success": 0.1,
+          "collision": 0.7666666666666667,
+          "mean_steps": 54.1,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -922,19 +922,19 @@
           },
           "episode": 2600,
           "stage": 2,
-          "train_rolling_succ": 0.95,
-          "wall_s": 555.9,
+          "train_rolling_succ": 0.07,
+          "wall_s": 1379.1,
           "train_shield_stats": {
-            "steps": 50008,
+            "steps": 117405,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.6,
-          "collision": 0.3333333333333333,
-          "mean_steps": 28.066666666666666,
+          "success": 0.03333333333333333,
+          "collision": 0.6666666666666666,
+          "mean_steps": 60.63333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -943,19 +943,19 @@
           },
           "episode": 2800,
           "stage": 2,
-          "train_rolling_succ": 0.9,
-          "wall_s": 585.6,
+          "train_rolling_succ": 0.06,
+          "wall_s": 1503.7,
           "train_shield_stats": {
-            "steps": 52662,
+            "steps": 128158,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.7,
-          "collision": 0.13333333333333333,
-          "mean_steps": 35.166666666666664,
+          "success": 0.03333333333333333,
+          "collision": 0.7666666666666667,
+          "mean_steps": 57.333333333333336,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -964,10 +964,10 @@
           },
           "episode": 3000,
           "stage": 2,
-          "train_rolling_succ": 0.9,
-          "wall_s": 617.9,
+          "train_rolling_succ": 0.05,
+          "wall_s": 1635.1,
           "train_shield_stats": {
-            "steps": 55536,
+            "steps": 139560,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
@@ -977,8 +977,8 @@
       "1": [
         {
           "success": 0.1,
-          "collision": 0.7,
-          "mean_steps": 54.233333333333334,
+          "collision": 0.5666666666666667,
+          "mean_steps": 60.4,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -987,10 +987,10 @@
           },
           "episode": 200,
           "stage": 1,
-          "train_rolling_succ": 0.8775510204081632,
-          "wall_s": 54.9,
+          "train_rolling_succ": 0.8111111111111111,
+          "wall_s": 63.2,
           "train_shield_stats": {
-            "steps": 5021,
+            "steps": 5582,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
@@ -998,8 +998,8 @@
         },
         {
           "success": 0.2,
-          "collision": 0.5666666666666667,
-          "mean_steps": 49.46666666666667,
+          "collision": 0.5333333333333333,
+          "mean_steps": 49.0,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1009,18 +1009,18 @@
           "episode": 400,
           "stage": 2,
           "train_rolling_succ": 0.8,
-          "wall_s": 106.7,
+          "wall_s": 119.2,
           "train_shield_stats": {
-            "steps": 9731,
+            "steps": 10439,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.16666666666666666,
-          "collision": 0.7333333333333333,
-          "mean_steps": 38.63333333333333,
+          "success": 0.13333333333333333,
+          "collision": 0.6666666666666666,
+          "mean_steps": 48.166666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1029,19 +1029,19 @@
           },
           "episode": 600,
           "stage": 2,
-          "train_rolling_succ": 0.75,
-          "wall_s": 153.3,
+          "train_rolling_succ": 0.67,
+          "wall_s": 179.8,
           "train_shield_stats": {
-            "steps": 14050,
+            "steps": 15787,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.3,
-          "collision": 0.5333333333333333,
-          "mean_steps": 44.43333333333333,
+          "success": 0.26666666666666666,
+          "collision": 0.4666666666666667,
+          "mean_steps": 50.233333333333334,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1050,19 +1050,19 @@
           },
           "episode": 800,
           "stage": 2,
-          "train_rolling_succ": 0.89,
-          "wall_s": 190.6,
+          "train_rolling_succ": 0.74,
+          "wall_s": 234.4,
           "train_shield_stats": {
-            "steps": 17317,
+            "steps": 20563,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.36666666666666664,
-          "collision": 0.5,
-          "mean_steps": 39.666666666666664,
+          "success": 0.4,
+          "collision": 0.4,
+          "mean_steps": 39.6,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1071,31 +1071,10 @@
           },
           "episode": 1000,
           "stage": 2,
-          "train_rolling_succ": 0.83,
-          "wall_s": 227.7,
+          "train_rolling_succ": 0.75,
+          "wall_s": 280.7,
           "train_shield_stats": {
-            "steps": 20579,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 0
-          }
-        },
-        {
-          "success": 0.4,
-          "collision": 0.5333333333333333,
-          "mean_steps": 33.56666666666667,
-          "eval_shield_stats": {
-            "steps": 0,
-            "rejected": 0,
-            "scaled": 0,
-            "no_safe": 0
-          },
-          "episode": 1200,
-          "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 264.7,
-          "train_shield_stats": {
-            "steps": 23940,
+            "steps": 24601,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
@@ -1104,7 +1083,28 @@
         {
           "success": 0.3333333333333333,
           "collision": 0.5,
-          "mean_steps": 44.233333333333334,
+          "mean_steps": 41.63333333333333,
+          "eval_shield_stats": {
+            "steps": 0,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 0
+          },
+          "episode": 1200,
+          "stage": 2,
+          "train_rolling_succ": 0.8,
+          "wall_s": 329.0,
+          "train_shield_stats": {
+            "steps": 28898,
+            "rejected": 0,
+            "scaled": 0,
+            "no_safe": 0
+          }
+        },
+        {
+          "success": 0.4,
+          "collision": 0.43333333333333335,
+          "mean_steps": 47.63333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1113,19 +1113,19 @@
           },
           "episode": 1400,
           "stage": 2,
-          "train_rolling_succ": 0.8,
-          "wall_s": 304.8,
+          "train_rolling_succ": 0.82,
+          "wall_s": 370.8,
           "train_shield_stats": {
-            "steps": 27591,
+            "steps": 32498,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.36666666666666664,
-          "collision": 0.43333333333333335,
-          "mean_steps": 45.833333333333336,
+          "success": 0.4666666666666667,
+          "collision": 0.4,
+          "mean_steps": 41.3,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1134,19 +1134,19 @@
           },
           "episode": 1600,
           "stage": 2,
-          "train_rolling_succ": 0.79,
-          "wall_s": 344.6,
+          "train_rolling_succ": 0.86,
+          "wall_s": 408.9,
           "train_shield_stats": {
-            "steps": 31131,
+            "steps": 35857,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 43.5,
+          "success": 0.4,
+          "collision": 0.43333333333333335,
+          "mean_steps": 54.166666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1155,19 +1155,19 @@
           },
           "episode": 1800,
           "stage": 2,
-          "train_rolling_succ": 0.8,
-          "wall_s": 384.4,
+          "train_rolling_succ": 0.81,
+          "wall_s": 448.9,
           "train_shield_stats": {
-            "steps": 34683,
+            "steps": 39235,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4,
-          "mean_steps": 38.266666666666666,
+          "success": 0.3333333333333333,
+          "collision": 0.5333333333333333,
+          "mean_steps": 46.53333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1176,19 +1176,19 @@
           },
           "episode": 2000,
           "stage": 2,
-          "train_rolling_succ": 0.83,
-          "wall_s": 420.8,
+          "train_rolling_succ": 0.71,
+          "wall_s": 496.6,
           "train_shield_stats": {
-            "steps": 37903,
+            "steps": 43381,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4,
-          "collision": 0.5,
-          "mean_steps": 45.13333333333333,
+          "success": 0.5,
+          "collision": 0.36666666666666664,
+          "mean_steps": 38.03333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1197,19 +1197,19 @@
           },
           "episode": 2200,
           "stage": 2,
-          "train_rolling_succ": 0.86,
-          "wall_s": 456.6,
+          "train_rolling_succ": 0.65,
+          "wall_s": 552.6,
           "train_shield_stats": {
-            "steps": 41058,
+            "steps": 48008,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.4666666666666667,
-          "mean_steps": 31.533333333333335,
+          "success": 0.26666666666666666,
+          "collision": 0.6333333333333333,
+          "mean_steps": 44.56666666666667,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1218,19 +1218,19 @@
           },
           "episode": 2400,
           "stage": 2,
-          "train_rolling_succ": 0.84,
-          "wall_s": 493.2,
+          "train_rolling_succ": 0.76,
+          "wall_s": 606.6,
           "train_shield_stats": {
-            "steps": 44340,
+            "steps": 52446,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.43333333333333335,
-          "collision": 0.4,
-          "mean_steps": 39.333333333333336,
+          "success": 0.3333333333333333,
+          "collision": 0.5333333333333333,
+          "mean_steps": 42.166666666666664,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1239,19 +1239,19 @@
           },
           "episode": 2600,
           "stage": 2,
-          "train_rolling_succ": 0.85,
-          "wall_s": 524.9,
+          "train_rolling_succ": 0.65,
+          "wall_s": 665.2,
           "train_shield_stats": {
-            "steps": 47201,
+            "steps": 57366,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.6333333333333333,
-          "collision": 0.3333333333333333,
-          "mean_steps": 20.3,
+          "success": 0.4,
+          "collision": 0.43333333333333335,
+          "mean_steps": 38.63333333333333,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1260,19 +1260,19 @@
           },
           "episode": 2800,
           "stage": 2,
-          "train_rolling_succ": 0.87,
-          "wall_s": 557.7,
+          "train_rolling_succ": 0.57,
+          "wall_s": 735.7,
           "train_shield_stats": {
-            "steps": 50168,
+            "steps": 63310,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0
           }
         },
         {
-          "success": 0.6,
-          "collision": 0.3333333333333333,
-          "mean_steps": 23.633333333333333,
+          "success": 0.4666666666666667,
+          "collision": 0.4,
+          "mean_steps": 33.6,
           "eval_shield_stats": {
             "steps": 0,
             "rejected": 0,
@@ -1281,10 +1281,10 @@
           },
           "episode": 3000,
           "stage": 2,
-          "train_rolling_succ": 0.9,
-          "wall_s": 586.2,
+          "train_rolling_succ": 0.59,
+          "wall_s": 802.5,
           "train_shield_stats": {
-            "steps": 52701,
+            "steps": 68851,
             "rejected": 0,
             "scaled": 0,
             "no_safe": 0

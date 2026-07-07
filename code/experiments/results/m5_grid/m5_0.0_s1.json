@@ -26,121 +26,121 @@
     "aux0": {
       "1": [
         {
-          "success": 0.7666666666666667,
-          "collision": 0.16666666666666666,
+          "success": 0.6,
+          "collision": 0.26666666666666666,
           "episode": 200,
           "stage": 1,
-          "train_rolling_succ": 0.6976744186046512,
+          "train_rolling_succ": 0.5694444444444444,
           "aux_loss": NaN,
-          "wall_s": 1360.8
+          "wall_s": 1339.8
         },
         {
-          "success": 0.6,
-          "collision": 0.3333333333333333,
+          "success": 0.4,
+          "collision": 0.36666666666666664,
           "episode": 400,
-          "stage": 2,
-          "train_rolling_succ": 0.54,
+          "stage": 1,
+          "train_rolling_succ": 0.59,
           "aux_loss": NaN,
-          "wall_s": 2231.6
-        },
-        {
-          "success": 0.5666666666666667,
-          "collision": 0.43333333333333335,
-          "episode": 600,
-          "stage": 2,
-          "train_rolling_succ": 0.62,
-          "aux_loss": NaN,
-          "wall_s": 3180.5
+          "wall_s": 2607.6
         },
         {
           "success": 0.7,
           "collision": 0.26666666666666666,
-          "episode": 800,
+          "episode": 600,
           "stage": 2,
-          "train_rolling_succ": 0.51,
+          "train_rolling_succ": 0.59,
           "aux_loss": NaN,
-          "wall_s": 4162.7
+          "wall_s": 3512.9
         },
         {
-          "success": 0.4666666666666667,
-          "collision": 0.5,
+          "success": 0.8,
+          "collision": 0.2,
+          "episode": 800,
+          "stage": 2,
+          "train_rolling_succ": 0.68,
+          "aux_loss": NaN,
+          "wall_s": 4381.3
+        },
+        {
+          "success": 0.5,
+          "collision": 0.36666666666666664,
           "episode": 1000,
           "stage": 2,
-          "train_rolling_succ": 0.62,
+          "train_rolling_succ": 0.68,
           "aux_loss": NaN,
-          "wall_s": 5105.5
+          "wall_s": 5295.0
+        },
+        {
+          "success": 0.5333333333333333,
+          "collision": 0.43333333333333335,
+          "episode": 1200,
+          "stage": 2,
+          "train_rolling_succ": 0.47,
+          "aux_loss": NaN,
+          "wall_s": 6392.7
+        },
+        {
+          "success": 0.5666666666666667,
+          "collision": 0.4,
+          "episode": 1400,
+          "stage": 2,
+          "train_rolling_succ": 0.47,
+          "aux_loss": NaN,
+          "wall_s": 7435.7
+        },
+        {
+          "success": 0.5,
+          "collision": 0.43333333333333335,
+          "episode": 1600,
+          "stage": 2,
+          "train_rolling_succ": 0.53,
+          "aux_loss": NaN,
+          "wall_s": 8426.2
+        },
+        {
+          "success": 0.5666666666666667,
+          "collision": 0.3333333333333333,
+          "episode": 1800,
+          "stage": 2,
+          "train_rolling_succ": 0.61,
+          "aux_loss": NaN,
+          "wall_s": 9394.3
+        },
+        {
+          "success": 0.6,
+          "collision": 0.3,
+          "episode": 2000,
+          "stage": 2,
+          "train_rolling_succ": 0.55,
+          "aux_loss": NaN,
+          "wall_s": 10443.8
         },
         {
           "success": 0.5,
           "collision": 0.4666666666666667,
-          "episode": 1200,
-          "stage": 2,
-          "train_rolling_succ": 0.5,
-          "aux_loss": NaN,
-          "wall_s": 6231.3
-        },
-        {
-          "success": 0.6,
-          "collision": 0.36666666666666664,
-          "episode": 1400,
-          "stage": 2,
-          "train_rolling_succ": 0.41,
-          "aux_loss": NaN,
-          "wall_s": 7349.9
-        },
-        {
-          "success": 0.7,
-          "collision": 0.3,
-          "episode": 1600,
-          "stage": 2,
-          "train_rolling_succ": 0.54,
-          "aux_loss": NaN,
-          "wall_s": 8302.6
-        },
-        {
-          "success": 0.5333333333333333,
-          "collision": 0.36666666666666664,
-          "episode": 1800,
-          "stage": 2,
-          "train_rolling_succ": 0.54,
-          "aux_loss": NaN,
-          "wall_s": 9334.0
-        },
-        {
-          "success": 0.6,
-          "collision": 0.36666666666666664,
-          "episode": 2000,
-          "stage": 2,
-          "train_rolling_succ": 0.61,
-          "aux_loss": NaN,
-          "wall_s": 10308.9
-        },
-        {
-          "success": 0.5666666666666667,
-          "collision": 0.36666666666666664,
           "episode": 2200,
           "stage": 2,
-          "train_rolling_succ": 0.56,
+          "train_rolling_succ": 0.48,
           "aux_loss": NaN,
-          "wall_s": 11278.5
+          "wall_s": 11452.3
         },
         {
-          "success": 0.26666666666666666,
-          "collision": 0.7,
+          "success": 0.4666666666666667,
+          "collision": 0.43333333333333335,
           "episode": 2400,
           "stage": 2,
-          "train_rolling_succ": 0.56,
+          "train_rolling_succ": 0.52,
           "aux_loss": NaN,
-          "wall_s": 12213.0
+          "wall_s": 12269.7
         },
         {
-          "success": 0.43333333333333335,
-          "collision": 0.4666666666666667,
+          "success": 0.4666666666666667,
+          "collision": 0.5,
           "episode": 2500,
           "stage": 2,
-          "train_rolling_succ": 0.49,
+          "train_rolling_succ": 0.51,
           "aux_loss": NaN,
-          "wall_s": 12664.5
+          "wall_s": 12650.4
         }
       ]
     }

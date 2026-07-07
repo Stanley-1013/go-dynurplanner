@@ -38,3 +38,33 @@
 [noshield seed0] ep  400 | stage 2 | succ 0.13 | true-coll 0.60 | no_safe 0 | 148.7s
 [noshield seed0] ep  600 | stage 2 | succ 0.27 | true-coll 0.57 | no_safe 0 | 232.1s
 [noshield seed0] ep  800 | stage 2 | succ 0.23 | true-coll 0.63 | no_safe 0 | 320.4s
+[noshield seed0] ep 1000 | stage 2 | succ 0.07 | true-coll 0.67 | no_safe 0 | 417.5s
+[noshield seed0] ep 1200 | stage 2 | succ 0.20 | true-coll 0.67 | no_safe 0 | 519.3s
+[noshield seed0] ep 1400 | stage 2 | succ 0.07 | true-coll 0.77 | no_safe 0 | 628.4s
+[noshield seed0] ep 1600 | stage 2 | succ 0.03 | true-coll 0.77 | no_safe 0 | 737.0s
+[noshield seed0] ep 1800 | stage 2 | succ 0.03 | true-coll 0.73 | no_safe 0 | 864.7s
+[noshield seed0] ep 2000 | stage 2 | succ 0.03 | true-coll 0.73 | no_safe 0 | 993.5s
+[noshield seed0] ep 2200 | stage 2 | succ 0.10 | true-coll 0.47 | no_safe 0 | 1127.6s
+[noshield seed0] ep 2400 | stage 2 | succ 0.07 | true-coll 0.50 | no_safe 0 | 1256.4s
+[noshield seed0] ep 2600 | stage 2 | succ 0.10 | true-coll 0.77 | no_safe 0 | 1379.1s
+[noshield seed0] ep 2800 | stage 2 | succ 0.03 | true-coll 0.67 | no_safe 0 | 1503.7s
+[noshield seed0] ep 3000 | stage 2 | succ 0.03 | true-coll 0.77 | no_safe 0 | 1635.1s
+[noshield seed1] ep 110: ADVANCE to stage 1 (2, 0.1)
+[noshield seed1] ep  200 | stage 1 | succ 0.10 | true-coll 0.57 | no_safe 0 | 63.2s
+[noshield seed1] ep 210: ADVANCE to stage 2 (3, 0.25)
+[noshield seed1] ep  400 | stage 2 | succ 0.20 | true-coll 0.53 | no_safe 0 | 119.2s
+[noshield seed1] ep  600 | stage 2 | succ 0.13 | true-coll 0.67 | no_safe 0 | 179.8s
+[noshield seed1] ep  800 | stage 2 | succ 0.27 | true-coll 0.47 | no_safe 0 | 234.4s
+[noshield seed1] ep 1000 | stage 2 | succ 0.40 | true-coll 0.40 | no_safe 0 | 280.7s
+[noshield seed1] ep 1200 | stage 2 | succ 0.33 | true-coll 0.50 | no_safe 0 | 329.0s
+[noshield seed1] ep 1400 | stage 2 | succ 0.40 | true-coll 0.43 | no_safe 0 | 370.8s
+[noshield seed1] ep 1600 | stage 2 | succ 0.47 | true-coll 0.40 | no_safe 0 | 408.9s
+[noshield seed1] ep 1800 | stage 2 | succ 0.40 | true-coll 0.43 | no_safe 0 | 448.9s
+[noshield seed1] ep 2000 | stage 2 | succ 0.33 | true-coll 0.53 | no_safe 0 | 496.6s
+[noshield seed1] ep 2200 | stage 2 | succ 0.50 | true-coll 0.37 | no_safe 0 | 552.6s
+[noshield seed1] ep 2400 | stage 2 | succ 0.27 | true-coll 0.63 | no_safe 0 | 606.6s
+[noshield seed1] ep 2600 | stage 2 | succ 0.33 | true-coll 0.53 | no_safe 0 | 665.2s
+[noshield seed1] ep 2800 | stage 2 | succ 0.40 | true-coll 0.43 | no_safe 0 | 735.7s
+[noshield seed1] ep 3000 | stage 2 | succ 0.47 | true-coll 0.40 | no_safe 0 | 802.5s
+   shield final: succ 0.60 | true-coll 0.25
+ noshield final: succ 0.25 | true-coll 0.58

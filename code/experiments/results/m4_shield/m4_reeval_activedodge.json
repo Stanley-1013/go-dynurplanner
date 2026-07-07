@@ -1,0 +1,26 @@
+{
+  "shield_seed0": {
+    "success": 0.6833333333333333,
+    "collision": 0.2,
+    "no_safe": 23,
+    "dodges": 45
+  },
+  "shield_seed1": {
+    "success": 0.6666666666666666,
+    "collision": 0.2833333333333333,
+    "no_safe": 39,
+    "dodges": 30
+  },
+  "noshield_seed0": {
+    "success": 0.05,
+    "collision": 0.65,
+    "no_safe": 0,
+    "dodges": 0
+  },
+  "noshield_seed1": {
+    "success": 0.3,
+    "collision": 0.5166666666666667,
+    "no_safe": 0,
+    "dodges": 0
+  }
+}

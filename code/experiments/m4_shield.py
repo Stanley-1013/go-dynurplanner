@@ -64,7 +64,18 @@ def shielded_actor_action(env, agent, sel, s):
     ladder (scale-down along its direction; last resort = max-tau* candidate
     from the pool around it)."""
     a = agent.act(s, explore=False)
-    for alpha in (1.0, 0.5, 0.25, 0.125, 0.0):
+    if env.peek_tau_star(a, sel._inflation(a)) is None:
+        return a
+    # Active dodge: search the candidate pool around the actor action for a
+    # CERTIFIED alternative (still a hard guarantee — just more directions
+    # than the passive slow-down ladder, which traps cornered states).
+    cands = sel._candidates(s)
+    certified = [c for c in cands if env.peek_tau_star(c, sel._inflation(c)) is None]
+    if certified:
+        sel.stats["scaled"] += 1  # reuse counter: intervention happened
+        best = max(certified, key=lambda c: env.peek_reward(c))
+        return best
+    for alpha in (0.5, 0.25, 0.125, 0.0):
         if env.peek_tau_star(alpha * a, sel._inflation(alpha * a)) is None:
             return alpha * a
     sel.stats["no_safe"] += 1
