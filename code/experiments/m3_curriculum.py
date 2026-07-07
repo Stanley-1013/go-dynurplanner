@@ -138,17 +138,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--episodes", type=int, default=3000)
     ap.add_argument("--seeds", type=int, default=2)
+    ap.add_argument("--modes", type=str, default="uoar,ct")
     ap.add_argument("--out", type=str, default="experiments/results/m3_curriculum")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     results = {}
-    for mode in ("uoar", "ct"):
+    for mode in args.modes.split(","):
         results[mode] = {}
         for seed in range(args.seeds):
             results[mode][seed] = run_one(mode, args.episodes, seed)
-    with open(out_dir / "m3c_results.json", "w") as f:
+    tag = args.modes.replace(",", "-")
+    with open(out_dir / f"m3c_{tag}.json", "w") as f:
         json.dump({"config": vars(args), "stages": STAGES, "results": results}, f, indent=2)
 
     for mode in results:

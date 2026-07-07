@@ -8,8 +8,14 @@ rejected (shield=on) or not (shield=off). Expected per blueprint H4:
 shielded true-collision rate ~ 0 (up to the honest no-safe residual, which
 is counted), with bounded success-rate cost.
 
-Usage: .venv/bin/python experiments/m4_shield.py [--episodes 1500]
-       [--speed 0.25] [--seeds 2] [--reward-mode ct]
+Ported onto the blueprint §5 curriculum protocol (see m3_curriculum.py):
+tabletop task, STAGES [(0,0.0),(2,0.10),(3,0.25)], rolling-success
+auto-advance on the TRAIN env only, fixed-width state via
+env.set_difficulty. Evaluation always runs in the FINAL stage's dynamic
+scenes, mirroring m3_curriculum.evaluate.
+
+Usage: .venv/bin/python experiments/m4_shield.py [--episodes 3000]
+       [--seeds 2] [--reward-mode uoar]
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ import argparse
 import json
 import sys
 import time
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -30,8 +37,11 @@ from godynur.env import DynArmEnv  # noqa: E402
 from godynur.td3 import TD3  # noqa: E402
 
 WARMUP_STEPS = 1500
-EVAL_EVERY = 100
+EVAL_EVERY = 200
 EVAL_EPISODES = 30
+STAGES = [(0, 0.0), (2, 0.10), (3, 0.25)]
+ADVANCE_WINDOW = 100
+ADVANCE_THRESHOLD = 0.7
 
 
 def make_selector(env, agent, shield: bool, seed: int) -> APE2Shield:
@@ -49,6 +59,7 @@ def make_selector(env, agent, shield: bool, seed: int) -> APE2Shield:
 
 
 def evaluate(env, agent, shield: bool, seed: int):
+    env.set_difficulty(*STAGES[-1])
     sel = make_selector(env, agent, shield, seed=90_000 + seed)
     succ, coll, steps = 0, 0, 0
     for _ in range(EVAL_EPISODES):
@@ -69,14 +80,24 @@ def evaluate(env, agent, shield: bool, seed: int):
     }
 
 
-def run_one(shield: bool, reward_mode: str, speed: float, episodes: int, seed: int):
-    env = DynArmEnv(speed=speed, reward_mode=reward_mode, seed=seed)
-    eval_env = DynArmEnv(speed=speed, reward_mode=reward_mode, seed=10_000 + seed)
+def run_one(shield: bool, reward_mode: str, episodes: int, seed: int):
+    env = DynArmEnv(
+        task="tabletop", n_obstacles=3, reward_mode=reward_mode, seed=seed
+    )
+    eval_env = DynArmEnv(
+        task="tabletop", n_obstacles=3, reward_mode=reward_mode, seed=10_000 + seed
+    )
     agent = TD3(
-        env.state_dim, env.action_dim, action_scale=env.action_bound[1], seed=seed
+        env.state_dim, env.action_dim, action_scale=env.action_bound[1],
+        expl_noise=0.25, seed=seed,
     )
     sel = make_selector(env, agent, shield, seed)
+    stage_idx = 0
+    env.set_difficulty(*STAGES[stage_idx])
+    rolling = deque(maxlen=ADVANCE_WINDOW)
     history, total_steps, t0 = [], 0, time.time()
+    tag = "shield" if shield else "noshield"
+
     for ep in range(1, episodes + 1):
         s = env.reset()
         done = False
@@ -99,21 +120,39 @@ def run_one(shield: bool, reward_mode: str, speed: float, episodes: int, seed: i
             agent.learn()
             s = s2
             total_steps += 1
+        rolling.append(1 if env.on_goal >= env.goal_dwell else 0)
+
+        # Curriculum advance (train env only).
+        if (
+            stage_idx < len(STAGES) - 1
+            and len(rolling) == ADVANCE_WINDOW
+            and np.mean(rolling) >= ADVANCE_THRESHOLD
+        ):
+            stage_idx += 1
+            env.set_difficulty(*STAGES[stage_idx])
+            rolling.clear()
+            print(
+                f"[{tag} seed{seed}] ep {ep}: ADVANCE to stage "
+                f"{stage_idx} {STAGES[stage_idx]}",
+                flush=True,
+            )
+
         if ep % EVAL_EVERY == 0 or ep == episodes:
             ev = evaluate(eval_env, agent, shield, seed)
             ev.update(
                 {
                     "episode": ep,
+                    "stage": stage_idx,
+                    "train_rolling_succ": float(np.mean(rolling)) if rolling else 0.0,
                     "wall_s": round(time.time() - t0, 1),
                     "train_shield_stats": dict(sel.stats),
                 }
             )
             history.append(ev)
-            tag = "shield" if shield else "noshield"
             print(
-                f"[{tag} seed{seed}] ep {ep:>4} | succ {ev['success']:.2f} | "
-                f"true-coll {ev['collision']:.2f} | no_safe {sel.stats['no_safe']} "
-                f"| {ev['wall_s']}s",
+                f"[{tag} seed{seed}] ep {ep:>4} | stage {stage_idx} | "
+                f"succ {ev['success']:.2f} | true-coll {ev['collision']:.2f} "
+                f"| no_safe {sel.stats['no_safe']} | {ev['wall_s']}s",
                 flush=True,
             )
     return history
@@ -121,10 +160,9 @@ def run_one(shield: bool, reward_mode: str, speed: float, episodes: int, seed: i
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--episodes", type=int, default=1500)
-    ap.add_argument("--speed", type=float, default=0.25)
+    ap.add_argument("--episodes", type=int, default=3000)
     ap.add_argument("--seeds", type=int, default=2)
-    ap.add_argument("--reward-mode", type=str, default="ct")
+    ap.add_argument("--reward-mode", type=str, default="uoar")
     ap.add_argument("--out", type=str, default="experiments/results/m4_shield")
     args = ap.parse_args()
 
@@ -136,10 +174,12 @@ def main():
         results[key] = {}
         for seed in range(args.seeds):
             results[key][seed] = run_one(
-                shield, args.reward_mode, args.speed, args.episodes, seed
+                shield, args.reward_mode, args.episodes, seed
             )
-    with open(out_dir / f"m4_speed{args.speed}_{args.reward_mode}.json", "w") as f:
-        json.dump({"config": vars(args), "results": results}, f, indent=2)
+    with open(out_dir / f"m4_{args.reward_mode}.json", "w") as f:
+        json.dump(
+            {"config": vars(args), "stages": STAGES, "results": results}, f, indent=2
+        )
 
     for key in results:
         fin = [results[key][s][-1] for s in results[key]]

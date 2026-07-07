@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop 8 · RL 訓練線:負結果三連發與它們教的事</title>
+<style>
+  :root{
+    --navy:#10231f;--navy-2:#16322b;--navy-line:#2c5446;
+    --paper:#f5f2ea;--paper-2:#e9e4d6;--ink:#211f1a;--ink-soft:#54503f;--rule:#d5cdb6;
+    --core:#0f9d77;--core-soft:#3fc79b;--ur:#2563b8;--key:#7c3aed;
+    --ok:#1f8a54;--ok-bg:#d6ecdd;--corr:#b5871a;--corr-bg:#f6e8c6;--bad:#b23b2e;--bad-bg:#f3dcd6;--low:#6b6478;--low-bg:#e7e3ee;
+    --shadow:0 1px 2px rgba(16,35,31,.05),0 10px 30px rgba(16,35,31,.08);--maxw:1080px;
+  }
+  @media (prefers-color-scheme: dark){:root{--paper:#161512;--paper-2:#1e1c17;--ink:#eae6da;--ink-soft:#b8b2a0;--rule:#3a362c;}}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.7}
+  header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#e6f2ec;border-bottom:1px solid var(--navy-line)}
+  .tnav{max-width:var(--maxw);margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto}
+  .tnav .home{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--core-soft);text-transform:uppercase;border:1px solid #2c5446;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-right:4px}
+  .tnav a{white-space:nowrap;font-size:12px;color:#bcd6cb;text-decoration:none;padding:6px 9px;border-radius:7px}
+  .tnav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .hero{max-width:var(--maxw);margin:0 auto;padding:46px 24px 14px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h1{font-family:Lora,serif;font-weight:600;font-size:clamp(1.6rem,3.2vw,2.5rem);line-height:1.18;margin:.25em 0 .3em;color:var(--navy)}
+  @media (prefers-color-scheme: dark){h1{color:#dfeee7}}
+  h1 em{font-style:italic;color:var(--core)}
+  .deck{font-size:15px;color:var(--ink-soft);max-width:820px}
+  main{max-width:var(--maxw);margin:0 auto;padding:14px 24px 90px}
+  section{margin-top:50px;scroll-margin-top:64px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;color:var(--core);text-transform:uppercase}
+  h2.sec{font-family:Lora,serif;font-size:clamp(1.3rem,2.2vw,1.85rem);color:var(--navy);font-weight:600;margin:.1em 0 .2em}
+  @media (prefers-color-scheme: dark){h2.sec{color:#dfeee7}}
+  .rule{height:3px;width:60px;background:linear-gradient(90deg,var(--core),transparent);border-radius:3px;margin:6px 0 16px}
+  p.body,ul.body,ol.body{font-size:14.5px;line-height:1.8;max-width:820px}
+  ul.body li,ol.body li{margin-bottom:6px}
+  p.body b{color:var(--navy)}
+  @media (prefers-color-scheme: dark){p.body b{color:#dfeee7}}
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+  .card.core{border-color:var(--core)}
+  .card.corr{border-color:var(--corr)}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border-radius:999px;font-weight:600;margin-right:6px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .tag.corr{background:var(--corr-bg);color:var(--corr)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .verdictbox{border-left:4px solid var(--core);background:var(--paper-2);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+  .verdictbox.corr{border-left-color:var(--corr)}
+  b.label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;color:var(--core);text-transform:uppercase;display:block;margin-bottom:4px}
+  b.label.corr{color:var(--corr)}
+  a{color:var(--ur)}
+  img.fig{max-width:100%;border:1px solid var(--rule);border-radius:10px;background:#fff}
+  code.inline{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--paper-2);padding:1px 6px;border-radius:5px}
+  footer{max-width:var(--maxw);margin:40px auto 0;padding:20px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--ink-soft);text-align:center;font-family:"IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header class="top">
+  <nav class="tnav">
+    <span class="home">DynURPlanner · Loop 8</span>
+    <a href="#flat">平坦協議不可學</a>
+    <a href="#reward-archaeology">獎勵考古學</a>
+    <a href="#h3-round1">H3 第一輪</a>
+    <a href="#next">下一步</a>
+  </nav>
+</header>
+<div class="hero">
+  <div class="kicker">Loop 8 · RL Training Line · Three honest negatives in a row</div>
+  <h1>RL 訓練線:<em>負結果三連發</em>,以及它們各自教的事</h1>
+  <p class="deck">本輪是把 M2-pre 之後的地基（DynArmEnv + 拱心石存活判定）真正拿去訓練 TD3 的第一手記錄。三次負結果依序出現:平坦協議下 TD3 完全學不會(0% 成功)、stage-0 純追近獎勵學不動、CT 獎勵在課程下把 agent 訓成極端避障恐懼症。每一次都被誠實記錄、診斷、修正——這正是研究迴圈該有的樣子,而不是把失敗藏起來只報好消息。</p>
+</div>
+<main>
+
+<section id="flat">
+  <div class="eyebrow">Negative #1 · Flat Protocol</div>
+  <h2 class="sec">平坦協議不可學:TD3 在全隨機起點/終點 + 3 障礙下 0% 成功</h2>
+  <div class="rule"></div>
+  <p class="body"><b>協議</b>:flat M3(<code class="inline">m3_baseline.py</code>)——random start/goal、3 obstacles @ 0.25 m/s,無課程、無分階段。TD3 訓練 1500 episodes × 2 seeds × 2 個獎勵模式(uoar、ct)。</p>
+  <table>
+    <tr><th>獎勵模式</th><th>成功率</th><th>最終真實碰撞率</th></tr>
+    <tr><td>uoar</td><td>0%(全部 episode/seed)</td><td>0.75</td></tr>
+    <tr><td>ct</td><td>0%(全部 episode/seed)</td><td>0.83</td></tr>
+  </table>
+  <div class="verdictbox corr">
+    <b class="label corr">誠實負基線</b>
+    <p class="body" style="margin:0">兩種獎勵模式在平坦協議下成功率都是 <b>0%</b>——episode 在碰撞中死亡的速度快過目標訊號能累積起來的速度。這不是失敗的實驗,是<b>證成課程與 ED2 必要性的證據</b>:URPlanner 本身也是用同樣的動機(平坦訓練不可行)來引入 ED2 這個組件。下一步不是調參數讓平坦協議變好,而是走向分階段課程。</p>
+  </div>
+</section>
+
+<section id="reward-archaeology">
+  <div class="eyebrow">Negative #2 · Reward Archaeology</div>
+  <h2 class="sec">獎勵考古學:一個不起眼的輔助項救回 stage-0</h2>
+  <div class="rule"></div>
+  <p class="body">分階段課程的第一步——stage-0(0 障礙,純追近)——用最樸素的獎勵設計(<code class="inline">-distance</code> + 5-step dwell 判定成功)先跑了一輪:<b>rolling success 只有 0.2 @ 1600 episodes</b>,practically 學不動。回頭精讀 URPlanner Eq.(11):</p>
+  <div class="card">
+    <p class="body" style="margin:0"><code class="inline">r_pose = -(e_p + e_o) + phi_aux + phi_G</code></p>
+  </div>
+  <p class="body">獎勵裡除了位置/姿態誤差項,還有兩個輔助項 <code class="inline">phi_aux</code>、<code class="inline">phi_G</code> 我們原本的實作漏掉了。實作 <code class="inline">phi_aux</code>(指數型接近度獎勵的近似形式——精確形式在其引用文獻 [9] 中,我們未能取得原文,已記錄於 <code class="inline">ASSUMPTIONS.md</code> 第 7 項)並改用「到達即成功」的語義後:</p>
+  <div class="verdictbox">
+    <b class="label">結果:0.73 rolling success @ 500 episodes(3.5 倍)</b>
+    <p class="body" style="margin:0"><b>教訓</b>:URPlanner 的收斂並非只靠主誤差項,而是<b>依賴 phi_aux 這個容易被忽略的輔助項</b>。少了它,同樣的環境和動作空間下 TD3 幾乎學不到東西;加上它,同樣的網路 3.5 倍加速收斂。移植論文獎勵設計時,輔助項不是可選的裝飾,是收斂的必要條件。</p>
+  </div>
+</section>
+
+<section id="h3-round1">
+  <div class="eyebrow">Negative #3 · H3 Round 1</div>
+  <h2 class="sec">H3 第一輪:CT 獎勵慘敗與診斷</h2>
+  <div class="rule"></div>
+  <p class="body"><b>協議</b>:課程訓練(tabletop task,stages 0 障礙 → 2 @ 0.10 m/s → 3 @ 0.25 m/s,rolling success ≥ 0.7 時 auto-advance)。</p>
+  <table>
+    <tr><th>獎勵模式</th><th>兩個 seed 的課程進度</th><th>最終階段成功率</th><th>真實碰撞率</th></tr>
+    <tr><td>uoar</td><td>兩個 seed 都到達 stage 2</td><td>0.65</td><td>0.25</td></tr>
+    <tr><td>ct</td><td>兩個 seed 都<b>卡在 stage 1</b></td><td>0.17</td><td>0.62</td></tr>
+  </table>
+  <div class="verdictbox corr">
+    <b class="label corr">診斷</b>
+    <p class="body" style="margin:0">CT 獎勵裡的 TTC(time-to-collision)項寫成 <code class="inline">-dt/(tau*+1e-3)</code>——這個形式<b>無界</b>:當 tau* 趨近 0(接觸前一瞬間)時懲罰可以衝到 -50 這個量級。尖峰式的懲罰把 critic 的價值估計毀掉,agent 學成了<b>極端避障恐懼症</b>——寧可完全不動、不接近任何障礙,也不冒進而觸發這根尖刺,結果連 stage 1 的課程門檻都跨不過。</p>
+  </div>
+  <div class="card core">
+    <b class="label">修正</b>
+    <p class="body" style="margin:0">改用<b>有界形式</b> <code class="inline">-(1 - tau*/dt) ∈ [-1, 0]</code>、<code class="inline">zeta_t = 0.5</code>。ct 臂目前<b>重跑中</b>。</p>
+  </div>
+  <p class="body"><span class="tag low">未支持</span> H3(CT 獎勵優於/等於 UOAR 獎勵)在本輪數據下<b>不成立</b>,誠實記錄而非隱藏。若有界版重跑後 ct 仍輸給 uoar,結論將轉向:<b>「CT 資訊的貢獻應該由屏蔽(shield)機制承擔,而非塞進獎勵函數裡」</b>——這個轉向本身就是可發表的 finding,而不是一個需要掩蓋的失敗。</p>
+</section>
+
+<section id="next">
+  <div class="eyebrow">Next</div>
+  <h2 class="sec">下一步</h2>
+  <div class="rule"></div>
+  <ol class="body">
+    <li><b>ct-v2 重跑中</b>:有界 TTC 形式(<code class="inline">-(1-tau*/dt)</code>、zeta_t=0.5)下,ct 臂能否追上 uoar 臂的課程進度與最終成功率</li>
+    <li><b>M4(APE2-Shield on/off,uoar 獎勵)佇列中</b>:同一套課程協議下比較屏蔽開/關,驗證 H4(屏蔽能否把真實碰撞率壓到接近 0,同時成功率代價有界)</li>
+    <li><b>M2-full(柵格 + 預報輔助)</b>在 H3/H4 之後排入:把已存活的拱心石(佔據預報輔助任務)接上柵格編碼器,進入完整訓練</li>
+  </ol>
+</section>
+
+</main>
+<footer>Loop 8 執行紀錄 · 平坦協議 0% 成功 · phi_aux 救回 stage-0(0.2→0.73)· H3 第一輪 ct 慘敗與 TTC 有界化修正中 · 2026-07-07</footer>
+</body>
+</html>

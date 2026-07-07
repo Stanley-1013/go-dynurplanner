@@ -54,7 +54,7 @@ class DynArmEnv:
         grid_n: int = 32,
         zeta_c: float = 1.0,   # current-overlap weight (URPlanner zeta)
         zeta_s: float = 1.0,   # swept-integral weight (CT mode)
-        zeta_t: float = 0.1,   # continuous-TTC weight (CT mode)
+        zeta_t: float = 0.5,   # continuous-TTC weight (CT mode, bounded form)
         task: str = "random",  # 'random' | 'tabletop' (URPlanner-style)
         seed: int = 0,
     ):
@@ -304,7 +304,10 @@ class DynArmEnv:
             if (t := first_contact_time(seg, ob.moving_box(margin), self.dt))
             is not None
         ]
-        r_ttc = -self.dt / (min(taus) + 1e-3) if taus else 0.0
+        # Bounded TTC penalty in [-1, 0]: the unbounded -dt/(tau*+eps)
+        # form blew up to ~-50 near contact and wrecked critic learning
+        # (M3-curriculum: ct arms stuck at stage 1 with obstacle-phobia).
+        r_ttc = -(1.0 - min(taus) / self.dt) if taus else 0.0
         return (
             r_pose
             + self.zeta_c * r_current

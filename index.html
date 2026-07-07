@@ -95,9 +95,15 @@
     <div><div class="t">實驗室代碼血統確認 ＋ DynArmEnv 完成（Morvan 介面相容）</div><div class="d">師兄指出代碼源自<b>莫烦Python《机械手臂从零开始》</b>（2017, BV1nW411a7Qg, GitHub: MorvanZhou/train-robot-arm-from-scratch）——手寫解析環境、step(a)→(s,r,done)、關節增量、免模擬器，正是 URPlanner 參數化空間的胚胎。已建 <b>godynur/env.py DynArmEnv</b>：保持 Morvan 介面（師兄的 DDPG/TD3/APE2 棧可直接跑），內部升級為移動障礙＋連續時間精確碰撞記帳（不可穿隧的 env）＋雙獎勵模式（uoar/ct，M3 消融軸）＋柵格觀測 grid_history()。測試 32/32 全綠</div><div class="meta">2026-07-07 · 交接相容性就緒 · 立場：M2-full 的地基完成</div></div>
   </a>
 
+  <div class="lane">RL Training Line · Loop 8</div>
+  <a class="item" href="research-log/08_rl_training_h3.html">
+    <div class="n">11</div>
+    <div><div class="t">RL 訓練線：負結果三連發（Loop 8）</div><div class="d"><b>平坦協議不可學</b>：flat M3（全隨機起點/終點＋3 障礙 @0.25m/s）TD3 訓練 0% 成功（uoar/ct 兩模式皆然），證成課程必要性。<b>Eq.11 獎勵考古</b>：stage-0 純追近獎勵原本學不動（rolling 0.2 @1600 eps），補上 URPlanner phi_aux 輔助項後 0.73 @500 eps（3.5×）。<b>H3 首輪</b>：課程訓練下 uoar 兩 seed 到達 stage 2（成功 0.65），ct 兩 seed 卡在 stage 1（成功 0.17）——診斷為 TTC 項無界化摧毀 critic，修正為有界形式後 ct-v2 重跑中</div><div class="meta">2026-07-07 · 三次誠實負結果 · 立場：失敗被診斷，不被隱藏</div></div>
+  </a>
+
   <div class="lane">Next</div>
   <div class="item" style="opacity:.75">
-    <div class="n">11</div>
+    <div class="n">12</div>
     <div><div class="t">見師兄（關鍵路徑）→ M2-full 訓練（待辦）</div><div class="d">帶 Loop 7 數據 + DynArmEnv demo；確認 a_r、柵格語義、特權訓練、資源；回來後在 DynArmEnv 上跑 DDPG/SAC 基線 → 接柵格編碼器＋預報輔助頭（GPU）</div></div>
   </div>
 </main>
