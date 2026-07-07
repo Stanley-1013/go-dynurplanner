@@ -55,7 +55,23 @@ def make_selector(env, agent, shield: bool, seed: int) -> APE2Shield:
         sa = torch.cat([st, at], 1)
         return float(torch.min(agent.q1(sa), agent.q2(sa)))
 
-    return APE2Shield(env, base_fn, q_fn, shield=shield, seed=seed)
+    return APE2Shield(env, base_fn, q_fn, shield=shield, seed=seed,
+                      anneal_steps=150_000)
+
+
+def shielded_actor_action(env, agent, sel, s):
+    """Deployment semantics: actor action passed through the certification
+    ladder (scale-down along its direction; last resort = max-tau* candidate
+    from the pool around it)."""
+    a = agent.act(s, explore=False)
+    for alpha in (1.0, 0.5, 0.25, 0.125, 0.0):
+        if env.peek_tau_star(alpha * a, sel._inflation(alpha * a)) is None:
+            return alpha * a
+    sel.stats["no_safe"] += 1
+    cands = sel._candidates(s)
+    taus = [(env.peek_tau_star(c, sel._inflation(c)) or np.inf, k)
+            for k, c in enumerate(cands)]
+    return cands[max(taus)[1]]
 
 
 def evaluate(env, agent, shield: bool, seed: int):
@@ -66,7 +82,12 @@ def evaluate(env, agent, shield: bool, seed: int):
         s = env.reset()
         done = False
         while not done:
-            s, _, done = env.step(sel.act(s, step=10**9))  # eta=1: trust critic
+            a = (
+                shielded_actor_action(env, agent, sel, s)
+                if shield
+                else agent.act(s, explore=False)
+            )
+            s, _, done = env.step(a)
             steps += 1
         if env.last_tau_star is not None:
             coll += 1
@@ -155,6 +176,11 @@ def run_one(shield: bool, reward_mode: str, episodes: int, seed: int):
                 f"| no_safe {sel.stats['no_safe']} | {ev['wall_s']}s",
                 flush=True,
             )
+    torch.save(
+        {"actor": agent.actor.state_dict(), "q1": agent.q1.state_dict(),
+         "q2": agent.q2.state_dict()},
+        Path("experiments/results/m4_shield") / f"td3_{tag}_seed{seed}.pt",
+    )
     return history
 
 
