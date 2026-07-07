@@ -160,6 +160,22 @@ class DynArmEnv:
     def sample_action(self) -> np.ndarray:
         return self.rng.uniform(*self.action_bound, self.action_dim)
 
+    def scene_params(self, pad_to: int | None = None) -> np.ndarray:
+        """Obstacle snapshot as (pad_to, 9): [center(3), half(3), vel(3)] per
+        slot; absent slots filled with a distant dummy (center=50) that
+        rasterizes to nothing. The analytic-space replay trick: storing 9
+        floats per obstacle instead of voxel grids makes grid-RL replay
+        buffers ~4000x smaller; grids are re-rasterized lazily on sampling."""
+        n = pad_to if pad_to is not None else self.n_obstacles_max
+        out = np.full((n, 9), 50.0, dtype=np.float32)
+        out[:, 3:6] = 0.01
+        out[:, 6:9] = 0.0
+        for i, ob in enumerate(self.scene.obstacles[:n]):
+            out[i, 0:3] = ob.center
+            out[i, 3:6] = ob.half
+            out[i, 6:9] = ob.vel
+        return out
+
     # ---- candidate peeking (no state mutation) ----------------------------
     # The analytic parameterized space makes candidate evaluation free: both
     # the immediate reward and the interval-collision verdict of a candidate
