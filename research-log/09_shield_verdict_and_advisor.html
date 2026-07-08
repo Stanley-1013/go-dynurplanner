@@ -141,6 +141,16 @@
     <b class="label">誠實記錄:一個實驗設計 confound,而非明確的 SDF 優勢</b>
     <p class="body" style="margin:0">SDF+closest-point 的 aux=0 臂(0.70/0.25)打平向量參考線,是目前最佳柵格結果——但 <b>aux=1 臂的失敗模式在 binary 與 SDF 之間幾乎逐位重複</b>:seed1 在 binary(succ 0.26/coll 0.66)與 SDF(succ 0.26/coll 0.58)兩種柵格下數字幾乎相同、都卡在 stage 1。這強烈暗示 <b>seed=1 本身是難的初始化/課程路徑,與柵格模式或 aux 開關無關</b>——目前的 n=2 設計讓不同 arm 共用同一組 seed 數值,不是真正獨立抽樣,污染了 A/B 比較的效度。結論:SDF 是否真的比二值好、aux 是否真的有幫助,<b>目前證據不足以下判斷</b>;下一輪需要 seed 與 arm 解耦(每個 arm 用獨立隨機種子而非共用 0/1)、且 n≥4。這個 confound 本身是寫進論文方法論章節的誠實材料。</p>
   </div>
+  <h3 class="sub">解耦重跑(<code class="inline">--seed-salt</code>,每個 arm 用完全獨立的隨機種子)</h3>
+  <table>
+    <tr><th>設定</th><th>seed A</th><th>seed B</th><th>succ 均值±std</th><th>coll</th></tr>
+    <tr><td>sdf-16+closest, aux=0</td><td>succ 0.00 coll 0.73(卡在 stage 0)</td><td>succ 0.77 coll 0.20</td><td>0.385±0.39</td><td>0.465</td></tr>
+    <tr><td><b>sdf-16+closest, aux=1</b></td><td>succ 0.70 coll 0.20</td><td>succ 0.67 coll 0.23</td><td><b>0.685±0.01</b></td><td><b>0.215</b></td></tr>
+  </table>
+  <div class="card core">
+    <b class="label">一個不同形狀的訊號:輔助任務可能穩定訓練,而非提升峰值表現</b>
+    <p class="body" style="margin:0">解耦後的模式很清楚:<b>aux=0 一個 seed 完全訓練崩潰</b>(卡在 stage 0,succ 0.00,從未學會純接近目標都不會),另一個表現很好(0.77)——變異度 0.39。<b>aux=1 兩個 seed 都穩定成功</b>(0.70、0.67),變異度只有 0.01。這不是「aux 讓平均表現更好」的故事(0.685 vs 0.385 的差距主要來自 aux=0 那次崩潰,不是穩定的提升量),而是「<b>佔據預報輔助任務似乎降低了訓練崩潰的機率</b>」——這在 RL 輔助任務文獻裡是常見且合理的效果(穩定表徵學習,而非直接提升獎勵)。<b>誠實邊界</b>:n=2 每臂仍然太小,一次崩潰可以是巧合;這是一個值得用 n≥4 獨立種子驗證的假設,不是定論。若成立,論文框架會從「H2:aux 提升表現」修正為更精確、更誠實的「H2':aux 降低訓練不穩定/崩潰風險」——後者其實是更常見、更容易被審稿人接受的輔助任務效果類型。</p>
+  </div>
 </section>
 
 <section id="next">

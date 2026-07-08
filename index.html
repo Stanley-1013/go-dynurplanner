@@ -103,7 +103,7 @@
 
   <a class="item" href="research-log/09_shield_verdict_and_advisor.html">
     <div class="n">12</div>
-    <div><div class="t">H4 屏蔽成立 + 師兄指令落地（Loop 9）</div><div class="d">主動閃避屏蔽承重實驗過關：shield 0.675 succ / 0.24 coll vs noshield 0.175 / 0.585（近 4 倍成功率、碰撞減半以上），殘餘碰撞皆為誠實 no_safe 事件；H2 二值柵格首讀 n=2 不可判；師兄四項指令落地，柵格轉向 SDF + 最近障礙點特徵，SDF-16³ 四臂已開跑</div><div class="meta">2026-07-08 · H4 判定成立 · 立場：屏蔽把碰撞轉為可證的不可避免事件</div></div>
+    <div><div class="t">H4 屏蔽成立 + 師兄指令落地 + H2 解耦重跑（Loop 9）</div><div class="d">主動閃避屏蔽承重實驗過關：shield 0.675 succ / 0.24 coll vs noshield 0.175 / 0.585（近 4 倍成功率、碰撞減半以上），殘餘碰撞皆為誠實 no_safe 事件；師兄四項指令落地，柵格轉向 SDF + 最近障礙點特徵；H2 首讀抓到 seed/arm 混淆的實驗設計 bug，<code>--seed-salt</code> 解耦後重跑：aux=0 一次訓練崩潰（succ 0/coll 0.73）、aux=1 兩個獨立種子都穩定成功（0.70/0.67）——暗示輔助任務可能<b>降低訓練崩潰風險</b>而非提升峰值表現，n=2 仍待擴大驗證</div><div class="meta">2026-07-08 · H4 判定成立、H2 假設待驗證 · 立場：屏蔽把碰撞轉為可證的不可避免事件</div></div>
   </a>
 
   <div class="lane">Next</div>
