@@ -6,6 +6,14 @@
 （[arXiv:2505.20175](https://arxiv.org/abs/2505.20175)）基础上向动态（障碍物移动）
 环境延伸。
 
+> **名称释义**：课题原文（`research-topic.md`）要求三件事——*状态表征*
+> （state representation）、*奖励函数设计*（reward function design）、
+> *算法优化*（algorithm optimization）——外加把 *URPlanner* 延伸到*动态*
+> 环境。**GO** = **G**rid **O**bservation（栅格观测），对应状态表征这一项
+> （导师的 occupancy grid 指令，见 `research-log/06_research_blueprint.html`）；
+> 奖励与算法两项分别对应 D-UOAR-CT 与 APE2-Shield。**Dyn** = 动态环境；
+> **URPlanner** = 本项目延伸的基底论文。
+
 ## 摘要
 
 面向机械臂的标准强化学习运动规划器，每个控制步只在起始和/或终止构型处检查一次碰撞。

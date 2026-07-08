@@ -6,6 +6,15 @@ Research in progress — NUS master's project extending URPlanner
 ([arXiv:2505.20175](https://arxiv.org/abs/2505.20175)) toward dynamic
 (moving-obstacle) environments.
 
+> **Name**: the assigned topic (`research-topic.md`) asks for three things —
+> *state representation*, *reward function design*, and *algorithm
+> optimization* — on top of a *dynamic*-environment extension of *URPlanner*.
+> **GO** = **G**rid **O**bservation, answering the state-representation
+> requirement (the advisor's occupancy-grid directive, see
+> `research-log/06_research_blueprint.html`); the reward/algorithm pieces are
+> D-UOAR-CT and APE2-Shield respectively. **Dyn** = dynamic environments;
+> **URPlanner** = the base paper this project extends.
+
 ## Abstract
 
 Standard reinforcement-learning motion planners for manipulators check
