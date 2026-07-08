@@ -1,0 +1,152 @@
+{
+  "config": {
+    "episodes": 2500,
+    "seeds": 1,
+    "arms": "0.0",
+    "device": "cuda",
+    "learn_every": 2,
+    "seed_offset": 0,
+    "grid_mode": "sdf",
+    "grid_n": 16,
+    "closest_point": true,
+    "seed_salt": 242,
+    "out": "experiments/results/m5_grid_deconf"
+  },
+  "stages": [
+    [
+      0,
+      0.0
+    ],
+    [
+      2,
+      0.1
+    ],
+    [
+      3,
+      0.25
+    ]
+  ],
+  "results": {
+    "aux0": {
+      "0": [
+        {
+          "success": 0.0,
+          "collision": 0.8333333333333334,
+          "episode": 200,
+          "stage": 0,
+          "train_rolling_succ": 0.01,
+          "aux_loss": NaN,
+          "wall_s": 882.0
+        },
+        {
+          "success": 0.03333333333333333,
+          "collision": 0.6333333333333333,
+          "episode": 400,
+          "stage": 0,
+          "train_rolling_succ": 0.0,
+          "aux_loss": NaN,
+          "wall_s": 1590.0
+        },
+        {
+          "success": 0.1,
+          "collision": 0.8,
+          "episode": 600,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 2204.2
+        },
+        {
+          "success": 0.06666666666666667,
+          "collision": 0.7,
+          "episode": 800,
+          "stage": 0,
+          "train_rolling_succ": 0.01,
+          "aux_loss": NaN,
+          "wall_s": 2809.0
+        },
+        {
+          "success": 0.0,
+          "collision": 0.7,
+          "episode": 1000,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 3412.0
+        },
+        {
+          "success": 0.03333333333333333,
+          "collision": 0.7333333333333333,
+          "episode": 1200,
+          "stage": 0,
+          "train_rolling_succ": 0.01,
+          "aux_loss": NaN,
+          "wall_s": 4002.4
+        },
+        {
+          "success": 0.0,
+          "collision": 0.8,
+          "episode": 1400,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 4576.6
+        },
+        {
+          "success": 0.0,
+          "collision": 0.8666666666666667,
+          "episode": 1600,
+          "stage": 0,
+          "train_rolling_succ": 0.01,
+          "aux_loss": NaN,
+          "wall_s": 5147.8
+        },
+        {
+          "success": 0.0,
+          "collision": 0.8333333333333334,
+          "episode": 1800,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 5708.6
+        },
+        {
+          "success": 0.03333333333333333,
+          "collision": 0.6666666666666666,
+          "episode": 2000,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 6264.1
+        },
+        {
+          "success": 0.0,
+          "collision": 0.7,
+          "episode": 2200,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 6810.5
+        },
+        {
+          "success": 0.0,
+          "collision": 0.8,
+          "episode": 2400,
+          "stage": 0,
+          "train_rolling_succ": 0.02,
+          "aux_loss": NaN,
+          "wall_s": 7349.8
+        },
+        {
+          "success": 0.0,
+          "collision": 0.7333333333333333,
+          "episode": 2500,
+          "stage": 0,
+          "train_rolling_succ": 0.01,
+          "aux_loss": NaN,
+          "wall_s": 7640.7
+        }
+      ]
+    }
+  }
+}
