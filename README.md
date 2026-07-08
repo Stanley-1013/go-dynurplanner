@@ -1,5 +1,7 @@
 # GO-DynURPlanner — Continuous-Time Collision Reasoning for Dynamic Manipulator Motion Planning
 
+English | [简体中文](README.zh-CN.md)
+
 Research in progress — NUS master's project extending URPlanner
 ([arXiv:2505.20175](https://arxiv.org/abs/2505.20175)) toward dynamic
 (moving-obstacle) environments.
