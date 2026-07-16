@@ -267,14 +267,44 @@ disclosure style for the original `eps_lin`).
 ### Phase 5 — occupancy forecasting + TD3/APE2 integration, full experiments, **seed scale-up**
 - [ ] wire `grid_td3.py`/`forecast.py` obstacle prediction into the N-step
       safety horizon
+- [x] **Phase 5a**: `experiments/m6_kinodynamic_shield.py` — three-arm
+      comparison (`no_shield`/`ape2_shield`/`kinodynamic_shield`), disjoint
+      per-arm seed ranges (`ARM_SEED_STRIDE=1e6`, avoids the Loop 9
+      seed-confound even across arms), per-`EVAL_EVERY`-block intervention
+      rate logged (supports the "Learning" metric below directly). All
+      three arms independently smoke-verified by the commander (not just
+      Codex's kinodynamic-only smoke) — 8 episodes, all ran cleanly, no
+      crashes. Measured per-episode wall time at this tiny scale: `no_shield`
+      ≈0.39s, `ape2_shield`≈0.89s, `kinodynamic_shield`≈5.6s (QP overhead
+      dominates, consistent with the Phase 2 perf finding).
 - [ ] full A/B experiments across shield variants. **Raise seed count** —
       existing H2/M5 results used n=2 only (HANDOFF.md: "n=2 hypothesis
       pending scale-up"); target n≥5 minimum, n=8–10 for anything destined
       for the paper, with Wilson CIs per the existing C1 convention
       (`m5_grid.py --seed-salt` already fixes the seed-confound bug found
       in Loop 9 — reuse that pattern, don't reintroduce the confound)
+  - **Phase 5b sizing decision (commander, 2026-07-17)**: historical
+    M4 (`experiments/logs/m4v2.log`) reaches final curriculum stage by
+    ~ep 200 but success rate is STILL rising at its ep-3000 ceiling
+    (noshield 0.33→0.40→0.47 in its last 3 checkpoints) — not fully
+    converged even there. Given `kinodynamic_shield`'s ~5.6s/episode,
+    the historical 3000-episode default would cost ~4.7h/seed (~23.5h
+    for 5 seeds sequential) — too large a first commitment. Chose
+    **800 episodes × 5 seeds** as the first real Phase 5b pass: well past
+    curriculum completion, captures a meaningful early/mid training
+    trend, caps `kinodynamic_shield` at ~1.24h/seed (~6.2h for 5 seeds
+    sequential, dominant arm). Launched as 3 PARALLEL background
+    processes (one per arm, `--seed-salt 0 --seeds 5 --episodes 800`),
+    logs at `experiments/logs/m6_<arm>.log`, results under
+    `experiments/results/m6_kinodynamic/`. This is a first pass, not the
+    final paper numbers — plan a longer/larger Phase 5c rerun (closer to
+    the historical 3000-episode budget, n=8-10) once these results are
+    sane-checked, per the roadmap's own n≥5-minimum/n=8-10-for-paper
+    two-tier target.
 - [ ] intervention-rate-over-training metric — does the policy learn to
-      self-limit, or does it permanently lean on the shield?
+      self-limit, or does it permanently lean on the shield? (data will
+      exist once Phase 5b's per-block `train_intervention_rate` history
+      is analyzed — not yet analyzed as of this entry)
 
 ## 4. Evaluation metrics (apply from Phase 4 onward)
 
@@ -324,6 +354,20 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter14: verified Phase 5a's `m6_kinodynamic_shield.py`
+  (commander) — full read-through, correct per-arm mechanism separation
+  (no_shield: plain TD3; ape2_shield: faithful port of m4_shield.py's
+  deployment ladder; kinodynamic_shield: safety inside env.step(), no
+  APE2 wrapper needed); `pytest` unaffected (78/78). Ran my own smoke
+  test covering ALL THREE arms (Codex's smoke only covered
+  kinodynamic_shield) at 8 episodes/1 seed each — all ran cleanly,
+  timing data collected (see Phase 5a's roadmap entry). Committed the
+  script. Sized and launched Phase 5b (800 episodes x 5 seeds, 3
+  parallel background processes) — see the Phase 5b sizing note above
+  for the reasoning. This will run for hours; subsequent loop iterations
+  should just check progress via the log tails and the background-task
+  completion notifications, not redo this analysis.
+- 2026-07-17 iter13: added `experiments/m6_kinodynamic_shield.py`, a three-arm plain-TD3 / APE2-shield / velocity-mode kinodynamic-shield comparison with M4's unchanged tabletop curriculum and evaluation protocol, disjoint salted per-arm seeds, and Phase-5 safety/efficiency/intervention/timing metrics; a 15-episode, 1-seed kinodynamic-only smoke ran end-to-end and emitted sane JSON in 80.79s (the other two arms were not exercised in this time-bounded smoke), and the full suite remains green at 78 passed.
 - 2026-07-17 iter12: independently re-verified iter11's Phase-4 claim
   (commander session, extra scrutiny — this was the phase that already
   caught me proposing an unsound bound once). Reran `pytest` myself: 78

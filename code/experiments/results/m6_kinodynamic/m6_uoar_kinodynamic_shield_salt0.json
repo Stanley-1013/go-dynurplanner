@@ -1,0 +1,107 @@
+{
+  "config": {
+    "episodes": 15,
+    "seeds": 1,
+    "seed_salt": 0,
+    "arms": [
+      "kinodynamic_shield"
+    ],
+    "reward_mode": "uoar",
+    "out": "experiments/results/m6_kinodynamic"
+  },
+  "stages": [
+    [
+      0,
+      0.0
+    ],
+    [
+      2,
+      0.1
+    ],
+    [
+      3,
+      0.25
+    ]
+  ],
+  "results": {
+    "kinodynamic_shield": {
+      "0": [
+        {
+          "success": 0.0,
+          "collision": 0.6,
+          "mean_steps": 68.66666666666667,
+          "mean_steps_to_success": null,
+          "eval_shield_stats": {
+            "shield_fallback": 326,
+            "shield_emergency": 0
+          },
+          "eval_intervention_rate": 0.15825242718446603,
+          "eval_mean_intervention_norm": 0.32184761290443964,
+          "eval_episode_wall_s": [
+            0.520652,
+            0.956384,
+            0.227786,
+            0.34583,
+            0.289523,
+            0.931959,
+            0.358583,
+            0.969287,
+            1.034534,
+            0.938307,
+            0.407934,
+            0.209527,
+            0.252751,
+            0.586765,
+            0.917692,
+            1.00059,
+            0.942159,
+            0.63978,
+            0.951873,
+            0.571086,
+            0.640331,
+            1.095426,
+            0.929282,
+            0.237177,
+            0.84894,
+            0.275319,
+            0.908042,
+            0.116042,
+            0.652527,
+            1.007427
+          ],
+          "eval_mean_episode_wall_s": 0.658783870966666,
+          "episode": 15,
+          "stage": 0,
+          "actual_seed": 2000000,
+          "train_rolling_succ": 0.0,
+          "wall_s": 76.0,
+          "train_shield_stats": {},
+          "train_env_stats": {
+            "shield_fallback": 6,
+            "shield_emergency": 0
+          },
+          "train_intervention_rate": 0.004,
+          "train_mean_intervention_norm": 0.17828451102295523,
+          "train_episode_wall_s": [
+            0.711465,
+            0.76873,
+            0.698647,
+            3.49035,
+            4.129239,
+            4.617308,
+            5.002753,
+            5.557727,
+            4.091635,
+            4.448215,
+            4.664393,
+            3.879348,
+            4.527888,
+            5.633151,
+            4.042718
+          ],
+          "train_mean_episode_wall_s": 3.750904446199881
+        }
+      ]
+    }
+  }
+}

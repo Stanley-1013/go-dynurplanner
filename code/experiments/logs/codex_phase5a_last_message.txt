@@ -1,0 +1,22 @@
+Implemented [m6_kinodynamic_shield.py](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py) and updated the [roadmap status log](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md:327). Smoke outputs:
+
+- [Results JSON](/home/han/claude_project/papper-research/code/experiments/results/m6_kinodynamic/m6_uoar_kinodynamic_shield_salt0.json)
+- [TD3 checkpoint](/home/han/claude_project/papper-research/code/experiments/results/m6_kinodynamic/td3_kinodynamic_shield_seed2000000.pt)
+
+Smoke command:
+
+```bash
+cd code && source .venv/bin/activate && PYTHONPATH=. /usr/bin/time -p python experiments/m6_kinodynamic_shield.py --episodes 15 --seeds 1 --arms kinodynamic_shield
+```
+
+Wall time: **80.79 seconds**. The kinodynamic arm ran cleanly; the other arms were not exercised in this time-bounded smoke.
+
+Logged collision/success rates, episode length and steps-to-success, APE2 `no_safe`, kinodynamic fallback/emergency counts, intervention rates and norms during training/evaluation, and per-episode wall time. Standalone joint-limit/inter-sample violations, path/jerk costs, and per-QP timings remain deferred because the current environment exposes no distinct counters/timers.
+
+Regression suite:
+
+```text
+78 passed in 22.96s
+```
+
+Based on 3.75 seconds/training episode plus periodic evaluation, `--episodes 2000 --seeds 8` would take roughly **17 hours sequentially for the kinodynamic arm** on this machine.
