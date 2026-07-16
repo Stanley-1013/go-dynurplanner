@@ -1,0 +1,15 @@
+Files created/changed:
+
+- `code/godynur/kinodynamics.py`
+- `code/tests/test_kinodynamics.py`
+- `code/godynur/panda.py`
+- `code/ASSUMPTIONS.md`
+- `code/KINODYNAMIC_ROADMAP.md`
+
+Pytest: `54 passed in 20.91s`
+
+Phase 1: all four checklist items checked; none left unchecked.
+
+Human sanity-check required: placeholder `DDQ_MAX` values of 5/7.5 rad/s² and `DDDQ_MAX` values of 50/75 rad/s³ against configured Panda hardware limits.
+
+The pre-existing modified `code/experiments/logs/codex_phase1.log` was left untouched.

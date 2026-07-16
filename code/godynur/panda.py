@@ -39,6 +39,8 @@ _MDH = np.array(
 Q_MIN = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973])
 Q_MAX = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
 DQ_MAX = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100])
+DDQ_MAX = np.array([5.0, 5.0, 5.0, 5.0, 7.5, 7.5, 7.5])
+DDDQ_MAX = np.array([50.0, 50.0, 50.0, 50.0, 75.0, 75.0, 75.0])
 
 # Consolidated segment definition: indices into the origin list
 # [O0, O1, ..., O7, O_flange] (9 origins, index 0..8).

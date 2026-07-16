@@ -197,3 +197,12 @@ that WILL need a value/decision from the lab.
   M=2, N=3 (→ 7 candidates), T=2e5, H=1, ω1=0.6, ω2=0.1, N_D=80, φ=0.1,
   T_B=2e3. Our TD3 baseline uses its own standard hypers; APE2
   reproduction should use these.
+
+## 10. ⚠ Panda acceleration/jerk limits — PLACEHOLDER (2026-07-17)
+- The new kinodynamic safety track uses per-joint `DDQ_MAX = [5, 5, 5, 5,
+  7.5, 7.5, 7.5] rad/s²` and `DDDQ_MAX = [50, 50, 50, 50, 75, 75,
+  75] rad/s³`. These are physically reasonable initial engineering values,
+  with higher limits for the three distal joints in the same spirit as their
+  higher existing `DQ_MAX`; they are **not verified Panda controller limits**.
+  Confirm against the lab robot's configured limits before using the shield
+  for experiments or hardware, then re-run all kinodynamic safety tests.

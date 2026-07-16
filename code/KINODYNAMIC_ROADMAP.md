@@ -99,25 +99,33 @@ Check off as landed **and verified** (pytest green + read-back), not just
 dispatched. Do not start a phase until the previous one's tests are green.
 
 ### Phase 1 — single-joint (q,v,a,j) model + continuous-interval certification (no obstacles, no wiring into RL)
-- [ ] `code/godynur/kinodynamics.py`: discrete update (A,B), continuous
+- [x] `code/godynur/kinodynamics.py`: discrete update (A,B), continuous
       τ-domain `a(τ)/v(τ)/q(τ)`, **exact interval-extrema check** (critical
       regression test: endpoint-legal but mid-interval-illegal case — this
       is the concrete proof of why Phase 1 exists)
-- [ ] N-step braking-feasibility check (conservative bang-bang/S-curve
+- [x] N-step braking-feasibility check (conservative bang-bang/S-curve
       closed form acceptable for v1; Phase 2 replaces with a real QP)
-- [ ] accel/jerk limit placeholders added to `panda.py` (+ dated entry in
+- [x] accel/jerk limit placeholders added to `panda.py` (+ dated entry in
       `code/ASSUMPTIONS.md` following the existing placeholder convention,
       e.g. item 4's `a_r`)
-- [ ] `code/tests/test_kinodynamics.py`, full suite green, nothing else
+- [x] `code/tests/test_kinodynamics.py`, full suite green, nothing else
       touched
-- Status: DISPATCHED to Codex 2026-07-17 (background), log at
-  `code/experiments/logs/codex_phase1.log`
+- Status: COMPLETE and verified 2026-07-17; 54 tests passed (46 existing +
+  8 Phase-1 tests).
 
 ### Phase 2 — multi-joint jerk-horizon QP/LP safety filter
+- [x] solver choice: `code/.venv` had NO solver at all (`scipy`, `cvxpy`,
+      `osqp`, `qpsolvers` all absent — checked 2026-07-17). Installed
+      `scipy` (1.18.0) — smallest dependency that can solve this size of
+      QP (few vars/step × N horizon, box + simple linear constraints) via
+      `scipy.optimize.minimize`. Not added to a tracked requirements file
+      because none exists in this repo (`.venv` itself is gitignored,
+      deps have always been implicit) — flagging here so a fresh venv
+      setup knows to `pip install scipy`. Revisit with `osqp`/`cvxpy`
+      only if Phase 5 realtime solve-time benchmarks demand it.
 - [ ] N-step jerk-sequence optimization: `min ||v1-v_nom||²_W +
       λ_j Σ|j_k|²` s.t. `(q,v,a,j)` box + terminal braking set
-- [ ] solver choice (check venv for `cvxpy`/`osqp`/`scipy.optimize`; add
-      minimal dependency if needed) + realtime solve-time benchmark
+- [ ] realtime solve-time benchmark
 - [ ] tests: infeasible-state handling (must degrade gracefully, never
       silently violate), solve-time budget, safety-margin sensitivity
 
@@ -197,6 +205,20 @@ dispatched. Do not start a phase until the previous one's tests are green.
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter3: independently re-verified iter2's Phase-1 claim
+  (commander session, not Codex self-report) — `git diff --stat` scope
+  matches the constraint list exactly (kinodynamics.py, test_kinodynamics.py
+  new; panda.py/ASSUMPTIONS.md additive only); reran
+  `pytest tests -q` myself, confirmed **54 passed**; read `kinodynamics.py`
+  and `test_kinodynamics.py` in full, hand-verified the core regression
+  test's numbers (q(0)=q(1)=0, true interior max ≈0.385 > q_max=0.3) —
+  math checks out, not tautological. Phase 1 genuinely done. Installed
+  `scipy` into `code/.venv` for Phase 2 (no solver existed at all before).
+  Dispatching Phase 2 to Codex next.
+- 2026-07-17 iter2: Phase 1 single-joint jerk dynamics, exact interval
+  extrema/limit certification, conservative N-step braking witness, Panda
+  accel/jerk placeholders, and 8 regression tests landed; full `pytest`
+  confirmed 54/54 green (46 existing + 8 new).
 - 2026-07-17 iter1: roadmap created; architecture mapped via Explore
   agent; baseline `pytest` confirmed 46/46 green. Phase 1 dispatched to
   Codex (`gpt-5.6-codex`, background) — see §3 Phase 1 status line.
