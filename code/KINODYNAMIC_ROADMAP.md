@@ -163,11 +163,22 @@ dispatched. Do not start a phase until the previous one's tests are green.
 
 - **Implementation / mechanical work** (write a module+tests to a written
   spec, apply an already-proven pattern, run an experiment script): Codex
-  CLI — `codex exec -m gpt-5.6-codex -c model_reasoning_effort=<medium|high>
+  CLI — `codex exec -m gpt-5.6-sol -c model_reasoning_effort=<medium|high>
   -s workspace-write -C <repo root> -o <output-file>`. Use `high` effort
   for anything deriving a new closed-form/constraint (Phase 1, Phase 2
   design); `medium` once a pattern is proven and being reapplied
   (batch experiment scripts, more seeds of an existing script).
+  **Verified 2026-07-17: `gpt-5.6-codex` is NOT usable on this account**
+  (`invalid_request_error: not supported when using Codex with a ChatGPT
+  account` — that model requires API-key auth). `gpt-5.6-sol` is the
+  actual usable 5.6-series model here and is what "codex 5.6 series"
+  means in practice for this loop — use it, don't re-try `gpt-5.6-codex`.
+  Also: CLI must be ≥0.144.5 (`codex --version`); 0.140.0 rejects
+  `gpt-5.6-sol` with "requires a newer version of Codex" — if a future
+  session hits that error again, `npm install -g @openai/codex@latest`
+  (verify the reinstall actually produced a working binary — one attempt
+  here left a broken `@openai/codex-linux-x64` optional-dep install that
+  needed a second explicit `npm install -g @openai/codex@latest` to fix).
 - **Verification**: this commander session reads back the diff and runs
   pytest itself — Codex's own "done" claim is never trusted alone, same
   rule as any other subagent (dispatch.md §6). Long training runs get
