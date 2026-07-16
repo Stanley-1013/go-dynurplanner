@@ -142,11 +142,55 @@ dispatched. Do not start a phase until the previous one's tests are green.
   certification, not just the speed.
 
 ### Phase 3 — integrate fixed velocity-action mapping into `DynArmEnv` (opt-in, non-breaking)
-- [ ] add `v_nom` action mode alongside existing delta-q mode, flag-gated,
-      existing mode stays default until this track's own experiments
-      validate the new one
-- [ ] observation additions: `a_t`, braking margin (±), last intervention
-      magnitude
+
+**IMPORTANT DESIGN CORRECTION (commander, 2026-07-17, confirmed via Opus
+consult) — read before touching this phase.** Direct measurement (see
+Phase 2's perf finding above) showed Phase 2's hard `v_N=0,a_N=0` terminal
+EQUALITY constraint, at the only real-time-affordable horizon (`n_steps=3`,
+0.15s), suppresses almost ALL requested motion — even a modest per-joint
+`v_nom` (~10-30% of `DQ_MAX`) comes back certified at ≈0. Requiring a full
+stop within the SAME short horizon used for the real-time solve conflates
+two different things: "box limits must hold over the next control period"
+(needs to be real-time-cheap) and "a stop must remain reachable eventually"
+(the actual safety requirement — doesn't need to be found by the same
+expensive QP). Opus confirmed this is the standard MPC terminal-*set*-vs-
+terminal-*point* distinction and endorsed the fix below (agent id
+`a1459dd7f55f19c5f` if this session needs to resume that consult).
+
+**Corrected design, replaces the Phase 2 §3 items above as written:**
+1. Real-time QP: `n_steps=2` (not 3), terminal equality DROPPED from the
+   QP entirely — it only certifies box (q,v,a,j) limits over the next 2
+   control periods. Needs a new `safety_qp.solve_safety_qp(...,
+   require_terminal_stop: bool = True)` param; `False` skips the terminal
+   `LinearConstraint`. Default `True` preserves Phase 2's existing
+   tests/behavior unchanged.
+2. Terminal SET membership (not point) check, run separately and cheaply
+   on the state reached after the executed step: reuse Phase 1's
+   `braking_feasible` witness search, but it currently only returns
+   `bool` — add a sibling `braking_witness_jerk(...) -> float | None`
+   that returns the FIRST jerk of the same conservative bang-bang/S-curve
+   witness (refactor the shared search logic out of `braking_feasible` so
+   both call one internal helper — don't duplicate the math). Evaluate
+   this membership check with **derated authority** (`0.85 * a_max`,
+   `0.85 * j_max` — Opus's margin against one control period of latency),
+   horizon `n_brake=15-20` (cheap, O(n) closed-form, not a QP).
+3. **Fallback for recursive feasibility** (Opus's addition, closes the gap
+   between replans): the env stores the last accepted witness jerk. If a
+   step's QP+membership check fails, execute the STORED witness's braking
+   jerk rather than re-solving arbitrary — this is what makes the
+   guarantee inductive (always either extending a certified-safe state or
+   committing to an already-certified brake), not just "hope the next
+   solve works."
+- [ ] **Phase 3a (do this first, additive, small)**: `require_terminal_stop`
+      flag on `safety_qp.solve_safety_qp`; `braking_witness_jerk` on
+      `kinodynamics.py` (shared logic with `braking_feasible`, no
+      duplication); tests for both; full suite green, nothing else touched.
+- [ ] **Phase 3b (after 3a verified)**: add `v_nom` action mode to
+      `DynArmEnv`, flag-gated (`action_mode="delta_q"` stays default,
+      byte-identical existing behavior), wiring in the corrected 3-part
+      design above, incl. the last-witness fallback state.
+- [ ] observation additions: `a_t`, terminal-membership flag, last
+      intervention magnitude
 - [ ] safety-intervention penalty term `-λ‖v_nom - v_exec‖²`
 
 ### Phase 4 — extend `continuous.py` collision shield to cubic joint trajectories
@@ -217,6 +261,19 @@ dispatched. Do not start a phase until the previous one's tests are green.
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter6: before starting Phase 3, sanity-checked the shield's
+  actual behavior numerically (commander, direct `solve_safety_qp` calls)
+  — found the hard `v_N=0,a_N=0` terminal equality at real-time-affordable
+  `n_steps=3` suppresses nearly all motion. Escalated the terminal-set
+  design to an Opus consult (per this roadmap's own §5 escalation
+  trigger for "terminal braking set choice") rather than deciding
+  unilaterally; Opus confirmed the diagnosis and the proposed fix
+  (terminal SET membership via cheap derated `braking_feasible`, not a
+  terminal EQUALITY inside the expensive QP), plus added a last-witness
+  fallback for recursive feasibility across replans. Full design recorded
+  in the corrected Phase 3 entry above. Dispatching Phase 3a (the small,
+  additive `kinodynamics`/`safety_qp` amendments this design needs) next
+  — NOT touching `env.py` until 3a is verified.
 - 2026-07-17 iter5: independently re-verified iter4's Phase-2 claim
   (commander session) — diff scope correct (`safety_qp.py` +
   `test_safety_qp.py` only, roadmap edits additive), reran `pytest`
