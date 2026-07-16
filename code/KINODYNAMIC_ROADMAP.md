@@ -194,12 +194,75 @@ terminal-*point* distinction and endorsed the fix below (agent id
 - [x] safety-intervention penalty term `-λ‖v_nom - v_exec‖²`
 
 ### Phase 4 — extend `continuous.py` collision shield to cubic joint trajectories
-- [ ] generalize `MovingSegment`/`first_contact_time` from linear to cubic
-      `q(τ)` motion (or a documented, explicitly-conservative piecewise-
-      linear approximation as an interim step)
+
+**DESIGN NOTE (commander + Opus consult, 2026-07-17) — a near-miss worth
+recording.** My first proposal here was UNSOUND and Opus caught it before
+dispatch, via a clean counterexample — recorded because it's exactly the
+class of bug this whole research track exists to catch, and almost shipped
+it myself. Keep this note; don't let a future iteration re-propose the
+same broken shortcut.
+
+*What I proposed (WRONG):* keep the existing linear-chord collision
+checker unchanged, but inflate its existing `eps_lin` bound
+(`(1/4)(Σ√Rᵢ|δθᵢ|)²`, quadratic in the raw endpoint-to-endpoint angular
+delta `|δθᵢ|=|q(h)ᵢ-q(0)ᵢ|`) by substituting a padded
+`|δθᵢ|+2·overshootᵢ` in place of `|δθᵢ|`, where `overshootᵢ` is how far
+Phase 1's exact `q_min/q_max` pokes outside the endpoint-spanned range.
+
+*Why it's wrong:* `eps_lin`'s quadratic form bounds a genuinely
+second-order effect (chord vs. FK of a MONOTONIC sub-motion) — it
+implicitly assumes single-signed velocity, which cubic `q(τ)` no longer
+guarantees. Counterexample: `q(0)=q(h)=0` with a mid-interval hump to `ε`
+(possible now that q(τ) can reverse direction) → my formula gives
+`|δθ|=0`, padded bound `≈ Rε²`, but the TRUE Cartesian excursion is
+`≈√R·ε` — a FIRST-order quantity. For small `ε`, `Rε² ≪ √R·ε`: the padded
+bound is smaller than the true deviation, i.e. **unsound**, exactly the
+"checker misses a real excursion" failure this project's own C1 finding
+was about. Folding overshoot into the quadratic term hides a first-order
+effect inside a second-order formula.
+
+**Corrected design (Opus-endorsed, use this):** triangle-inequality split
+into two additive terms, not one inflated quadratic term:
+- **Term A** (unchanged): today's `eps_lin(|δθᵢ|)` — chord vs.
+  `FK(linear-interpolant(τ))`, monotonic by construction, existing proof
+  applies as-is, no change to its formula or inputs.
+- **Term B** (new): `Σᵢ √Rᵢ · dᵢ`, where `dᵢ = max_τ |qᵢ(τ) − linᵢ(τ)|`
+  over `τ∈[0,h]` — the deviation of the TRUE cubic joint trajectory from
+  the straight-line interpolant BETWEEN ITS OWN ENDPOINTS (not the same
+  quantity as Phase 1's `interval_extrema`, which bounds `q(τ)` itself,
+  not `q(τ)-lin(τ)`; needs its own small closed-form extremum search —
+  `q(τ)-lin(τ)` is cubic in τ, vanishes at both endpoints by construction,
+  its derivative is quadratic in τ so ≤2 interior critical points, same
+  technique as Phase 1's critical-point search, different target function).
+- `eps_total = eps_lin(|δθ|) + Σᵢ √Rᵢ·dᵢ`, fed wherever the existing
+  `eps_lin` currently feeds into `lemma_inflation`/the margin.
+
+**Validation is the actual soundness gate, not the formula alone**
+(Opus's guidance): dense-sample the TRUE `q(τ)` → FK(q(τ)) trajectory,
+compute the empirical max deviation from the chord, assert
+`empirical ≤ eps_total` on adversarial constructions — (a) `q(0)≈q(h)`
+with large jerk/accel producing a big mid-interval hump (the reversal
+case that broke my original proposal), (b) small-angle regime (exposes
+first-order dominance), (c) multiple joints reversing simultaneously
+(cross terms), (d) configurations sitting exactly on the existing
+collision margin. Log worst bound/true ratio; **fail if any ratio < 1**;
+separately flag ratios ≫1 as excess conservatism (not a failure, but
+worth noting, mirrors this repo's existing "measured conservatism ~30×"
+disclosure style for the original `eps_lin`).
+
+- [ ] `dᵢ` closed-form deviation-from-chord bound per joint (new function
+      in `kinodynamics.py`, reusing the critical-point-finding pattern,
+      not `interval_extrema` itself — different target function)
+- [ ] `eps_total` composition (Term A + Term B) wired into wherever
+      `continuous.py`/`panda.py` currently consumes `eps_lin`, for the
+      velocity-mode cubic-trajectory case only — must NOT change the
+      existing linear/delta_q path's `eps_lin` usage or its tests
+- [ ] adversarial dense-sampling validation tests per the four scenarios
+      above; fail loudly (assert, not silently pass) if bound/true < 1
 - [ ] compare discrete-endpoint vs. continuous-time vs.
       continuous+braking shield: collision rate, joint-limit violation
-      rate, inter-sample violation count
+      rate, inter-sample violation count (this sub-item is Phase 5-scale
+      experiment work, not required to land with the module itself)
 
 ### Phase 5 — occupancy forecasting + TD3/APE2 integration, full experiments, **seed scale-up**
 - [ ] wire `grid_td3.py`/`forecast.py` obstacle prediction into the N-step
@@ -261,6 +324,17 @@ terminal-*point* distinction and endorsed the fix below (agent id
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter10: before dispatching Phase 4, proposed a chord-error-
+  bound inflation approach for cubic joint trajectories, escalated it to
+  Opus for a soundness check (per this roadmap's own escalation trigger
+  for architecture-level collision-certification decisions) — Opus found
+  it UNSOUND via a clean counterexample (folding a first-order reversal
+  effect into a second-order formula) and gave a corrected triangle-
+  inequality decomposition instead. Full exchange recorded in the Phase 4
+  design note above so it isn't re-proposed. Dispatching the corrected
+  design to Codex next, with the adversarial validation tests as the
+  actual acceptance gate (agent id `ad222dfb467f95545` if this session
+  needs to resume that consult).
 - 2026-07-17 iter9: independently re-verified iter8's Phase-3b claim
   (commander session, extra scrutiny given this is the first change to
   `env.py`) — diff scope correct (`env.py` + one new test file only);
