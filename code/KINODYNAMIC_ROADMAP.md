@@ -181,7 +181,7 @@ terminal-*point* distinction and endorsed the fix below (agent id
    guarantee inductive (always either extending a certified-safe state or
    committing to an already-certified brake), not just "hope the next
    solve works."
-- [ ] **Phase 3a (do this first, additive, small)**: `require_terminal_stop`
+- [x] **Phase 3a (do this first, additive, small)**: `require_terminal_stop`
       flag on `safety_qp.solve_safety_qp`; `braking_witness_jerk` on
       `kinodynamics.py` (shared logic with `braking_feasible`, no
       duplication); tests for both; full suite green, nothing else touched.
@@ -261,6 +261,7 @@ terminal-*point* distinction and endorsed the fix below (agent id
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter7: Phase 3a landed with shared braking-witness search, first-jerk fallback API, and optional box-only safety QP certification; full `pytest` confirmed **61 passed** (58 existing + 3 Phase-3a tests).
 - 2026-07-17 iter6: before starting Phase 3, sanity-checked the shield's
   actual behavior numerically (commander, direct `solve_safety_qp` calls)
   — found the hard `v_N=0,a_N=0` terminal equality at real-time-affordable

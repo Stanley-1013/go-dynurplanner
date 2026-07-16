@@ -4,6 +4,7 @@ import pytest
 from godynur.kinodynamics import (
     acceleration,
     braking_feasible,
+    braking_witness_jerk,
     continuous_state,
     discrete_update,
     interval_extrema,
@@ -134,3 +135,33 @@ def test_braking_is_feasible_with_clear_stopping_room():
 
     # Assert
     assert feasible
+
+
+def test_braking_witness_jerk_is_immediately_legal_with_stopping_room():
+    # Arrange: mirror the feasible braking scenario above.
+    state = np.array([0.0, 0.5, 0.0])
+    h = 0.1
+    limits = (-2.0, 2.0, -2.0, 2.0, -2.0, 2.0, -20.0, 20.0)
+
+    # Act
+    jerk = braking_witness_jerk(*state, h, 20, *limits)
+
+    # Assert
+    assert isinstance(jerk, float)
+    next_state = discrete_update(state, jerk, h)
+    assert limits[0] <= next_state[0] <= limits[1]
+    assert limits[2] <= next_state[1] <= limits[3]
+    assert limits[4] <= next_state[2] <= limits[5]
+    assert limits[6] <= jerk <= limits[7]
+    assert interval_within_limits(*state, jerk, h, *limits)
+
+
+def test_braking_witness_jerk_is_none_near_position_limit():
+    # Arrange: mirror the infeasible braking scenario above.
+    limits = (-2.0, 1.0, -2.0, 2.0, -2.0, 2.0, -20.0, 20.0)
+
+    # Act
+    jerk = braking_witness_jerk(0.99, 0.5, 0.0, 0.1, 20, *limits)
+
+    # Assert
+    assert jerk is None

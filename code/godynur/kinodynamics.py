@@ -193,6 +193,111 @@ def interval_within_limits(
     )
 
 
+def _braking_witness_first_jerk(
+    q0: float,
+    v0: float,
+    a0: float,
+    h: float,
+    n_steps: int,
+    q_min: float,
+    q_max: float,
+    v_min: float,
+    v_max: float,
+    a_min: float,
+    a_max: float,
+    j_min: float,
+    j_max: float,
+) -> float | None:
+    """Search for a conservative braking witness and return its first jerk."""
+    if isinstance(n_steps, bool) or int(n_steps) != n_steps or n_steps < 1:
+        raise ValueError("n_steps must be a positive integer")
+    n_steps = int(n_steps)
+    h = _positive_period(h)
+    q, v, a = map(float, (q0, v0, a0))
+    bounds = tuple(
+        map(float, (q_min, q_max, v_min, v_max, a_min, a_max, j_min, j_max))
+    )
+    q_min, q_max, v_min, v_max, a_min, a_max, j_min, j_max = bounds
+    if q_min > q_max or v_min > v_max or a_min > a_max or j_min > j_max:
+        raise ValueError("each lower limit must not exceed its upper limit")
+    if not (
+        _inside(q, q_min, q_max)
+        and _inside(v, v_min, v_max)
+        and _inside(a, a_min, a_max)
+    ):
+        return None
+
+    if abs(v) <= _EPS and abs(a) <= _EPS:
+        return 0.0 if _inside(0.0, j_min, j_max) else None
+
+    direction_value = v if abs(v) > _EPS else a
+    direction = 1.0 if direction_value >= 0.0 else -1.0
+    target_acceleration = a_min if direction > 0.0 else a_max
+    first_jerk = None
+
+    for step in range(n_steps):
+        remaining = n_steps - step
+
+        # First try to settle both v and a in one exact step. A stopped state
+        # is a valid witness for all remaining steps when zero jerk is allowed.
+        j_settle = -a / h
+        settled = discrete_update(np.array([q, v, a]), j_settle, h)
+        if (
+            _inside(0.0, j_min, j_max)
+            and _inside(j_settle, j_min, j_max)
+            and abs(float(settled[1])) <= _EPS
+            and abs(float(settled[2])) <= _EPS
+            and interval_within_limits(q, v, a, j_settle, h, *bounds)
+        ):
+            return float(j_settle if first_jerk is None else first_jerk)
+
+        # Two constant-jerk intervals have a closed-form solution for
+        # v_{k+2}=a_{k+2}=0. This is the terminal S-curve release segment.
+        if remaining >= 2 and _inside(0.0, j_min, j_max):
+            j_first = -(v + 1.5 * h * a) / h**2
+            j_second = -a / h - j_first
+            if (
+                _inside(j_first, j_min, j_max)
+                and interval_within_limits(q, v, a, j_first, h, *bounds)
+            ):
+                first = discrete_update(np.array([q, v, a]), j_first, h)
+                q1, v1, a1 = map(float, first)
+                if (
+                    _inside(j_second, j_min, j_max)
+                    and interval_within_limits(
+                        q1, v1, a1, j_second, h, *bounds
+                    )
+                ):
+                    second = discrete_update(first, j_second, h)
+                    stopped = (
+                        abs(float(second[1])) <= _EPS
+                        and abs(float(second[2])) <= _EPS
+                    )
+                    if stopped:
+                        return float(
+                            j_first if first_jerk is None else first_jerk
+                        )
+
+        # Otherwise apply the largest admissible acceleration change toward
+        # maximum braking, respecting the acceleration endpoint bound.
+        j_brake = float(
+            np.clip((target_acceleration - a) / h, j_min, j_max)
+        )
+        if not interval_within_limits(q, v, a, j_brake, h, *bounds):
+            return None
+        if first_jerk is None:
+            first_jerk = j_brake
+
+        q, v, a = discrete_update(np.array([q, v, a]), j_brake, h)
+        q, v, a = float(q), float(v), float(a)
+        if direction * v < -_EPS:
+            return None
+
+    if abs(v) <= _EPS and abs(a) <= _EPS and _inside(0.0, j_min, j_max):
+        return first_jerk
+    return None
+
+
 def braking_feasible(
     q0: float,
     v0: float,
@@ -219,83 +324,54 @@ def braking_feasible(
     fixed maximum-deceleration profile found no safe witness; a less
     restrictive jerk sequence may exist.
     """
-    if isinstance(n_steps, bool) or int(n_steps) != n_steps or n_steps < 1:
-        raise ValueError("n_steps must be a positive integer")
-    n_steps = int(n_steps)
-    h = _positive_period(h)
-    q, v, a = map(float, (q0, v0, a0))
-    bounds = tuple(
-        map(float, (q_min, q_max, v_min, v_max, a_min, a_max, j_min, j_max))
-    )
-    q_min, q_max, v_min, v_max, a_min, a_max, j_min, j_max = bounds
-    if q_min > q_max or v_min > v_max or a_min > a_max or j_min > j_max:
-        raise ValueError("each lower limit must not exceed its upper limit")
-    if not (
-        _inside(q, q_min, q_max)
-        and _inside(v, v_min, v_max)
-        and _inside(a, a_min, a_max)
-    ):
-        return False
-
-    if abs(v) <= _EPS and abs(a) <= _EPS:
-        return _inside(0.0, j_min, j_max)
-
-    direction_value = v if abs(v) > _EPS else a
-    direction = 1.0 if direction_value >= 0.0 else -1.0
-    target_acceleration = a_min if direction > 0.0 else a_max
-
-    for step in range(n_steps):
-        remaining = n_steps - step
-
-        # First try to settle both v and a in one exact step. A stopped state
-        # is a valid witness for all remaining steps when zero jerk is allowed.
-        j_settle = -a / h
-        settled = discrete_update(np.array([q, v, a]), j_settle, h)
-        if (
-            _inside(0.0, j_min, j_max)
-            and _inside(j_settle, j_min, j_max)
-            and abs(float(settled[1])) <= _EPS
-            and abs(float(settled[2])) <= _EPS
-            and interval_within_limits(q, v, a, j_settle, h, *bounds)
-        ):
-            return True
-
-        # Two constant-jerk intervals have a closed-form solution for
-        # v_{k+2}=a_{k+2}=0. This is the terminal S-curve release segment.
-        if remaining >= 2 and _inside(0.0, j_min, j_max):
-            j_first = -(v + 1.5 * h * a) / h**2
-            j_second = -a / h - j_first
-            if (
-                _inside(j_first, j_min, j_max)
-                and interval_within_limits(q, v, a, j_first, h, *bounds)
-            ):
-                first = discrete_update(np.array([q, v, a]), j_first, h)
-                q1, v1, a1 = map(float, first)
-                if (
-                    _inside(j_second, j_min, j_max)
-                    and interval_within_limits(
-                        q1, v1, a1, j_second, h, *bounds
-                    )
-                ):
-                    second = discrete_update(first, j_second, h)
-                    stopped = (
-                        abs(float(second[1])) <= _EPS
-                        and abs(float(second[2])) <= _EPS
-                    )
-                    if stopped:
-                        return True
-
-        # Otherwise apply the largest admissible acceleration change toward
-        # maximum braking, respecting the acceleration endpoint bound.
-        j_brake = float(
-            np.clip((target_acceleration - a) / h, j_min, j_max)
+    return (
+        _braking_witness_first_jerk(
+            q0,
+            v0,
+            a0,
+            h,
+            n_steps,
+            q_min,
+            q_max,
+            v_min,
+            v_max,
+            a_min,
+            a_max,
+            j_min,
+            j_max,
         )
-        if not interval_within_limits(q, v, a, j_brake, h, *bounds):
-            return False
+        is not None
+    )
 
-        q, v, a = discrete_update(np.array([q, v, a]), j_brake, h)
-        q, v, a = float(q), float(v), float(a)
-        if direction * v < -_EPS:
-            return False
 
-    return abs(v) <= _EPS and abs(a) <= _EPS and _inside(0.0, j_min, j_max)
+def braking_witness_jerk(
+    q0: float,
+    v0: float,
+    a0: float,
+    h: float,
+    n_steps: int,
+    q_min: float,
+    q_max: float,
+    v_min: float,
+    v_max: float,
+    a_min: float,
+    a_max: float,
+    j_min: float,
+    j_max: float,
+) -> float | None:
+    """Return the first jerk of the conservative braking witness, if any."""
+    return _braking_witness_first_jerk(
+        q0,
+        v0,
+        a0,
+        h,
+        n_steps,
+        q_min,
+        q_max,
+        v_min,
+        v_max,
+        a_min,
+        a_max,
+        j_min,
+        j_max,
+    )

@@ -136,6 +136,7 @@ def _certify_candidate(
     a_max: np.ndarray,
     j_min: np.ndarray,
     j_max: np.ndarray,
+    require_terminal_stop: bool,
 ) -> tuple[bool, np.ndarray | None]:
     """Replay and certify a candidate against the original hard limits."""
     m, n_steps = jerk_sequence.shape
@@ -159,10 +160,11 @@ def _certify_candidate(
             state = discrete_update(state, jerk, h)
             if step == 0:
                 first_velocity[joint] = state[1]
-        if abs(float(state[1])) > _TERMINAL_TOL:
-            return False, None
-        if abs(float(state[2])) > _TERMINAL_TOL:
-            return False, None
+        if require_terminal_stop:
+            if abs(float(state[1])) > _TERMINAL_TOL:
+                return False, None
+            if abs(float(state[2])) > _TERMINAL_TOL:
+                return False, None
     return True, first_velocity
 
 
@@ -186,13 +188,16 @@ def solve_safety_qp(
     collocation_points=5,
     margin_shrink_frac=0.02,
     max_retries=3,
+    require_terminal_stop: bool = True,
 ) -> SafetyQPResult:
     """Solve and exactly certify an ``N``-step jerk sequence.
 
     SLSQP solves a linearly constrained quadratic objective using evenly
     spaced position/velocity collocation points.  If exact interval
     certification rejects its candidate, the position and velocity boxes are
-    tightened on each retry.  No uncertified sequence is ever returned.
+    tightened on each retry.  Terminal stopping is enforced unless
+    ``require_terminal_stop`` is false. No uncertified sequence is ever
+    returned.
     """
     started = perf_counter()
     q0 = _vector("q0", q0)
@@ -277,9 +282,10 @@ def solve_safety_qp(
     jerk_lower = np.repeat(j_min, n_steps)
     jerk_upper = np.repeat(j_max, n_steps)
     optimizer_bounds = Bounds(jerk_lower, jerk_upper)
-    terminal_constraint = LinearConstraint(
-        terminal_matrix, -terminal_offset, -terminal_offset
-    )
+    if require_terminal_stop:
+        terminal_constraint = LinearConstraint(
+            terminal_matrix, -terminal_offset, -terminal_offset
+        )
 
     def objective(jerk_flat: np.ndarray) -> float:
         velocity_error = v1_offset + v1_matrix @ jerk_flat - v_nom
@@ -295,11 +301,14 @@ def solve_safety_qp(
         )
         return tracking_gradient + 2.0 * lambda_j * jerk_flat
 
-    # A terminal least-squares solution is a more useful start than all-zero
-    # jerk when the incoming velocity or acceleration is nonzero.
-    initial, *_ = np.linalg.lstsq(
-        terminal_matrix, -terminal_offset, rcond=None
-    )
+    # A terminal least-squares solution is a more useful start when a full
+    # stop is required. Otherwise zero jerk is neutral for the box-only QP.
+    if require_terminal_stop:
+        initial, *_ = np.linalg.lstsq(
+            terminal_matrix, -terminal_offset, rcond=None
+        )
+    else:
+        initial = np.zeros(n_variables)
     initial = np.clip(initial, jerk_lower, jerk_upper)
 
     q_range = q_max - q_min
@@ -336,13 +345,18 @@ def solve_safety_qp(
             box_matrix, box_lower - box_offset, box_upper - box_offset
         )
 
+        constraints = (
+            (box_constraint, terminal_constraint)
+            if require_terminal_stop
+            else (box_constraint,)
+        )
         solution = minimize(
             objective,
             initial,
             method="SLSQP",
             jac=objective_jacobian,
             bounds=optimizer_bounds,
-            constraints=(box_constraint, terminal_constraint),
+            constraints=constraints,
             options={"ftol": 1e-10, "maxiter": 300, "disp": False},
         )
         if np.all(np.isfinite(solution.x)):
@@ -362,6 +376,7 @@ def solve_safety_qp(
                 a_max,
                 j_min,
                 j_max,
+                require_terminal_stop,
             )
             if certified:
                 return SafetyQPResult(

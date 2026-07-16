@@ -1,0 +1,15 @@
+Implemented Phase 3a.
+
+Files changed:
+
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+- [kinodynamics.py](/home/han/claude_project/papper-research/code/godynur/kinodynamics.py)
+- [safety_qp.py](/home/han/claude_project/papper-research/code/godynur/safety_qp.py)
+- [test_kinodynamics.py](/home/han/claude_project/papper-research/code/tests/test_kinodynamics.py)
+- [test_safety_qp.py](/home/han/claude_project/papper-research/code/tests/test_safety_qp.py)
+
+Final pytest: `61 passed in 21.51s`
+
+`braking_feasible`’s existing tests remain unchanged and pass. A 10,000-case differential check also matched the pre-refactor behavior exactly.
+
+The refactor is a clean shared-helper split: one internal witness search powers both boolean and first-jerk wrappers. No implementation uncertainty; the unrelated untracked `codex_phase3a.log` was left untouched.

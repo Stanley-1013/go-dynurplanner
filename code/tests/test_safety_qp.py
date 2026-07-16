@@ -167,3 +167,36 @@ def test_failed_exact_certification_retries_with_tightened_margin(monkeypatch):
     assert np.any(box_lower_bounds[1] > box_lower_bounds[0])
     assert exact_check_calls == 1 + result.jerk_sequence.shape[1]
     assert _replay_is_safe(result, q0, zeros, zeros, 0.1, limits)
+
+
+def test_box_only_horizon_is_feasible_when_terminal_stop_is_not():
+    # Arrange: one jerk interval cannot make both nonzero velocity and
+    # acceleration exactly zero, but the current motion is safely in bounds.
+    q0 = np.array([0.0])
+    v0 = np.array([0.5])
+    a0 = np.array([0.0])
+    v_nom = np.array([0.6])
+    limits = tuple(
+        np.array([value])
+        for value in (-2.0, 2.0, -2.0, 2.0, -2.0, 2.0, -20.0, 20.0)
+    )
+
+    # Act
+    stopped = solve_safety_qp(q0, v0, a0, v_nom, 0.1, 1, *limits)
+    box_only = solve_safety_qp(
+        q0,
+        v0,
+        a0,
+        v_nom,
+        0.1,
+        1,
+        *limits,
+        require_terminal_stop=False,
+    )
+
+    # Assert
+    assert not stopped.feasible
+    assert not stopped.certified
+    assert box_only.feasible
+    assert box_only.certified
+    assert _replay_is_safe(box_only, q0, v0, a0, 0.1, limits)
