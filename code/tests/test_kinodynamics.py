@@ -5,6 +5,7 @@ from godynur.kinodynamics import (
     acceleration,
     braking_feasible,
     braking_witness_jerk,
+    chord_deviation_bound,
     continuous_state,
     discrete_update,
     interval_extrema,
@@ -165,3 +166,23 @@ def test_braking_witness_jerk_is_none_near_position_limit():
 
     # Assert
     assert jerk is None
+
+
+def test_chord_deviation_bound_matches_reversal_hump_closed_form():
+    """The endpoint chord is zero while the cubic makes a large excursion."""
+    q0, v0, a0, j, h = 0.0, 2.0, -6.0, 6.0, 1.0
+
+    bound = chord_deviation_bound(q0, v0, a0, j, h)
+
+    assert position(q0, v0, a0, j, h) == pytest.approx(q0)
+    assert bound == pytest.approx(2.0 * np.sqrt(3.0) / 9.0, rel=1e-12)
+
+
+def test_chord_deviation_bound_is_tiny_for_nearly_constant_monotonic_motion():
+    q0, v0, a0, j, h = 0.4, 1.0, 1e-6, 0.0, 1.0
+    endpoint_delta = position(q0, v0, a0, j, h) - q0
+
+    bound = chord_deviation_bound(q0, v0, a0, j, h)
+
+    assert bound == pytest.approx(a0 * h**2 / 8.0, rel=1e-12)
+    assert bound / abs(endpoint_delta) < 1e-6

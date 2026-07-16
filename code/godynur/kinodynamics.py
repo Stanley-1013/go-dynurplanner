@@ -76,6 +76,76 @@ def position(q0: float, v0: float, a0: float, j: float, tau: float) -> float:
     )
 
 
+def chord_deviation_bound(
+    q0: float, v0: float, a0: float, j: float, h: float
+) -> float:
+    """Return the exact maximum joint deviation from its endpoint chord.
+
+    For ``lin(tau) = q0 + (q(h) - q0) * tau / h``, the difference
+    ``d(tau) = q(tau) - lin(tau)`` is cubic and is zero at both endpoints.
+    Its only possible nonzero extrema are therefore at the real roots of
+    the quadratic ``d'(tau)`` inside ``[0, h]``.
+    """
+    h = _positive_period(h)
+    q0, v0, a0, j = map(float, (q0, v0, a0, j))
+
+    # Algebraically cancelling q0 and v0 avoids subtracting nearly equal
+    # endpoint values in the reversal regime.  With c1 = v0 - chord_slope,
+    # d(tau) = c1*tau + (a0/2)*tau^2 + (j/6)*tau^3.
+    c1 = -0.5 * a0 * h - j * h**2 / 6.0
+
+    def deviation(tau: float) -> float:
+        return tau * (c1 + tau * (0.5 * a0 + tau * j / 6.0))
+
+    values = [0.0]
+    for root in _quadratic_roots(0.5 * j, a0, c1):
+        tau = _closed_interval_time(root, h)
+        if tau is not None and 0.0 < tau < h:
+            values.append(abs(deviation(tau)))
+    return float(max(values))
+
+
+def cubic_linearization_bound(
+    q0: np.ndarray,
+    v0: np.ndarray,
+    a0: np.ndarray,
+    jerk: np.ndarray,
+    h: float,
+    pk,
+) -> float:
+    """Bound Cartesian error from linearizing a cubic joint trajectory.
+
+    This is the Phase-4 additive triangle-inequality composition:
+
+    ``pk.chord_error_bound(q0, q(h)-q0)``
+    ``+ sum_i sqrt(R_i) * chord_deviation_bound_i``.
+
+    The existing quadratic chord term and its endpoint-delta input are left
+    unchanged.  The second, first-order term separately covers reversals of
+    the true cubic trajectory relative to its own endpoint interpolant.
+    """
+    h = _positive_period(h)
+    arrays = tuple(np.asarray(x, dtype=float) for x in (q0, v0, a0, jerk))
+    q0, v0, a0, jerk = arrays
+    expected_shape = (int(pk.n_joints),)
+    if any(x.shape != expected_shape for x in arrays):
+        raise ValueError(f"q0, v0, a0, and jerk must have shape {expected_shape}")
+
+    q_end = np.array(
+        [position(q0[i], v0[i], a0[i], jerk[i], h) for i in range(pk.n_joints)]
+    )
+    term_a = pk.chord_error_bound(q0, q_end - q0)
+    radii = pk.downstream_length_bounds(q0)
+    deviations = np.array(
+        [
+            chord_deviation_bound(q0[i], v0[i], a0[i], jerk[i], h)
+            for i in range(pk.n_joints)
+        ]
+    )
+    term_b = float(np.sum(np.sqrt(radii) * deviations))
+    return float(term_a + term_b)
+
+
 def continuous_state(
     q0: float, v0: float, a0: float, j: float, tau: float
 ) -> np.ndarray:

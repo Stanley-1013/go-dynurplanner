@@ -1,0 +1,12 @@
+Implemented Phase 4’s corrected additive bound.
+
+- Files changed: [kinodynamics.py](/home/han/claude_project/papper-research/code/godynur/kinodynamics.py), [panda.py](/home/han/claude_project/papper-research/code/godynur/panda.py), [env.py](/home/han/claude_project/papper-research/code/godynur/env.py), [test_kinodynamics.py](/home/han/claude_project/papper-research/code/tests/test_kinodynamics.py), [test_chord_deviation.py](/home/han/claude_project/papper-research/code/tests/test_chord_deviation.py), [test_env_velocity_mode.py](/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py), and [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md).
+- Full pytest: `78 passed in 21.74s`
+- Adversarial validation:
+  - (a) reversal: Cartesian-through-FK, ratio `2.427`
+  - (b) small angle: Cartesian-through-FK, ratio `2.425`
+  - (c) simultaneous reversals: Cartesian-through-FK, ratio `4.296`
+  - (d) allowed joint-space-only dense-scan substitute near joint limits—not a Cartesian collision-margin test
+- Additional randomized validation: 1,000 joint trajectories; minimum bound/scan ratio `1.000000000`.
+- Checked off: closed-form `dᵢ`, additive `eps_total` composition and velocity-only wiring, adversarial validation.
+- Left unchecked: shield-variant collision/limit experiment, because it is Phase-5-scale work outside this dispatch.

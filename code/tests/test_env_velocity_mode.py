@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from godynur.env import DynArmEnv
+from godynur.kinodynamics import cubic_linearization_bound
 from godynur.panda import DDQ_MAX, DQ_MAX, Q_MAX, Q_MIN
 
 
@@ -150,3 +151,31 @@ def test_default_and_explicit_delta_q_modes_remain_identical():
     assert "shield_emergency" not in explicit_env.stats
     assert not hasattr(default_env, "v")
     assert not hasattr(default_env, "a")
+
+
+def test_velocity_collision_check_receives_cubic_linearization_inflation():
+    env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=16,
+    )
+    env.reset()
+    env.q = (Q_MIN + Q_MAX) / 2.0
+    q0, v0, a0 = env.q.copy(), env.v.copy(), env.a.copy()
+    seen = {}
+
+    def capture_first_contact(dq, inflation=0.0):
+        seen["dq"] = np.asarray(dq).copy()
+        seen["inflation"] = inflation
+        return None
+
+    env._first_contact = capture_first_contact
+    env.step(np.full(7, 0.1))
+    executed_jerk = (env.a - a0) / env.dt
+    expected = cubic_linearization_bound(
+        q0, v0, a0, executed_jerk, env.dt, env.kin
+    )
+
+    assert expected > 0.0
+    assert seen["inflation"] == pytest.approx(expected)

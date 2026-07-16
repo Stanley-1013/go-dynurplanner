@@ -92,6 +92,18 @@ class PandaKinematics:
     def flange(self, q: np.ndarray) -> np.ndarray:
         return self.joint_origins(q)[8]
 
+    def downstream_length_bounds(self, q: np.ndarray) -> np.ndarray:
+        """Return the downstream arm-length bound ``R_i`` for each joint.
+
+        ``R_i`` is the sum of rigid-link lengths from joint ``i`` through
+        the flange.  It bounds the distance from that joint's origin to any
+        distal body point and is the same quantity used in
+        :meth:`chord_error_bound`.
+        """
+        o = self.joint_origins(q)
+        link_len = np.linalg.norm(np.diff(o, axis=0), axis=1)  # 8 lengths
+        return np.array([np.sum(link_len[i:]) for i in range(7)], dtype=float)
+
     def chord_error_bound(self, q: np.ndarray, dq: np.ndarray) -> float:
         """Conservative bound on chord (linear-interpolation) error over one step.
 
@@ -114,10 +126,8 @@ class PandaKinematics:
         """
         q = np.asarray(q, dtype=float)
         dq = np.asarray(dq, dtype=float)
-        o = self.joint_origins(q)
-        link_len = np.linalg.norm(np.diff(o, axis=0), axis=1)  # 8 lengths
+        downstream = self.downstream_length_bounds(q)
         s = 0.0
         for i in range(7):
-            downstream = float(np.sum(link_len[i:]))
-            s += np.sqrt(downstream) * abs(dq[i])
+            s += np.sqrt(downstream[i]) * abs(dq[i])
         return 0.25 * s * s

@@ -250,14 +250,14 @@ separately flag ratios ≫1 as excess conservatism (not a failure, but
 worth noting, mirrors this repo's existing "measured conservatism ~30×"
 disclosure style for the original `eps_lin`).
 
-- [ ] `dᵢ` closed-form deviation-from-chord bound per joint (new function
+- [x] `dᵢ` closed-form deviation-from-chord bound per joint (new function
       in `kinodynamics.py`, reusing the critical-point-finding pattern,
       not `interval_extrema` itself — different target function)
-- [ ] `eps_total` composition (Term A + Term B) wired into wherever
+- [x] `eps_total` composition (Term A + Term B) wired into wherever
       `continuous.py`/`panda.py` currently consumes `eps_lin`, for the
       velocity-mode cubic-trajectory case only — must NOT change the
       existing linear/delta_q path's `eps_lin` usage or its tests
-- [ ] adversarial dense-sampling validation tests per the four scenarios
+- [x] adversarial dense-sampling validation tests per the four scenarios
       above; fail loudly (assert, not silently pass) if bound/true < 1
 - [ ] compare discrete-endpoint vs. continuous-time vs.
       continuous+braking shield: collision rate, joint-limit violation
@@ -324,6 +324,26 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter12: independently re-verified iter11's Phase-4 claim
+  (commander session, extra scrutiny — this was the phase that already
+  caught me proposing an unsound bound once). Reran `pytest` myself: 78
+  passed. Hand-derived `chord_deviation_bound`'s closed form myself from
+  scratch (`d(τ)=c1τ+0.5a0τ²+(j/6)τ³`, `c1=-0.5a0h-jh²/6`) and confirmed
+  it matches the implementation exactly; independently brute-force
+  checked the reversal regression case's claimed `2√3/9` value against a
+  200k-point dense scan — matched to 9 decimal places. Independently
+  re-ran the Cartesian-through-FK adversarial checks myself (not just
+  trusting the test suite's assertions) with my own dense-sampling
+  script: reversal case ratio **2.427**, multi-joint simultaneous
+  reversal ratio **4.296** — both match Codex's reported numbers closely
+  and confirm bound > empirical truth in both cases (sound, with
+  measured conservatism in the 2-4x range, smaller than the original
+  `eps_lin`'s own ~30x — reasonable, not alarming). Confirmed
+  `downstream_length_bounds` was factored out of `chord_error_bound`
+  without changing its behavior (same R_i used by both terms, as
+  required). Phase 4 core is genuinely sound and done; the Phase 5-scale
+  shield-comparison experiment is correctly left for Phase 5.
+- 2026-07-17 iter11: Phase 4 cubic collision-linearization core landed: exact per-joint deviation bound, unchanged Term A plus additive Term B composition, and velocity-only collision-margin wiring; adversarial validation covers (a)-(c) Cartesian-through-FK and (d) by the explicitly allowed joint-space dense-scan substitute, with Cartesian bound/true ratios 2.425-4.296 and full pytest **78 passed**; the Phase-5-scale shield-comparison experiment remains unchecked.
 - 2026-07-17 iter10: before dispatching Phase 4, proposed a chord-error-
   bound inflation approach for cubic joint trajectories, escalated it to
   Opus for a soundness check (per this roadmap's own escalation trigger

@@ -200,6 +200,9 @@ class DynArmEnv:
         return self._state(), float(r), bool(done)
 
     def _step_velocity(self, action: np.ndarray):
+        q_old = self.q.copy()
+        v_old = self.v.copy()
+        a_old = self.a.copy()
         u_t = np.clip(np.asarray(action, float), -1.0, 1.0)
         v_nom = self.v + self.dv_scale * u_t
         qp = solve_safety_qp(
@@ -222,9 +225,12 @@ class DynArmEnv:
 
         accepted = False
         if qp.certified and qp.jerk_sequence is not None:
-            candidate = self._kinodynamic_update(qp.jerk_sequence[:, 0])
+            candidate_jerks = qp.jerk_sequence[:, 0]
+            candidate = self._kinodynamic_update(candidate_jerks)
             if self._braking_witness_jerks(*candidate) is not None:
                 q_new, v_new, a_new = candidate
+                q_trajectory_end = q_new.copy()
+                executed_jerks = candidate_jerks
                 accepted = True
 
         if not accepted:
@@ -235,22 +241,26 @@ class DynArmEnv:
             brake_jerks = self._braking_witness_jerks(self.q, self.v, self.a)
             if brake_jerks is not None:
                 q_new, v_new, a_new = self._kinodynamic_update(brake_jerks)
+                q_trajectory_end = q_new.copy()
+                executed_jerks = brake_jerks
                 self.stats["shield_fallback"] = (
                     self.stats.get("shield_fallback", 0) + 1
                 )
             else:
                 # Least-committal last resort: preserve current acceleration
                 # for one integration period, then defensively clip q and v.
-                q_new, v_new, a_new = self._kinodynamic_update(
-                    np.zeros(self.action_dim)
-                )
+                executed_jerks = np.zeros(self.action_dim)
+                q_new, v_new, a_new = self._kinodynamic_update(executed_jerks)
+                q_trajectory_end = q_new.copy()
                 q_new = np.clip(q_new, Q_MIN, Q_MAX)
                 v_new = np.clip(v_new, -DQ_MAX, DQ_MAX)
                 self.stats["shield_emergency"] = (
                     self.stats.get("shield_emergency", 0) + 1
                 )
 
-        q_old = self.q
+        eps_cubic = kinodynamics.cubic_linearization_bound(
+            q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+        )
         self.q = np.clip(q_new, Q_MIN, Q_MAX)
         self.v = np.clip(v_new, -DQ_MAX, DQ_MAX)
         self.a = a_new
@@ -261,7 +271,9 @@ class DynArmEnv:
         # Existing collision and reward conventions operate on (q, dq), so
         # temporarily restore q_t while evaluating the executed transition.
         self.q = q_old
-        tau_star = self._first_contact(dq)
+        tau_star = self._first_contact(
+            q_trajectory_end - q_old, inflation=eps_cubic
+        )
         self.last_tau_star = tau_star
         collided = tau_star is not None
         if collided:
@@ -474,15 +486,16 @@ class DynArmEnv:
         v_seg = 1.2 * 7 * self.action_bound[1] / self.dt  # conservative
         return dist_lb <= (v_obs + v_seg) * self.dt + 1e-9
 
-    def _first_contact(self, dq) -> float | None:
+    def _first_contact(self, dq, inflation: float = 0.0) -> float | None:
         taus = []
         for seg in self._moving_segments(dq):
             seg_lo = np.minimum(seg.a0, seg.b0)
             seg_hi = np.maximum(seg.a0, seg.b0)
             for ob in self.scene.obstacles:
-                if not self._pair_can_contact(seg_lo, seg_hi, ob, self.a_r):
+                margin = self.a_r + inflation
+                if not self._pair_can_contact(seg_lo, seg_hi, ob, margin):
                     continue
-                t = first_contact_time(seg, ob.moving_box(self.a_r), self.dt)
+                t = first_contact_time(seg, ob.moving_box(margin), self.dt)
                 if t is not None:
                     taus.append(t)
         return min(taus) if taus else None
