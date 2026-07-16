@@ -123,11 +123,23 @@ dispatched. Do not start a phase until the previous one's tests are green.
       deps have always been implicit) — flagging here so a fresh venv
       setup knows to `pip install scipy`. Revisit with `osqp`/`cvxpy`
       only if Phase 5 realtime solve-time benchmarks demand it.
-- [ ] N-step jerk-sequence optimization: `min ||v1-v_nom||²_W +
+- [x] N-step jerk-sequence optimization: `min ||v1-v_nom||²_W +
       λ_j Σ|j_k|²` s.t. `(q,v,a,j)` box + terminal braking set
-- [ ] realtime solve-time benchmark
-- [ ] tests: infeasible-state handling (must degrade gracefully, never
+- [x] realtime solve-time benchmark
+- [x] tests: infeasible-state handling (must degrade gracefully, never
       silently violate), solve-time budget, safety-margin sensitivity
+- **Perf finding (commander, 2026-07-17, direct measurement, m=7 joints,
+  h=0.05s, SLSQP via scipy.optimize.minimize)**: `n_steps=3` → 11.7ms mean
+  /12.7ms p95; `n_steps=5` → 31.9ms/41.1ms; `n_steps=8` → 72.9ms/87.7ms.
+  **This is too slow to call every env.step() at anything but the
+  shortest horizon during RL training** — at n_steps=8, 200k training
+  steps would cost ~4 hours in the safety filter alone. Phase 3's
+  per-step live shield MUST default to a short horizon (`n_steps=3`);
+  longer horizons are fine for offline/eval-time analysis only. If
+  training-scale runs (Phase 5) still find this a bottleneck, switch to
+  `osqp`/`cvxpy` (warm-started QP, likely 10-100x faster) rather than
+  reducing `collocation_points` or `max_retries`, which would weaken the
+  certification, not just the speed.
 
 ### Phase 3 — integrate fixed velocity-action mapping into `DynArmEnv` (opt-in, non-breaking)
 - [ ] add `v_nom` action mode alongside existing delta-q mode, flag-gated,
@@ -205,6 +217,26 @@ dispatched. Do not start a phase until the previous one's tests are green.
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter5: independently re-verified iter4's Phase-2 claim
+  (commander session) — diff scope correct (`safety_qp.py` +
+  `test_safety_qp.py` only, roadmap edits additive), reran `pytest`
+  myself: **58 passed**. Read `safety_qp.py` in full: the design is
+  smarter than what I specified in the dispatch — it exploits that the
+  multi-step trajectory is an exact LINEAR function of the jerk sequence
+  (fixed initial condition, LTI system), so the collocation constraints
+  fed to SLSQP are exactly affine, not an approximation; the only
+  approximation is between-collocation-point extrema, which is exactly
+  what the post-hoc `interval_within_limits` certify+retry loop exists to
+  catch. Confirmed the retry logic is actually exercised (not just
+  happy-path) via `test_failed_exact_certification_retries_with_tightened_margin`'s
+  monkeypatch-forced-first-failure test. Ran my own direct solve-time
+  benchmark before green-lighting Phase 3 (see Phase 2's perf finding in
+  §3 above) — dispatching Phase 3 next with `n_steps=3` per that finding.
+- 2026-07-17 iter4: Phase 2 multi-joint N-step SLSQP jerk filter landed
+  with collocation constraints, exact Phase-1 interval certification,
+  retry-with-tightened-margin fallback, and infeasible-safe returns; added
+  four QP tests including a 7-joint solve-time smoke guard; full `pytest`
+  confirmed **58 passed** (54 existing + 4 Phase-2 tests).
 - 2026-07-17 iter3: independently re-verified iter2's Phase-1 claim
   (commander session, not Codex self-report) — `git diff --stat` scope
   matches the constraint list exactly (kinodynamics.py, test_kinodynamics.py

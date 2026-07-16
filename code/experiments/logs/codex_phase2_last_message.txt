@@ -1,0 +1,11 @@
+Implemented Phase 2.
+
+- Created [safety_qp.py](/home/han/claude_project/papper-research/code/godynur/safety_qp.py)
+- Created [test_safety_qp.py](/home/han/claude_project/papper-research/code/tests/test_safety_qp.py)
+- Updated Phase 2/status in [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Final pytest: `58 passed in 21.79s`
+
+All Phase 2 items checked off; none left unchecked. SLSQP was used because SciPy is already available and the collocation/terminal constraints are affine.
+
+Human sanity-checks: C=5 remains a heuristic, though exact certification and margin retries prevent unsafe returns. The terminal `v_N=a_N=0` set is deliberately conservative. The timing test is a smoke guard, not a Phase 5 realtime characterization.
