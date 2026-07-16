@@ -1,0 +1,15 @@
+Implemented Phase 3b.
+
+Files changed:
+
+- [env.py](/home/han/claude_project/papper-research/code/godynur/env.py)
+- [test_env_velocity_mode.py](/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Final pytest: `70 passed in 21.78s`
+
+All 61 pre-existing tests remain unmodified and pass. Nine new tests cover velocity reset/state dimensions, normal certification, braking fallback, emergency handling, observations, reward penalty, and delta-q regression.
+
+Acceleration uses symmetric `a / DDQ_MAX` normalization. Defaults match the specification: `dv_scale=DQ_MAX*dt` and `brake_derate=0.85`; `dv_scale` remains a Phase 5 tuning placeholder.
+
+The pre-existing untracked `code/experiments/logs/codex_phase3b.log` was untouched.

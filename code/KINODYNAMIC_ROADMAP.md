@@ -185,13 +185,13 @@ terminal-*point* distinction and endorsed the fix below (agent id
       flag on `safety_qp.solve_safety_qp`; `braking_witness_jerk` on
       `kinodynamics.py` (shared logic with `braking_feasible`, no
       duplication); tests for both; full suite green, nothing else touched.
-- [ ] **Phase 3b (after 3a verified)**: add `v_nom` action mode to
+- [x] **Phase 3b (after 3a verified)**: add `v_nom` action mode to
       `DynArmEnv`, flag-gated (`action_mode="delta_q"` stays default,
       byte-identical existing behavior), wiring in the corrected 3-part
       design above, incl. the last-witness fallback state.
-- [ ] observation additions: `a_t`, terminal-membership flag, last
+- [x] observation additions: `a_t`, terminal-membership flag, last
       intervention magnitude
-- [ ] safety-intervention penalty term `-λ‖v_nom - v_exec‖²`
+- [x] safety-intervention penalty term `-λ‖v_nom - v_exec‖²`
 
 ### Phase 4 — extend `continuous.py` collision shield to cubic joint trajectories
 - [ ] generalize `MovingSegment`/`first_contact_time` from linear to cubic
@@ -261,6 +261,25 @@ terminal-*point* distinction and endorsed the fix below (agent id
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter9: independently re-verified iter8's Phase-3b claim
+  (commander session, extra scrutiny given this is the first change to
+  `env.py`) — diff scope correct (`env.py` + one new test file only);
+  reran `pytest` myself twice (no flakiness): **70 passed** both times.
+  Read the full `env.py` diff line-by-line: confirmed the `action_mode`
+  branch is a pure early-return in `step()` — the pre-existing `delta_q`
+  path's code is untouched, `state_dim`/`_state()` additions are strictly
+  conditional on `action_mode=="velocity"`, and a dedicated test
+  (`test_default_and_explicit_delta_q_modes_remain_identical`) asserts
+  `not hasattr(default_env, "v")` — the new attributes aren't even
+  created in default mode. Confirmed `_step_velocity` correctly reuses
+  the exact same collision/reward helpers as the original `step()`
+  (verified the `-5.0` collision penalty convention matches, not
+  double-applied — `_reward()` itself has no collision term). Verified
+  the accept/fallback/emergency three-tier degradation is genuinely
+  reachable and distinct (test file has one scenario per tier, confirmed
+  by reading the QP-then-membership-check control flow). Phase 3b
+  genuinely done. Dispatching Phase 4 next.
+- 2026-07-17 iter8: Phase 3b landed as an opt-in velocity-action mode with short-horizon box-only QP certification, derated terminal-membership gating, deterministic fresh-witness braking fallback, emergency zero-jerk handling, acceleration/shield observations, and intervention reward penalty; full `pytest` confirmed **70 passed** (61 existing + 9 Phase-3b tests).
 - 2026-07-17 iter7: Phase 3a landed with shared braking-witness search, first-jerk fallback API, and optional box-only safety QP certification; full `pytest` confirmed **61 passed** (58 existing + 3 Phase-3a tests).
 - 2026-07-17 iter6: before starting Phase 3, sanity-checked the shield's
   actual behavior numerically (commander, direct `solve_safety_qp` calls)

@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from . import kinodynamics, panda
 from .continuous import MovingSegment, first_contact_time, swept_overlap_integral
 from .geometry import AABB, segment_box_closest, segment_box_overlap, uoar
-from .panda import PandaKinematics, Q_MAX, Q_MIN
+from .panda import DDQ_MAX, DQ_MAX, PandaKinematics, Q_MAX, Q_MIN
+from .safety_qp import solve_safety_qp
 from .scenes import WS_HI, WS_LO, DynamicScene, sample_scene
 from .voxelizer import GridSpec, rasterize, rasterize_sdf
 
@@ -59,13 +61,21 @@ class DynArmEnv:
         grid_mode: str = "binary",  # 'binary' | 'sdf' (advisor: SDF learns better)
         closest_point_in_state: bool = False,  # advisor: d, direction, point
         seed: int = 0,
+        action_mode: str = "delta_q",  # 'delta_q' | 'velocity'
+        dv_scale: np.ndarray | None = None,
+        safety_n_steps: int = 2,
+        brake_check_n_steps: int = 20,
+        brake_derate: float = 0.85,
+        lambda_intervention: float = 0.1,
     ):
         assert reward_mode in ("uoar", "ct")
         assert task in ("random", "tabletop")
         assert grid_mode in ("binary", "sdf")
+        assert action_mode in ("delta_q", "velocity")
         self.task = task
         self.grid_mode = grid_mode
         self.closest_point_in_state = closest_point_in_state
+        self.action_mode = action_mode
         self.kin = PandaKinematics()
         self.speed = speed
         self.n_obstacles = n_obstacles
@@ -76,6 +86,19 @@ class DynArmEnv:
         self.k_frames = k_frames
         self.spec = GridSpec(lo=WS_LO, hi=WS_HI, n=grid_n)
         self.rng = np.random.default_rng(seed)
+        if action_mode == "velocity":
+            # Placeholder action scale for Phase 5 tuning: roughly the largest
+            # one-step velocity change reachable from rest under the jerk cap.
+            self.dv_scale = np.asarray(
+                panda.DQ_MAX * self.dt if dv_scale is None else dv_scale,
+                dtype=float,
+            )
+            assert self.dv_scale.shape == (self.action_dim,)
+            self.safety_n_steps = safety_n_steps
+            self.brake_check_n_steps = brake_check_n_steps
+            self.brake_derate = brake_derate
+            self.lambda_intervention = lambda_intervention
+            self.action_bound = [-1.0, 1.0]
         # Fixed obstacle slots (zero-padded): curriculum can lower the LIVE
         # obstacle count without changing the network's input width.
         self.n_obstacles_max = n_obstacles
@@ -84,10 +107,12 @@ class DynArmEnv:
             17
             + (6 * n_obstacles if obstacles_in_state else 0)
             + (7 if closest_point_in_state else 0)
+            + (9 if action_mode == "velocity" else 0)
         )
         # Episode stats maintained for Figure-1-style instrumentation.
         self.last_tau_star: float | None = None
         self.last_discrete_missed: bool = False
+        self.stats: dict[str, int] = {}
 
     # ---- Morvan interface -------------------------------------------------
 
@@ -124,6 +149,11 @@ class DynArmEnv:
 
     def reset(self) -> np.ndarray:
         self.q, self.goal = self._sample_start_goal()
+        if self.action_mode == "velocity":
+            self.v = np.zeros(self.action_dim)
+            self.a = np.zeros(self.action_dim)
+            self._last_terminal_membership = False
+            self._last_intervention_norm = 0.0
         margin = self.a_r + self.a_o
         for _ in range(100):
             self.scene: DynamicScene = sample_scene(
@@ -137,6 +167,9 @@ class DynArmEnv:
         return self._state()
 
     def step(self, action: np.ndarray):
+        if self.action_mode == "velocity":
+            return self._step_velocity(action)
+
         dq = np.clip(np.asarray(action, float), *self.action_bound)
         q_new = np.clip(self.q + dq, Q_MIN, Q_MAX)
         dq = q_new - self.q
@@ -154,6 +187,92 @@ class DynArmEnv:
             r -= 5.0  # terminal collision penalty (URPlanner-style)
 
         self.q = q_new
+        self.scene.step(self.dt)
+        self.t += 1
+        self._grids = self._grids[1:] + [self._rasterize_now()]
+
+        err = np.linalg.norm(self.kin.flange(self.q) - self.goal)
+        if err < self.goal_tol:
+            self.on_goal += 1
+        else:
+            self.on_goal = 0
+        done = collided or self.on_goal >= self.goal_dwell or self.t >= self.max_steps
+        return self._state(), float(r), bool(done)
+
+    def _step_velocity(self, action: np.ndarray):
+        u_t = np.clip(np.asarray(action, float), -1.0, 1.0)
+        v_nom = self.v + self.dv_scale * u_t
+        qp = solve_safety_qp(
+            self.q,
+            self.v,
+            self.a,
+            v_nom,
+            h=self.dt,
+            n_steps=self.safety_n_steps,
+            q_min=Q_MIN,
+            q_max=Q_MAX,
+            v_min=-DQ_MAX,
+            v_max=DQ_MAX,
+            a_min=-panda.DDQ_MAX,
+            a_max=panda.DDQ_MAX,
+            j_min=-panda.DDDQ_MAX,
+            j_max=panda.DDDQ_MAX,
+            require_terminal_stop=False,
+        )
+
+        accepted = False
+        if qp.certified and qp.jerk_sequence is not None:
+            candidate = self._kinodynamic_update(qp.jerk_sequence[:, 0])
+            if self._braking_witness_jerks(*candidate) is not None:
+                q_new, v_new, a_new = candidate
+                accepted = True
+
+        if not accepted:
+            # The environment is fully deterministic, so recomputing from the
+            # actual state reproduces exactly what a cached multi-step witness
+            # would prescribe there. It is also more robust: an accepted step
+            # between fallbacks cannot leave us replaying a stale brake plan.
+            brake_jerks = self._braking_witness_jerks(self.q, self.v, self.a)
+            if brake_jerks is not None:
+                q_new, v_new, a_new = self._kinodynamic_update(brake_jerks)
+                self.stats["shield_fallback"] = (
+                    self.stats.get("shield_fallback", 0) + 1
+                )
+            else:
+                # Least-committal last resort: preserve current acceleration
+                # for one integration period, then defensively clip q and v.
+                q_new, v_new, a_new = self._kinodynamic_update(
+                    np.zeros(self.action_dim)
+                )
+                q_new = np.clip(q_new, Q_MIN, Q_MAX)
+                v_new = np.clip(v_new, -DQ_MAX, DQ_MAX)
+                self.stats["shield_emergency"] = (
+                    self.stats.get("shield_emergency", 0) + 1
+                )
+
+        q_old = self.q
+        self.q = np.clip(q_new, Q_MIN, Q_MAX)
+        self.v = np.clip(v_new, -DQ_MAX, DQ_MAX)
+        self.a = a_new
+        self._last_terminal_membership = accepted
+        self._last_intervention_norm = float(np.linalg.norm(self.v - v_nom))
+        dq = self.q - q_old
+
+        # Existing collision and reward conventions operate on (q, dq), so
+        # temporarily restore q_t while evaluating the executed transition.
+        self.q = q_old
+        tau_star = self._first_contact(dq)
+        self.last_tau_star = tau_star
+        collided = tau_star is not None
+        if collided:
+            self.last_discrete_missed = not self._endpoint_overlaps(q_old + dq)
+
+        r = self._reward(dq)
+        r -= self.lambda_intervention * self._last_intervention_norm**2
+        if collided:
+            r -= 5.0
+
+        self.q = q_old + dq
         self.scene.step(self.dt)
         self.t += 1
         self._grids = self._grids[1:] + [self._rasterize_now()]
@@ -250,9 +369,53 @@ class DynArmEnv:
             parts.append([d])
             parts.append(direction)
             parts.append(p_box - flange)
+        if self.action_mode == "velocity":
+            parts.append(self.a / DDQ_MAX)
+            parts.append([1.0 if self._last_terminal_membership else 0.0])
+            parts.append([self._last_intervention_norm])
         return np.concatenate(parts).astype(np.float32)
 
     # ---- internals -----------------------------------------------------------
+
+    def _kinodynamic_update(
+        self, jerks: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        next_states = np.array(
+            [
+                kinodynamics.discrete_update(
+                    np.array([self.q[i], self.v[i], self.a[i]]),
+                    jerks[i],
+                    self.dt,
+                )
+                for i in range(self.action_dim)
+            ]
+        )
+        return next_states[:, 0], next_states[:, 1], next_states[:, 2]
+
+    def _braking_witness_jerks(
+        self, q: np.ndarray, v: np.ndarray, a: np.ndarray
+    ) -> np.ndarray | None:
+        jerks = []
+        for i in range(self.action_dim):
+            jerk = kinodynamics.braking_witness_jerk(
+                q[i],
+                v[i],
+                a[i],
+                self.dt,
+                self.brake_check_n_steps,
+                Q_MIN[i],
+                Q_MAX[i],
+                -DQ_MAX[i],
+                DQ_MAX[i],
+                -self.brake_derate * panda.DDQ_MAX[i],
+                self.brake_derate * panda.DDQ_MAX[i],
+                -self.brake_derate * panda.DDDQ_MAX[i],
+                self.brake_derate * panda.DDDQ_MAX[i],
+            )
+            if jerk is None:
+                return None
+            jerks.append(jerk)
+        return np.asarray(jerks)
 
     def _rasterize_now(self) -> np.ndarray:
         boxes = self.scene.static_aabbs(margin=0.0)
