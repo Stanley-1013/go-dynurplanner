@@ -372,6 +372,26 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter25: escalated the diagnostic findings to Opus for a
+  ranked root-cause call before spending more compute guessing. Opus's
+  read of the evidence (moves substantially, 0% collision, ALWAYS times
+  out at exactly max_steps, even in noise-free eval) pointed to a POMDP
+  gap: velocity mode makes `v_t` genuine dynamic state the policy needs
+  to decide when to decelerate, and asked me to check whether `v_t` is
+  even IN the observation. **It is not.** Checked `env.py::_state()`
+  directly (line 386-389): velocity-mode observation appends `self.a`
+  (acceleration, normalized) but never `self.v` (velocity) — **a real
+  bug in my own Phase 3 design spec**, not a Codex implementation error;
+  Codex built exactly what I specified, I simply forgot to include
+  velocity when I wrote that dispatch. My own exploration-noise-
+  accumulation hypothesis (iter24-adjacent reasoning) was ranked by
+  Opus as a real but minor contributor, not sufficient to explain a
+  100%-noise-free-eval failure — correctly deprioritized. Fixing this
+  directly: add `self.v` (normalized by `DQ_MAX`) to the velocity-mode
+  observation alongside the existing `self.a` term (`state_dim`'s `+9`
+  becomes `+16`). This is the highest-confidence fix found so far in
+  this debugging arc — dispatching it now with a validation probe.
+- 2026-07-18 iter24: stage-0 scripted reachability diagnostic (`m6_diag_scripted_policy.py`) found scripted success/collision/timeout = 38/0/62% over n=100 versus trained-3000ep TD3 = 0/0/100% over n=50; scripted velocity norm median/p90/max = 0.086/0.242/0.501 rad/s (DQ_MAX RMS fraction 1.43/4.03/7.66%) versus trained = 0.201/0.380/0.547 rad/s (3.35/6.33/8.72%), and scripted termination steps mean/median = 90.0/100 overall (successful episodes 73.7/76) versus trained = 100/100. Thus stage 0 is physically achievable at a reasonable 38% even with this simple policy, the trained actor is moving rather than stationary but wanders to timeout, and obstacles cannot explain the failure because stage 0 has none and neither cohort collided.
 - 2026-07-18 iter23: the 3000-episode probe (task `b7bq24gs9`) finished.
   **Credit-assignment/"just needs more time" hypothesis REFUTED**: 14
   checkpoints from ep200 to ep3000 all show succ 0.00-0.03, curriculum

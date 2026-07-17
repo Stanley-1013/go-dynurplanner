@@ -1,0 +1,16 @@
+Diagnostic added at [m6_diag_scripted_policy.py](/home/han/claude_project/papper-research/code/experiments/m6_diag_scripted_policy.py:1), with the status recorded in [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md:374).
+
+1. Scripted success: **38/100 (38%)**. This establishes that stage 0 is physically achievable under the current constants and 100-step budget; physical impossibility is not the primary blocker.
+
+2. Terminations: scripted = **38% success, 0% collision, 62% timeout**; trained TD3 = **0% success, 0% collision, 100% timeout** over 50 episodes. Because stage 0 has no obstacles, obstacle avoidance cannot explain the learning failure.
+
+3. Velocity: scripted median/p90/max = **0.086/0.242/0.501 rad/s**; trained = **0.201/0.380/0.547 rad/s**. Representative trained episode norms at steps 1/10/25/50/75/100 were **0.0005/0.044/0.272/0.091/0.325/0.297 rad/s**. The trained actor is not stationary—it moves faster than the successful script, although still at only **3.35% median RMS of `DQ_MAX`**.
+
+4. Timing: scripted episodes ended at **90.0 mean / 100 median steps** overall; successful episodes at **73.7 mean / 76 median**. Every trained episode ran exactly **100 steps**. This indicates sustained but ineffective wandering, not early collision.
+
+Best-guess ranking:
+
+1. Something else: failure to learn goal-directed velocity control/credit assignment—the actor moves, but not usefully.
+2. Physical constants and step budget contribute difficulty, but do not make the task unachievable.
+3. Degenerate “don’t move” optimum is unlikely.
+4. Obstacle avoidance is ruled out as the stage-0 blocker.
