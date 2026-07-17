@@ -1,0 +1,25 @@
+Implemented the replay-buffer relabeling fix.
+
+Files changed:
+
+- [env.py](/home/han/claude_project/papper-research/code/godynur/env.py)
+- [m6_kinodynamic_shield.py](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py)
+- [test_env_velocity_mode.py](/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Pytest: `79 passed in 23.12s`
+
+Probe command:
+
+```bash
+cd code && source .venv/bin/activate && OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4 PYTHONPATH=. python experiments/m6_kinodynamic_shield.py --episodes 400 --seeds 1 --seed-salt 100 --arms kinodynamic_shield --out /tmp/m6_fix_probe
+```
+
+Ep-400 comparison:
+
+| Run | Success | Stage | Intervention rate |
+|---|---:|---:|---:|
+| Fixed, salt 100 | 0.000 | 0 | 0.214 |
+| Pre-fix baseline, salt 0 seed 0 | 0.033 | 0 | 0.201 |
+
+Assessment: the fix restores replay-buffer consistency, but this short probe showed no learning improvement. The arm remains stuck at stage 0, suggesting another learning blocker likely remains.

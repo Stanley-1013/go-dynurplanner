@@ -179,3 +179,40 @@ def test_velocity_collision_check_receives_cubic_linearization_inflation():
 
     assert expected > 0.0
     assert seen["inflation"] == pytest.approx(expected)
+
+
+def test_executed_action_tracks_accepted_request_and_relabels_fallback():
+    accepted_env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=17,
+    )
+    accepted_env.reset()
+    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
+    accepted_env.a = 0.01 * DDQ_MAX
+    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
+
+    accepted_env.step(requested)
+
+    assert accepted_env._last_terminal_membership
+    assert np.allclose(accepted_env._last_executed_action, requested)
+
+    fallback_env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=18,
+    )
+    fallback_env.reset()
+    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
+    fallback_env.q[0] = Q_MAX[0] - 0.01
+    fallback_env.v = np.zeros(7)
+    fallback_env.v[0] = 0.05 * DQ_MAX[0]
+    fallback_env.a = np.zeros(7)
+    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+    fallback_env.step(requested)
+
+    assert fallback_env.stats["shield_fallback"] == 1
+    assert not np.allclose(fallback_env._last_executed_action, requested)

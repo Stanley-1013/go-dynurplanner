@@ -1,0 +1,4450 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.5
+--------
+workdir: /home/han/claude_project/papper-research
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019f70f9-6e0a-7eb1-b34f-8fc2724071b1
+--------
+user
+You are fixing a real bug found during Phase 5c analysis of the "kinodynamic certified action shield" track for GO-DynURPlanner. Read `code/KINODYNAMIC_ROADMAP.md`'s Phase 5 section (the Phase 5c checklist entry) and `code/experiments/results/m6_kinodynamic/ANALYSIS.md` IN FULL first — that document has the complete root-cause analysis; do not re-derive it, just implement the fix it recommends. Then read `code/godynur/env.py`'s `_step_velocity` method in full, and `code/experiments/m6_kinodynamic_shield.py`'s training loop (around lines 213-249) in full.
+
+## The bug, briefly
+
+`DynArmEnv._step_velocity` can silently execute a DIFFERENT jerk sequence than what the RL actor's nominal action `u_t` requested (via the accept/fallback/emergency branching — this is correct, intentional safety behavior, not a bug in itself). The bug is downstream: `m6_kinodynamic_shield.py`'s training loop stores the actor's RAW nominal action `a` in the TD3 replay buffer (`agent.buffer.add(s, a, r, s2, ...)`), even on the ~20% of steps where the shield substituted something else. This makes `(s, a, r, s2)` an inconsistent transition — `s2` reflects what the shield actually did, not what `a` would have done — which corrupts a fifth of all stored training data and is the leading hypothesis for why the `kinodynamic_shield` arm failed to learn at all in the Phase 5b run (never advanced past curriculum stage 0 in any of 5 seeds).
+
+## Fix, part 1: `code/godynur/env.py`
+
+In `_step_velocity`, after the accept/fallback/emergency branching determines `q_new, v_new, a_new` (whichever path ran) and BEFORE the final re-clip/state-update lines, compute the "effective executed action" — the `u` value that, fed through the SAME nominal mapping `v_nom = v_old + dv_scale * u_t` the actor uses, would have produced the ACTUAL velocity change that was executed:
+
+```
+u_executed = (v_new - v_old) / dv_scale   # elementwise, v_old is self.v BEFORE this step's update
+```
+
+Store this as a new instance attribute, e.g. `self._last_executed_action = np.clip(u_executed, -1.0, 1.0)` (clip defensively — the actor's action space is `[-1,1]`; the shield's conservative braking jerks should normally stay within that range but clip anyway so this never hands the training loop an out-of-distribution label). Set this on EVERY call to `_step_velocity` (accept, fallback, AND emergency paths all need it — don't only set it in one branch). Make sure `v_old` is captured before any mutation (check the existing code — `v_old = self.v.copy()` may already exist near the top of the method from Phase 3/4; reuse it, don't introduce a second copy with different timing).
+
+This is purely additive observability — do not change any existing safety/certification logic, constraint, or control flow in `_step_velocity`. The existing 78 tests must all still pass unmodified.
+
+Add a test in `code/tests/test_env_velocity_mode.py` (append): after a normal accepted step with a known `u_t` and no intervention, assert `env._last_executed_action` is close to the original `u_t` (since nothing was substituted, the "effective executed action" should recover the original request). After a step that triggers the fallback path (reuse the existing near-limit test scenario from that file), assert `env._last_executed_action` is DIFFERENT from the original requested action (proving the relabeling actually does something different when the shield intervenes — this is the property that matters, don't just check it "exists").
+
+## Fix, part 2: `code/experiments/m6_kinodynamic_shield.py`
+
+In the training loop (around line 239-240), for the `kinodynamic_shield` arm specifically, store `env._last_executed_action` in the replay buffer instead of the raw `a`:
+
+```python
+s2, r, done = env.step(a)
+buffer_action = env._last_executed_action if arm == "kinodynamic_shield" else a
+agent.buffer.add(s, buffer_action, r, s2, float(done))
+```
+
+Do NOT change this for `no_shield` or `ape2_shield` — they don't have this problem (their `a` already reflects what was executed, `ape2_shield`'s shield runs before `env.step()` sees the action). Also check the WARMUP_STEPS random-exploration branch (`a = env.sample_action()`, around line 219) — during warmup for `kinodynamic_shield`, `a` is random and still gets fed through `env.step(a)`, so the SAME relabeling applies there too; make sure the buffer-storage line covers both the warmup and post-warmup branches (it should, if you put the relabeling logic right before the shared `agent.buffer.add` call rather than duplicating it in both branches).
+
+## Validate the fix actually works — run a short training probe, don't just trust the code change
+
+Run a short `kinodynamic_shield`-only training run to sanity-check the fix has a real effect (this is the actual acceptance criterion, not just "the code compiles"):
+
+```bash
+cd code && source .venv/bin/activate && OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4 PYTHONPATH=. python experiments/m6_kinodynamic_shield.py --episodes 400 --seeds 1 --seed-salt 100 --arms kinodynamic_shield --out /tmp/m6_fix_probe
+```
+
+(Use `--seed-salt 100` so this probe's seed doesn't collide with the already-committed `--seed-salt 0` results; write output to `/tmp/m6_fix_probe`, NOT into the tracked `experiments/results/m6_kinodynamic/` directory — this is a validation probe, not a result to commit.) Compare against the ALREADY-COMMITTED `--seed-salt 0` seed 0 result at the same 400-episode checkpoint (`experiments/results/m6_kinodynamic/m6_uoar_kinodynamic_shield_salt0.json`, seed "0", the `episode: 400` entry — succ was 0.03 there). Report whether the fixed run shows ANY sign of improvement (higher success, curriculum advancing past stage 0, or a declining intervention rate) — if it looks just as stuck, say so plainly rather than declaring victory; the buffer-consistency bug might be A cause but not the ONLY cause, and an honest "still stuck, here's what I observed" is a fine outcome to report. Do not spend more than this one short probe run's worth of time on further debugging — if the fix doesn't obviously help, report the finding and stop; further investigation is a separate follow-up dispatch, not this one.
+
+## Constraints
+
+- Do NOT modify `continuous.py`, `ape2.py`, `td3.py`, `grid_td3.py`, `forecast.py`, `voxelizer.py`, `scenes.py`, `policy.py`, `panda.py`, `kinodynamics.py`, `safety_qp.py`. Only `env.py` (additive attribute only), `m6_kinodynamic_shield.py` (the buffer-storage line + the WARMUP_STEPS branch check), and `test_env_velocity_mode.py`.
+- Run the full suite: `cd code && source .venv/bin/activate && PYTHONPATH=. python -m pytest tests -q` — all 78 existing tests plus your new ones must pass, zero regressions.
+- Append one line to `code/KINODYNAMIC_ROADMAP.md` section 6 (status log, newest first, keep existing entries) with the probe result (improved / still stuck / inconclusive) and your honest read on what it means.
+
+## Report format (final message, keep it short)
+Files changed, final pytest result line, the probe run's actual command and outcome (succ/stage/intervention-rate numbers at ep 400, compared to the pre-fix seed-0 baseline at the same checkpoint), and your honest assessment of whether this fix appears to have helped, been neutral, or whether something else is likely still blocking learning.
+
+warning: Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.
+codex
+I’ll follow the documented Phase 5c diagnosis directly, then make only the three allowed code/test edits, run the full suite, and run exactly the requested 400-episode probe before updating the roadmap status log.
+exec
+/bin/bash -lc 'rg -n "''^#|''^##|Phase 5|5c|''^6'"\\.|"'^## 6|Section 6" code/KINODYNAMIC_ROADMAP.md && wc -l code/KINODYNAMIC_ROADMAP.md code/experiments/results/m6_kinodynamic/ANALYSIS.md code/godynur/env.py code/experiments/m6_kinodynamic_shield.py code/tests/test_env_velocity_mode.py' in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+1:# Kinodynamic Certified Safety Layer — Roadmap & Task Queue
+9:## 0. Origin & scope boundary
+29:## 1. Condensed architecture spec
+56:## 2. Current codebase mapping (verified 2026-07-17, Explore agent)
+96:## 3. Phased task queue
+101:### Phase 1 — single-joint (q,v,a,j) model + continuous-interval certification (no obstacles, no wiring into RL)
+116:### Phase 2 — multi-joint jerk-horizon QP/LP safety filter
+125:      only if Phase 5 realtime solve-time benchmarks demand it.
+139:  training-scale runs (Phase 5) still find this a bottleneck, switch to
+144:### Phase 3 — integrate fixed velocity-action mapping into `DynArmEnv` (opt-in, non-breaking)
+196:### Phase 4 — extend `continuous.py` collision shield to cubic joint trajectories
+264:      rate, inter-sample violation count (this sub-item is Phase 5-scale
+267:### Phase 5 — occupancy forecasting + TD3/APE2 integration, full experiments, **seed scale-up**
+270:- [x] **Phase 5a**: `experiments/m6_kinodynamic_shield.py` — three-arm
+286:  - **Phase 5b sizing decision (commander, 2026-07-17)**: historical
+293:    **800 episodes × 5 seeds** as the first real Phase 5b pass: well past
+300:    final paper numbers — plan a longer/larger Phase 5c rerun (closer to
+307:      all 5 seeds, no downward trend. See Phase 5c analysis below for why
+309:- [x] **Phase 5c analysis** — full writeup:
+327:## 4. Evaluation metrics (apply from Phase 4 onward)
+337:## 5. Model routing policy for this loop
+373:## 6. Loop status log (append one line per iteration, newest first)
+379:  entire run. Committed. All three Phase 5b arms now complete — wrote
+380:  the full Phase 5c analysis (`experiments/results/m6_kinodynamic/ANALYSIS.md`),
+384:  specific to the `kinodynamic_shield` arm — see the Phase 5 checklist
+397:  reached stage 1-2 — worth flagging honestly in the Phase 5c writeup as
+446:- 2026-07-17 iter15: session was interrupted mid-launch of Phase 5b.
+466:  fallback wakeup), then move to Phase 5c analysis.
+467:- 2026-07-17 iter14: verified Phase 5a's `m6_kinodynamic_shield.py`
+474:  timing data collected (see Phase 5a's roadmap entry). Committed the
+475:  script. Sized and launched Phase 5b (800 episodes x 5 seeds, 3
+476:  parallel background processes) — see the Phase 5b sizing note above
+498:  required). Phase 4 core is genuinely sound and done; the Phase 5-scale
+499:  shield-comparison experiment is correctly left for Phase 5.
+583:## 7. How to resume after context loss
+  590 code/KINODYNAMIC_ROADMAP.md
+  168 code/experiments/results/m6_kinodynamic/ANALYSIS.md
+  561 code/godynur/env.py
+  405 code/experiments/m6_kinodynamic_shield.py
+  181 code/tests/test_env_velocity_mode.py
+ 1905 total
+
+exec
+/bin/bash -lc 'cat code/experiments/results/m6_kinodynamic/ANALYSIS.md' in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+# Phase 5c — M6 three-arm comparison, first-pass analysis
+
+**Run config**: 800 episodes × 5 seeds per arm, `--seed-salt 0`, tabletop
+task, `n_obstacles=3`, `reward_mode=uoar`. Source JSONs:
+`m6_uoar_no_shield_salt0.json`, `m6_uoar_ape2_shield_salt0.json`,
+`m6_uoar_kinodynamic_shield_salt0.json` (all in this directory, all git-
+tracked, all independently verified by the commander — diff scope,
+5/5-seeds-present, pytest unaffected — before this analysis was written).
+
+This is a **first pass**, not the paper-final numbers (roadmap Phase 5
+targets n=8-10 for that). Read the headline finding below before
+scaling up seed count further — there is a concrete bug to fix first.
+
+## Headline finding: the kinodynamic_shield arm did not learn, and there's a likely concrete cause
+
+All three arms, final-episode-block eval, mean ± population stdev across 5 seeds:
+
+| Arm | Success rate | Collision rate | Final curriculum stage (per seed) |
+|---|---|---|---|
+| `no_shield` | 0.333 ± 0.145 | 0.493 ± 0.100 | [1,1,0,1,1] |
+| `ape2_shield` | 0.260 ± 0.049 | 0.460 ± 0.098 | [2,2,2,2,2] |
+| `kinodynamic_shield` | **0.027 ± 0.025** | **0.593 ± 0.098** | **[0,0,0,0,0]** |
+
+`kinodynamic_shield` never advanced past curriculum stage 0 (the
+*easiest* stage — 0 obstacles/speed per `STAGES[0]=(0,0.0)`) in **any**
+of its 5 seeds, and its success rate stayed near zero (0.00–0.07)
+throughout training. This isn't seed noise — it's consistent across all
+5 seeds independently. It's also not explained by task difficulty: it
+never even reached the harder stages `no_shield`/`ape2_shield` were
+being evaluated on, yet still collided *more* (0.593 vs. 0.493/0.460)
+and succeeded far less.
+
+**Leading hypothesis, verified by reading the code (not speculation):**
+`m6_kinodynamic_shield.py` line 237 stores the RL actor's raw nominal
+action in the replay buffer (`a = agent.act(s, explore=True)` →
+`agent.buffer.add(s, a, r, s2, ...)`), but for `action_mode="velocity"`,
+`env.step(a)` (`env.py`'s `_step_velocity`) can silently substitute a
+DIFFERENT actually-executed jerk sequence when the shield intervenes
+(fallback or emergency path) — which happened on **~20% of all training
+steps** (`train_intervention_rate` stayed flat at 0.19–0.22 the entire
+run, see the Learning section below). When intervention happens, the
+stored transition `(s, a, r, s2)` is **inconsistent**: `s2` is the result
+of whatever the shield actually did, not of executing `a`. TD3's critic
+is being trained on ~1/5 of transitions where the action label doesn't
+match the dynamics outcome — a real, verifiable data-quality bug, not
+just "needs more episodes."
+
+This is architecturally different from `ape2_shield`, which does NOT
+have this problem: `sel.act(s, step=total_steps)` (line 235) already
+returns the shield-CERTIFIED action *before* it's stored, because
+APE2Shield's candidate selection happens outside `env.step()`. The
+`kinodynamic_shield` design intentionally moved safety *inside*
+`env.step()` (Phase 3's architecture choice, for good reasons —
+receding-horizon replanning needs the full `(q,v,a)` state every
+step, which an external wrapper can't cleanly own) — but that means the
+training loop now needs to read back what was ACTUALLY executed, and
+`env.py` doesn't yet expose that in a form the buffer can use (only
+`_last_intervention_norm`, a scalar magnitude, and `_last_terminal_membership`,
+a bool — not the actual executed action vector).
+
+**Recommended fix before any further seed scale-up**: expose the
+actually-executed velocity command (or an equivalent action-space
+quantity, e.g. normalize `executed_jerks`' resulting `v_new` back
+through the same `v_nom = v_t + dv_scale·u_t` mapping to get an
+effective `u_executed`) as a new `env` attribute, and have the training
+script store `u_executed` (not the raw `a`) in the replay buffer for the
+`kinodynamic_shield` arm — mirroring what `ape2_shield` already does
+correctly. This is a scoped, well-understood fix, not a redesign.
+
+## Safety
+
+- Collision rate: `ape2_shield` (0.460) ≤ `no_shield` (0.493) — a modest
+  ~3.3pp gap, well within the seed-to-seed stdev (~0.10) for both, so
+  **not a strong signal at n=5** that the existing shield reduces
+  collisions on this metric alone (consistent with it being deployed as
+  a *joint-limit/kinematic* safety net historically, not a general
+  obstacle-avoidance mechanism — collisions here are driven by the
+  policy's obstacle-avoidance competence, which both arms share).
+- `kinodynamic_shield`'s 0.593 collision rate is NOT a fair comparison
+  point yet given the buffer-consistency issue above — revisit after
+  the fix.
+- Joint-limit violation rate / inter-sample violation count / no-feasible-
+  brake fraction: **still not measured** (flagged as deferred in Phase
+  5a's script header) — these are exactly the things the kinodynamic
+  shield is DESIGNED to prevent, and the current metrics can't yet show
+  whether it's succeeding at that job, only at the (confounded) task-
+  success/collision numbers above. This is the biggest metric gap to
+  close next, since it's the actual claim Phase 1-4 make.
+
+## Efficiency
+
+- `mean_steps` per eval episode: `no_shield` 32.9-53.4, `ape2_shield`
+  52.7-58.0, `kinodynamic_shield` 63.3-78.9. `kinodynamic_shield`'s
+  episodes run longest — consistent with a policy that isn't reaching
+  the goal OR colliding-and-terminating early as often per step, i.e.
+  wandering — again likely downstream of the learning failure above,
+  not a property of the shield mechanism itself.
+- Wall-clock cost per eval episode: `no_shield` ~0.05-0.08s,
+  `ape2_shield` ~0.18-0.23s (~3x, candidate-generation overhead),
+  `kinodynamic_shield` ~0.42-0.52s (~8-10x `no_shield`, ~2x
+  `ape2_shield`) — consistent with Phase 2's own solve-time benchmark
+  finding; this cost is inherent to the QP-based shield, not a bug.
+
+## Shield behavior
+
+- `ape2_shield`'s `no_safe` count (final eval block, ~30 episodes):
+  11-36 — a real, nontrivial rate of "no certified-safe candidate found,
+  fell back to the max-τ* candidate" events, consistent with prior M4
+  findings that the shield's certification ladder gets exercised often
+  under this obstacle density.
+- `kinodynamic_shield`'s intervention rate: essentially flat at
+  **0.19-0.22** across seeds and across the entire training run (see
+  Learning below) — the shield's fallback/emergency path is firing on
+  roughly 1 in 5 steps throughout, not just early on.
+
+## Learning (does the policy learn to self-limit?)
+
+Per-checkpoint (`ep 200/400/600/800`) trend, `kinodynamic_shield` seed 0:
+
+| Checkpoint | intervention_rate | collision_rate |
+|---|---|---|
+| ep 200 | 0.188 | 0.633 |
+| ep 400 | 0.201 | 0.667 |
+| ep 600 | 0.202 | 0.767 |
+| ep 800 | 0.199 | 0.733 |
+
+**No downward trend in intervention rate, and no improvement in
+collision rate** — both are flat-to-slightly-worse over this training
+window. This is an honest negative result at this budget/setup: within
+800 episodes, the policy shows no sign of "internalizing" the limits and
+reducing its reliance on the shield. Given the buffer-consistency issue
+above is a strong confound for why the policy isn't learning much of
+anything yet, this metric should be re-measured after that fix before
+drawing a real conclusion about self-limiting behavior — right now it's
+confounded with "did the policy learn the task at all."
+
+## What this first pass does and doesn't tell us
+
+**Established**: the full Phase 1-4 pipeline runs end-to-end at scale
+without crashing, produces internally-consistent (never-unsafe, per
+Phase 1-4's own verified certification guarantees) trajectories, and the
+experiment harness (Phase 5a) correctly collects the roadmap's metrics
+where they're cheaply available.
+
+**Not yet established**: whether the kinodynamic shield is actually
+better or worse than the existing APE2 shield at its actual job (safety
+under equal task performance) — the current run can't answer that
+because the `kinodynamic_shield` arm's policy essentially never learned
+the task, for a specific, identified, fixable reason (the replay-buffer
+action-consistency gap above), not because the shield itself is
+unsound (Phase 1-4's certification math is independently verified and
+holds regardless of RL training outcome).
+
+## Recommended next steps (in order)
+
+1. **Fix the replay-buffer action-consistency bug** (expose the
+   executed action from `env.py`, use it in `m6_kinodynamic_shield.py`).
+   This is the single highest-value next step — everything else is hard
+   to interpret until this is fixed.
+2. Re-run `kinodynamic_shield` alone (not all 3 arms) at the same 800×5
+   scale to confirm the fix actually lets the policy learn (a sane check:
+   does it start advancing curriculum stages and does intervention rate
+   start trending down?) before re-committing to a full 3-arm rerun.
+3. Add the deferred Safety metrics (joint-limit violation rate,
+   inter-sample violation count, no-feasible-brake fraction) — these are
+   the actual claims Phase 1-4 make and aren't measured yet.
+4. Only after 1-3: scale to the roadmap's n=8-10 target for paper-grade
+   numbers, with Wilson CIs per the existing C1 convention.
+
+exec
+/bin/bash -lc "sed -n '267,326p' code/KINODYNAMIC_ROADMAP.md" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+### Phase 5 — occupancy forecasting + TD3/APE2 integration, full experiments, **seed scale-up**
+- [ ] wire `grid_td3.py`/`forecast.py` obstacle prediction into the N-step
+      safety horizon
+- [x] **Phase 5a**: `experiments/m6_kinodynamic_shield.py` — three-arm
+      comparison (`no_shield`/`ape2_shield`/`kinodynamic_shield`), disjoint
+      per-arm seed ranges (`ARM_SEED_STRIDE=1e6`, avoids the Loop 9
+      seed-confound even across arms), per-`EVAL_EVERY`-block intervention
+      rate logged (supports the "Learning" metric below directly). All
+      three arms independently smoke-verified by the commander (not just
+      Codex's kinodynamic-only smoke) — 8 episodes, all ran cleanly, no
+      crashes. Measured per-episode wall time at this tiny scale: `no_shield`
+      ≈0.39s, `ape2_shield`≈0.89s, `kinodynamic_shield`≈5.6s (QP overhead
+      dominates, consistent with the Phase 2 perf finding).
+- [ ] full A/B experiments across shield variants. **Raise seed count** —
+      existing H2/M5 results used n=2 only (HANDOFF.md: "n=2 hypothesis
+      pending scale-up"); target n≥5 minimum, n=8–10 for anything destined
+      for the paper, with Wilson CIs per the existing C1 convention
+      (`m5_grid.py --seed-salt` already fixes the seed-confound bug found
+      in Loop 9 — reuse that pattern, don't reintroduce the confound)
+  - **Phase 5b sizing decision (commander, 2026-07-17)**: historical
+    M4 (`experiments/logs/m4v2.log`) reaches final curriculum stage by
+    ~ep 200 but success rate is STILL rising at its ep-3000 ceiling
+    (noshield 0.33→0.40→0.47 in its last 3 checkpoints) — not fully
+    converged even there. Given `kinodynamic_shield`'s ~5.6s/episode,
+    the historical 3000-episode default would cost ~4.7h/seed (~23.5h
+    for 5 seeds sequential) — too large a first commitment. Chose
+    **800 episodes × 5 seeds** as the first real Phase 5b pass: well past
+    curriculum completion, captures a meaningful early/mid training
+    trend, caps `kinodynamic_shield` at ~1.24h/seed (~6.2h for 5 seeds
+    sequential, dominant arm). Launched as 3 PARALLEL background
+    processes (one per arm, `--seed-salt 0 --seeds 5 --episodes 800`),
+    logs at `experiments/logs/m6_<arm>.log`, results under
+    `experiments/results/m6_kinodynamic/`. This is a first pass, not the
+    final paper numbers — plan a longer/larger Phase 5c rerun (closer to
+    the historical 3000-episode budget, n=8-10) once these results are
+    sane-checked, per the roadmap's own n≥5-minimum/n=8-10-for-paper
+    two-tier target.
+- [x] intervention-rate-over-training metric — does the policy learn to
+      self-limit, or does it permanently lean on the shield? **Answer at
+      this scale: no** — flat 0.19-0.22 across all 4 training checkpoints,
+      all 5 seeds, no downward trend. See Phase 5c analysis below for why
+      this is confounded and shouldn't be over-interpreted yet.
+- [x] **Phase 5c analysis** — full writeup:
+      `experiments/results/m6_kinodynamic/ANALYSIS.md`. **Critical
+      finding**: `kinodynamic_shield` never advanced past curriculum
+      stage 0 in any of 5 seeds (succ 0.00-0.07 throughout), while
+      `no_shield`/`ape2_shield` both learned normally. Root cause
+      identified (not just speculated — verified by reading the code):
+      `m6_kinodynamic_shield.py` stores the RL actor's raw NOMINAL action
+      in the replay buffer, but `env.py`'s `_step_velocity` can silently
+      substitute a different actually-executed jerk sequence when the
+      shield intervenes (~20% of steps, measured) — corrupting ~1/5 of
+      stored transitions with an action label that doesn't match the
+      real dynamics outcome. `ape2_shield` doesn't have this problem
+      (its shield certifies the action BEFORE `env.step()`, so the
+      stored action is always what was actually executed).
+      **Do not scale up seeds further until this is fixed** — see the
+      analysis doc's "Recommended next steps" for the fix and re-
+      validation order.
+
+
+exec
+/bin/bash -lc 'rg -n "def _step_velocity|''^    def " code/godynur/env.py && sed -n '"'190,265p' code/experiments/m6_kinodynamic_shield.py && sed -n '1,220p' code/tests/test_env_velocity_mode.py" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+47:    def __init__(
+126:    def set_difficulty(self, n_obstacles: int, speed: float) -> None:
+134:    def _sample_start_goal(self):
+150:    def reset(self) -> np.ndarray:
+169:    def step(self, action: np.ndarray):
+202:    def _step_velocity(self, action: np.ndarray):
+300:    def sample_action(self) -> np.ndarray:
+303:    def scene_params(self, pad_to: int | None = None) -> np.ndarray:
+325:    def peek_reward(self, action: np.ndarray) -> float:
+332:    def peek_tau_star(
+358:    def grid_history(self) -> np.ndarray:
+362:    def _state(self) -> np.ndarray:
+392:    def _kinodynamic_update(
+407:    def _braking_witness_jerks(
+432:    def _rasterize_now(self) -> np.ndarray:
+438:    def closest_obstacle_point(self):
+450:    def _boxes(self, margin: float) -> list[AABB]:
+453:    def _config_collides(self, q, margin) -> bool:
+461:    def _moving_segments(self, dq) -> list[MovingSegment]:
+473:    def _pair_can_contact(self, seg_lo, seg_hi, ob, margin: float) -> bool:
+489:    def _first_contact(self, dq, inflation: float = 0.0) -> float | None:
+503:    def _endpoint_overlaps(self, q_new) -> bool:
+518:    def _reward(self, dq) -> float:
+        seed=10_000 + seed,
+        action_mode=action_mode,
+    )
+    agent = TD3(
+        env.state_dim,
+        env.action_dim,
+        action_scale=env.action_bound[1],
+        expl_noise=0.25,
+        seed=seed,
+    )
+    sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
+    stage_idx = 0
+    env.set_difficulty(*STAGES[stage_idx])
+    rolling = deque(maxlen=ADVANCE_WINDOW)
+    history = []
+    total_steps = 0
+    t0 = time.perf_counter()
+
+    block_steps = 0
+    block_interventions = 0
+    block_intervention_norm = 0.0
+    block_episode_wall_s: list[float] = []
+
+    for ep in range(1, episodes + 1):
+        episode_t0 = time.perf_counter()
+        s = env.reset()
+        done = False
+        while not done:
+            if total_steps < WARMUP_STEPS:
+                a = env.sample_action()
+                if arm == "ape2_shield":
+                    cand = a
+                    a = None
+                    for alpha in (1.0, 0.5, 0.25, 0.0):
+                        if (
+                            env.peek_tau_star(
+                                alpha * cand, sel._inflation(alpha * cand)
+                            )
+                            is None
+                        ):
+                            a = alpha * cand
+                            break
+                    if a is None:
+                        a = cand
+            elif arm == "ape2_shield":
+                a = sel.act(s, step=total_steps)
+            else:
+                a = agent.act(s, explore=True)
+
+            s2, r, done = env.step(a)
+            agent.buffer.add(s, a, r, s2, float(done))
+            agent.learn()
+            s = s2
+            total_steps += 1
+            block_steps += 1
+            if arm == "kinodynamic_shield":
+                block_interventions += int(not env._last_terminal_membership)
+                block_intervention_norm += env._last_intervention_norm
+
+        block_episode_wall_s.append(time.perf_counter() - episode_t0)
+        rolling.append(1 if env.on_goal >= env.goal_dwell else 0)
+
+        if (
+            stage_idx < len(STAGES) - 1
+            and len(rolling) == ADVANCE_WINDOW
+            and np.mean(rolling) >= ADVANCE_THRESHOLD
+        ):
+            stage_idx += 1
+            env.set_difficulty(*STAGES[stage_idx])
+            rolling.clear()
+            print(
+                f"[{arm} seed{seed}] ep {ep}: ADVANCE to stage "
+                f"{stage_idx} {STAGES[stage_idx]}",
+                flush=True,
+            )
+
+import numpy as np
+import pytest
+
+from godynur.env import DynArmEnv
+from godynur.kinodynamics import cubic_linearization_bound
+from godynur.panda import DDQ_MAX, DQ_MAX, Q_MAX, Q_MIN
+
+
+@pytest.mark.parametrize(
+    "obstacles_in_state,closest_point_in_state",
+    [(False, False), (True, False), (False, True), (True, True)],
+)
+def test_velocity_reset_and_state_dim_add_exactly_nine_fields(
+    obstacles_in_state, closest_point_in_state
+):
+    common = {
+        "n_obstacles": 0,
+        "obstacles_in_state": obstacles_in_state,
+        "closest_point_in_state": closest_point_in_state,
+        "seed": 10,
+    }
+    delta_env = DynArmEnv(**common)
+    velocity_env = DynArmEnv(action_mode="velocity", **common)
+
+    state = velocity_env.reset()
+
+    assert np.array_equal(velocity_env.v, np.zeros(7))
+    assert np.array_equal(velocity_env.a, np.zeros(7))
+    assert velocity_env.state_dim == delta_env.state_dim + 9
+    assert state.shape == (velocity_env.state_dim,)
+    assert np.array_equal(state[-9:], np.zeros(9, dtype=np.float32))
+
+
+def test_feasible_velocity_step_uses_normal_certified_path():
+    env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=11,
+    )
+    env.reset()
+    env.q = (Q_MIN + Q_MAX) / 2.0
+    v_nom = env.v + env.dv_scale * 0.1
+
+    state, reward, done = env.step(np.full(7, 0.1))
+
+    assert env.stats.get("shield_fallback", 0) == 0
+    assert env.stats.get("shield_emergency", 0) == 0
+    assert env._last_terminal_membership
+    assert np.all(env.v > 0.0)
+    assert np.linalg.norm(env.v - v_nom) < np.linalg.norm(v_nom)
+    assert np.allclose(state[-9:-2], env.a / DDQ_MAX)
+    assert state[-2] == 1.0
+    assert np.isclose(state[-1], env._last_intervention_norm)
+    assert np.isfinite(reward)
+    assert isinstance(done, bool)
+
+
+def test_near_limit_velocity_request_executes_fresh_braking_fallback():
+    env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=12,
+    )
+    env.reset()
+    env.q = (Q_MIN + Q_MAX) / 2.0
+    env.q[0] = Q_MAX[0] - 0.01
+    env.v = np.zeros(7)
+    env.v[0] = 0.05 * DQ_MAX[0]
+    env.a = np.zeros(7)
+
+    state, _, _ = env.step(np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+
+    assert env.stats["shield_fallback"] == 1
+    assert env.stats.get("shield_emergency", 0) == 0
+    assert not env._last_terminal_membership
+    assert state[-2] == 0.0
+    assert np.all(env.q >= Q_MIN)
+    assert np.all(env.q <= Q_MAX)
+
+
+def test_numerical_edge_state_uses_nonthrowing_emergency_path():
+    env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=15,
+    )
+    env.reset()
+    env.q = (Q_MIN + Q_MAX) / 2.0
+    env.q[0] = Q_MAX[0] - 0.005
+    env.v = np.zeros(7)
+    env.v[0] = 0.05 * DQ_MAX[0]
+    env.a = np.zeros(7)
+
+    env.step(np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+
+    assert env.stats["shield_emergency"] == 1
+    assert env.stats.get("shield_fallback", 0) == 0
+    assert np.all(env.q >= Q_MIN)
+    assert np.all(env.q <= Q_MAX)
+    assert np.all(env.v >= -DQ_MAX)
+    assert np.all(env.v <= DQ_MAX)
+
+
+def test_velocity_reward_subtracts_intervention_penalty_only():
+    common = {
+        "action_mode": "velocity",
+        "n_obstacles": 0,
+        "obstacles_in_state": False,
+        "seed": 13,
+    }
+    unpenalized = DynArmEnv(lambda_intervention=0.0, **common)
+    penalized = DynArmEnv(lambda_intervention=0.1, **common)
+    unpenalized.reset()
+    penalized.reset()
+    midpoint = (Q_MIN + Q_MAX) / 2.0
+    unpenalized.q = midpoint.copy()
+    penalized.q = midpoint.copy()
+    action = np.full(7, 0.5)
+
+    _, reward_without_penalty, _ = unpenalized.step(action)
+    _, reward_with_penalty, _ = penalized.step(action)
+
+    expected_penalty = 0.1 * penalized._last_intervention_norm**2
+    assert np.isclose(reward_without_penalty - reward_with_penalty, expected_penalty)
+
+
+def test_default_and_explicit_delta_q_modes_remain_identical():
+    default_env = DynArmEnv(n_obstacles=0, obstacles_in_state=False, seed=14)
+    explicit_env = DynArmEnv(
+        action_mode="delta_q",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=14,
+    )
+    default_state = default_env.reset()
+    explicit_state = explicit_env.reset()
+    action = np.linspace(-0.05, 0.05, 7)
+
+    default_result = default_env.step(action)
+    explicit_result = explicit_env.step(action)
+
+    assert np.array_equal(default_state, explicit_state)
+    assert np.array_equal(default_result[0], explicit_result[0])
+    assert default_result[1:] == explicit_result[1:]
+    assert "shield_fallback" not in default_env.stats
+    assert "shield_emergency" not in default_env.stats
+    assert "shield_fallback" not in explicit_env.stats
+    assert "shield_emergency" not in explicit_env.stats
+    assert not hasattr(default_env, "v")
+    assert not hasattr(default_env, "a")
+
+
+def test_velocity_collision_check_receives_cubic_linearization_inflation():
+    env = DynArmEnv(
+        action_mode="velocity",
+        n_obstacles=0,
+        obstacles_in_state=False,
+        seed=16,
+    )
+    env.reset()
+    env.q = (Q_MIN + Q_MAX) / 2.0
+    q0, v0, a0 = env.q.copy(), env.v.copy(), env.a.copy()
+    seen = {}
+
+    def capture_first_contact(dq, inflation=0.0):
+        seen["dq"] = np.asarray(dq).copy()
+        seen["inflation"] = inflation
+        return None
+
+    env._first_contact = capture_first_contact
+    env.step(np.full(7, 0.1))
+    executed_jerk = (env.a - a0) / env.dt
+    expected = cubic_linearization_bound(
+        q0, v0, a0, executed_jerk, env.dt, env.kin
+    )
+
+    assert expected > 0.0
+    assert seen["inflation"] == pytest.approx(expected)
+
+exec
+/bin/bash -lc "sed -n '202,299p' code/godynur/env.py" in /home/han/claude_project/papper-research
+exec
+/bin/bash -lc "sed -n '175,330p' code/experiments/m6_kinodynamic_shield.py" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+    def _step_velocity(self, action: np.ndarray):
+        q_old = self.q.copy()
+        v_old = self.v.copy()
+        a_old = self.a.copy()
+        u_t = np.clip(np.asarray(action, float), -1.0, 1.0)
+        v_nom = self.v + self.dv_scale * u_t
+        qp = solve_safety_qp(
+            self.q,
+            self.v,
+            self.a,
+            v_nom,
+            h=self.dt,
+            n_steps=self.safety_n_steps,
+            q_min=Q_MIN,
+            q_max=Q_MAX,
+            v_min=-DQ_MAX,
+            v_max=DQ_MAX,
+            a_min=-panda.DDQ_MAX,
+            a_max=panda.DDQ_MAX,
+            j_min=-panda.DDDQ_MAX,
+            j_max=panda.DDDQ_MAX,
+            require_terminal_stop=False,
+        )
+
+        accepted = False
+        if qp.certified and qp.jerk_sequence is not None:
+            candidate_jerks = qp.jerk_sequence[:, 0]
+            candidate = self._kinodynamic_update(candidate_jerks)
+            if self._braking_witness_jerks(*candidate) is not None:
+                q_new, v_new, a_new = candidate
+                q_trajectory_end = q_new.copy()
+                executed_jerks = candidate_jerks
+                accepted = True
+
+        if not accepted:
+            # The environment is fully deterministic, so recomputing from the
+            # actual state reproduces exactly what a cached multi-step witness
+            # would prescribe there. It is also more robust: an accepted step
+            # between fallbacks cannot leave us replaying a stale brake plan.
+            brake_jerks = self._braking_witness_jerks(self.q, self.v, self.a)
+            if brake_jerks is not None:
+                q_new, v_new, a_new = self._kinodynamic_update(brake_jerks)
+                q_trajectory_end = q_new.copy()
+                executed_jerks = brake_jerks
+                self.stats["shield_fallback"] = (
+                    self.stats.get("shield_fallback", 0) + 1
+                )
+            else:
+                # Least-committal last resort: preserve current acceleration
+                # for one integration period, then defensively clip q and v.
+                executed_jerks = np.zeros(self.action_dim)
+                q_new, v_new, a_new = self._kinodynamic_update(executed_jerks)
+                q_trajectory_end = q_new.copy()
+                q_new = np.clip(q_new, Q_MIN, Q_MAX)
+                v_new = np.clip(v_new, -DQ_MAX, DQ_MAX)
+                self.stats["shield_emergency"] = (
+                    self.stats.get("shield_emergency", 0) + 1
+                )
+
+        eps_cubic = kinodynamics.cubic_linearization_bound(
+            q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+        )
+        self.q = np.clip(q_new, Q_MIN, Q_MAX)
+        self.v = np.clip(v_new, -DQ_MAX, DQ_MAX)
+        self.a = a_new
+        self._last_terminal_membership = accepted
+        self._last_intervention_norm = float(np.linalg.norm(self.v - v_nom))
+        dq = self.q - q_old
+
+        # Existing collision and reward conventions operate on (q, dq), so
+        # temporarily restore q_t while evaluating the executed transition.
+        self.q = q_old
+        tau_star = self._first_contact(
+            q_trajectory_end - q_old, inflation=eps_cubic
+        )
+        self.last_tau_star = tau_star
+        collided = tau_star is not None
+        if collided:
+            self.last_discrete_missed = not self._endpoint_overlaps(q_old + dq)
+
+        r = self._reward(dq)
+        r -= self.lambda_intervention * self._last_intervention_norm**2
+        if collided:
+            r -= 5.0
+
+        self.q = q_old + dq
+        self.scene.step(self.dt)
+        self.t += 1
+        self._grids = self._grids[1:] + [self._rasterize_now()]
+
+        err = np.linalg.norm(self.kin.flange(self.q) - self.goal)
+        if err < self.goal_tol:
+            self.on_goal += 1
+        else:
+            self.on_goal = 0
+        done = collided or self.on_goal >= self.goal_dwell or self.t >= self.max_steps
+        return self._state(), float(r), bool(done)
+
+
+ succeeded in 0ms:
+    seed: int,
+    out_dir: Path,
+):
+    action_mode = "velocity" if arm == "kinodynamic_shield" else "delta_q"
+    env = DynArmEnv(
+        task="tabletop",
+        n_obstacles=3,
+        reward_mode=reward_mode,
+        seed=seed,
+        action_mode=action_mode,
+    )
+    eval_env = DynArmEnv(
+        task="tabletop",
+        n_obstacles=3,
+        reward_mode=reward_mode,
+        seed=10_000 + seed,
+        action_mode=action_mode,
+    )
+    agent = TD3(
+        env.state_dim,
+        env.action_dim,
+        action_scale=env.action_bound[1],
+        expl_noise=0.25,
+        seed=seed,
+    )
+    sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
+    stage_idx = 0
+    env.set_difficulty(*STAGES[stage_idx])
+    rolling = deque(maxlen=ADVANCE_WINDOW)
+    history = []
+    total_steps = 0
+    t0 = time.perf_counter()
+
+    block_steps = 0
+    block_interventions = 0
+    block_intervention_norm = 0.0
+    block_episode_wall_s: list[float] = []
+
+    for ep in range(1, episodes + 1):
+        episode_t0 = time.perf_counter()
+        s = env.reset()
+        done = False
+        while not done:
+            if total_steps < WARMUP_STEPS:
+                a = env.sample_action()
+                if arm == "ape2_shield":
+                    cand = a
+                    a = None
+                    for alpha in (1.0, 0.5, 0.25, 0.0):
+                        if (
+                            env.peek_tau_star(
+                                alpha * cand, sel._inflation(alpha * cand)
+                            )
+                            is None
+                        ):
+                            a = alpha * cand
+                            break
+                    if a is None:
+                        a = cand
+            elif arm == "ape2_shield":
+                a = sel.act(s, step=total_steps)
+            else:
+                a = agent.act(s, explore=True)
+
+            s2, r, done = env.step(a)
+            agent.buffer.add(s, a, r, s2, float(done))
+            agent.learn()
+            s = s2
+            total_steps += 1
+            block_steps += 1
+            if arm == "kinodynamic_shield":
+                block_interventions += int(not env._last_terminal_membership)
+                block_intervention_norm += env._last_intervention_norm
+
+        block_episode_wall_s.append(time.perf_counter() - episode_t0)
+        rolling.append(1 if env.on_goal >= env.goal_dwell else 0)
+
+        if (
+            stage_idx < len(STAGES) - 1
+            and len(rolling) == ADVANCE_WINDOW
+            and np.mean(rolling) >= ADVANCE_THRESHOLD
+        ):
+            stage_idx += 1
+            env.set_difficulty(*STAGES[stage_idx])
+            rolling.clear()
+            print(
+                f"[{arm} seed{seed}] ep {ep}: ADVANCE to stage "
+                f"{stage_idx} {STAGES[stage_idx]}",
+                flush=True,
+            )
+
+        if ep % EVAL_EVERY == 0 or ep == episodes:
+            ev = evaluate(eval_env, agent, arm, seed)
+            ev.update(
+                {
+                    "episode": ep,
+                    "stage": stage_idx,
+                    "actual_seed": seed,
+                    "train_rolling_succ": (
+                        float(np.mean(rolling)) if rolling else 0.0
+                    ),
+                    "wall_s": round(time.perf_counter() - t0, 1),
+                    "train_shield_stats": dict(sel.stats) if sel else {},
+                    "train_env_stats": (
+                        _kinodynamic_counts(env)
+                        if arm == "kinodynamic_shield"
+                        else {}
+                    ),
+                    # Block-local values make intervention-over-training trends
+                    # directly comparable at every EVAL_EVERY checkpoint.
+                    "train_intervention_rate": (
+                        block_interventions / block_steps
+                        if arm == "kinodynamic_shield"
+                        else None
+                    ),
+                    "train_mean_intervention_norm": (
+                        block_intervention_norm / block_steps
+                        if arm == "kinodynamic_shield"
+                        else None
+                    ),
+                    "train_episode_wall_s": [
+                        round(value, 6) for value in block_episode_wall_s
+                    ],
+                    "train_mean_episode_wall_s": float(
+                        np.mean(block_episode_wall_s)
+                    ),
+                }
+            )
+            history.append(ev)
+            no_safe = sel.stats["no_safe"] if sel else 0
+            intervention = ev["train_intervention_rate"]
+            intervention_text = (
+                f" | intervene {intervention:.3f}"
+                if intervention is not None
+                else ""
+            )
+            print(
+                f"[{arm} seed{seed}] ep {ep:>4} | stage {stage_idx} | "
+                f"succ {ev['success']:.2f} | true-coll {ev['collision']:.2f} "
+                f"| no_safe {no_safe}{intervention_text} | {ev['wall_s']}s",
+                flush=True,
+            )
+            block_steps = 0
+            block_interventions = 0
+            block_intervention_norm = 0.0
+            block_episode_wall_s = []
+
+    torch.save(
+        {
+            "actor": agent.actor.state_dict(),
+            "q1": agent.q1.state_dict(),
+            "q2": agent.q2.state_dict(),
+        },
+        out_dir / f"td3_{arm}_seed{seed}.pt",
+    )
+    return history
+
+exec
+/bin/bash -lc "sed -n '373,445p' code/KINODYNAMIC_ROADMAP.md && git status --short" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+## 6. Loop status log (append one line per iteration, newest first)
+
+- 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+  5 seeds, independently verified (JSON structure + pytest 78/78).
+  Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+  succ 0.00-0.07, collision 0.47-0.73, stuck at curriculum stage 0 the
+  entire run. Committed. All three Phase 5b arms now complete — wrote
+  the full Phase 5c analysis (`experiments/results/m6_kinodynamic/ANALYSIS.md`),
+  organized per §4's four metric categories, with real numbers pulled
+  from all three result JSONs. **Found and verified (by reading the
+  actual code, not guessing) a real replay-buffer action-consistency bug**
+  specific to the `kinodynamic_shield` arm — see the Phase 5 checklist
+  entry above and the analysis doc for full detail. This is very likely
+  why that arm failed to learn at all, and it should be fixed and
+  re-validated before any further seed scale-up (n=8-10 would just burn
+  compute on a confounded setup otherwise). Next: dispatch the fix.
+- 2026-07-17 iter18: `no_shield` (task `bd0iqcpc3`) finished, independently
+  verified — 5 seeds, all 800 episodes, succ range 0.17-0.53 / coll
+  0.37-0.63; seed2 never advanced past curriculum stage 0 (legitimate
+  training variance, rolling success never hit the 70% advance
+  threshold). Committed. `kinodynamic_shield` seed0 finished 800
+  episodes in 1099.7s (~1.37s/ep, matches the post-fix estimate) but its
+  success rate stayed near 0 (0.00-0.07) and it NEVER advanced past
+  curriculum stage 0, unlike `no_shield`/`ape2_shield` which both
+  reached stage 1-2 — worth flagging honestly in the Phase 5c writeup as
+  a real finding (possibly the velocity-action interface/hyperparameters
+  need their own tuning pass, not a like-for-like drop-in with delta-q's
+  tuned settings) rather than glossing over it. Collision rate stayed
+  high (63-77%) — expected, since the shield only guards joint-limit/
+  kinematic safety, not obstacle avoidance, which is still the policy's
+  job to learn. `load average` back down to ~11-17, no new
+  oversubscription. Continuing to monitor `kinodynamic_shield`'s
+  remaining 4 seeds.
+- 2026-07-17 iter17: thread-limiting fix confirmed working well.
+  `ape2_shield` (task `bzvrh4qk7`) finished cleanly — ~220s/seed (vs.
+  thousands of seconds/seed under the earlier oversubscription),
+  independently verified (commander): all 5 seeds present, each reached
+  final curriculum stage (stage 2), final succ/coll range 0.20-0.33 /
+  0.27-0.53 across seeds — meaningful cross-seed variance, exactly the
+  kind of spread n=2 would have risked missing. Committed
+  `m6_uoar_ape2_shield_salt0.json`. `no_shield` ~90% done (seed 4/5).
+  `kinodynamic_shield` now measuring ~1.39s/episode (600 eps in 831.3s)
+  — better than even the original smoke-test estimate, ~1.5h projected
+  total for all 5 seeds. Both remaining arms progressing normally,
+  continuing to monitor.
+- 2026-07-17 iter16: user checked in ~4h49m after the iter15 relaunch.
+  Found the three parallel processes were badly CPU-oversubscribed —
+  `load average 28` on a 16-core machine, each process using ~38 threads
+  / 450-620% CPU simultaneously (numpy/scipy/torch each spawning their
+  own BLAS/intra-op thread pools with no cap, ×3 concurrent processes).
+  Measured real throughput was ~38.7s/episode for `kinodynamic_shield`
+  under this contention — ~7x slower than the smoke-tested 5.6s/ep,
+  which would have meant ~43h total instead of the planned ~6.2h.
+  Progress at kill time: `no_shield` ~48% through (seed 2/5, ep400),
+  `ape2_shield` ~65% (seed 3/5, ep200), `kinodynamic_shield` only ~10%
+  (seed 0/5, ep400/800) — none had reached a seed boundary with results
+  flushed to disk (the script only assembles/writes its JSON after ALL
+  seeds of a run finish), so killing lost that in-progress compute, but
+  nothing corrupted or silently wrong was ever written. **Lesson: launching
+  N heavy ML training processes in parallel without capping each one's
+  thread count is a real trap — always set `OMP_NUM_THREADS`/
+  `MKL_NUM_THREADS`/`OPENBLAS_NUM_THREADS` (and check `uptime`/`top`
+  shortly after launch) when running more than one such job
+  concurrently on a shared machine.** Relaunched all three arms with
+  `OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4
+  NUMEXPR_NUM_THREADS=4` (3×4=12 of 16 cores, leaving headroom); 1-min
+  load average dropped from 28 to 16 within 30s of relaunch, per-process
+  CPU% dropped modestly (~1645%→~1262% combined) — a real but partial
+  fix (torch's own intra-op pool doesn't fully respect these env vars in
+  every build); will re-measure actual throughput at the next check-in
+  before deciding whether further tuning or an episode-count reduction
+  is needed. New task ids: `no_shield` `bd0iqcpc3`, `ape2_shield`
+  `bzvrh4qk7`, `kinodynamic_shield` `bqd7hcxt1`.
+?? code/experiments/logs/codex_phase5d.log
+
+codex
+The code matches the Phase 5c writeup exactly: `v_old` is already captured at the correct time, and the shared replay-buffer write sits after both warmup and learned-action branches. I’m adding the executed-action observation immediately after all three safety paths converge, then relabeling only the kinodynamic arm at that shared write.
+exec
+/bin/bash -lc "sed -n '35,125p' code/godynur/env.py && sed -n '1,90p' code/experiments/m6_kinodynamic_shield.py && sed -n '330,405p' code/experiments/m6_kinodynamic_shield.py" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+from .scenes import WS_HI, WS_LO, DynamicScene, sample_scene
+from .voxelizer import GridSpec, rasterize, rasterize_sdf
+
+
+class DynArmEnv:
+    dt = 0.05  # control interval (s)
+    action_bound = [-0.05, 0.05]  # rad per step per joint (lemma budget)
+    action_dim = 7
+    goal_tol = 0.05  # m
+    goal_dwell = 1  # reach = success (URPlanner phi_G semantics)
+    max_steps = 100
+
+    def __init__(
+        self,
+        speed: float = 0.5,
+        n_obstacles: int = 3,
+        reward_mode: str = "ct",  # 'uoar' | 'ct'
+        obstacles_in_state: bool = True,
+        a_r: float = 0.06,
+        a_o: float = 0.05,
+        k_frames: int = 3,
+        grid_n: int = 32,
+        zeta_c: float = 1.0,   # current-overlap weight (URPlanner zeta)
+        zeta_s: float = 1.0,   # swept-integral weight (CT mode)
+        zeta_t: float = 0.5,   # continuous-TTC weight (CT mode, bounded form)
+        task: str = "random",  # 'random' | 'tabletop' (URPlanner-style)
+        grid_mode: str = "binary",  # 'binary' | 'sdf' (advisor: SDF learns better)
+        closest_point_in_state: bool = False,  # advisor: d, direction, point
+        seed: int = 0,
+        action_mode: str = "delta_q",  # 'delta_q' | 'velocity'
+        dv_scale: np.ndarray | None = None,
+        safety_n_steps: int = 2,
+        brake_check_n_steps: int = 20,
+        brake_derate: float = 0.85,
+        lambda_intervention: float = 0.1,
+    ):
+        assert reward_mode in ("uoar", "ct")
+        assert task in ("random", "tabletop")
+        assert grid_mode in ("binary", "sdf")
+        assert action_mode in ("delta_q", "velocity")
+        self.task = task
+        self.grid_mode = grid_mode
+        self.closest_point_in_state = closest_point_in_state
+        self.action_mode = action_mode
+        self.kin = PandaKinematics()
+        self.speed = speed
+        self.n_obstacles = n_obstacles
+        self.reward_mode = reward_mode
+        self.obstacles_in_state = obstacles_in_state
+        self.a_r, self.a_o = a_r, a_o
+        self.zeta_c, self.zeta_s, self.zeta_t = zeta_c, zeta_s, zeta_t
+        self.k_frames = k_frames
+        self.spec = GridSpec(lo=WS_LO, hi=WS_HI, n=grid_n)
+        self.rng = np.random.default_rng(seed)
+        if action_mode == "velocity":
+            # Placeholder action scale for Phase 5 tuning: roughly the largest
+            # one-step velocity change reachable from rest under the jerk cap.
+            self.dv_scale = np.asarray(
+                panda.DQ_MAX * self.dt if dv_scale is None else dv_scale,
+                dtype=float,
+            )
+            assert self.dv_scale.shape == (self.action_dim,)
+            self.safety_n_steps = safety_n_steps
+            self.brake_check_n_steps = brake_check_n_steps
+            self.brake_derate = brake_derate
+            self.lambda_intervention = lambda_intervention
+            self.action_bound = [-1.0, 1.0]
+        # Fixed obstacle slots (zero-padded): curriculum can lower the LIVE
+        # obstacle count without changing the network's input width.
+        self.n_obstacles_max = n_obstacles
+        # 7 q + 3 flange + 3 goal + 3 delta + 1 dwell flag
+        self.state_dim = (
+            17
+            + (6 * n_obstacles if obstacles_in_state else 0)
+            + (7 if closest_point_in_state else 0)
+            + (9 if action_mode == "velocity" else 0)
+        )
+        # Episode stats maintained for Figure-1-style instrumentation.
+        self.last_tau_star: float | None = None
+        self.last_discrete_missed: bool = False
+        self.stats: dict[str, int] = {}
+
+    # ---- Morvan interface -------------------------------------------------
+
+    # Franka 'ready' pose (standard home configuration).
+    Q_HOME = np.array([0.0, -0.3, 0.0, -2.2, 0.0, 2.0, 0.79])
+    # Table-top goal region (URPlanner-style: goals above the table in
+    # front of the robot).
+    GOAL_LO = np.array([0.25, -0.35, 0.15])
+    GOAL_HI = np.array([0.70, 0.35, 0.70])
+
+"""M6 — Phase-5a comparison of delta-q and kinodynamic safety mechanisms.
+
+Arms (same TD3 hyperparameters, curriculum, task, and evaluation protocol):
+  no_shield          : delta-q actions with plain TD3
+  ape2_shield        : delta-q actions with the published APE2 shield
+  kinodynamic_shield : velocity actions with safety enforced by DynArmEnv
+
+This intentionally mirrors m4_shield.py's tabletop protocol.  The velocity
+arm does not use APE2: its QP, terminal-membership check, fallback, and
+emergency behavior are part of env.step().
+
+Cheap Phase-5 metrics available today are logged here.  Standalone joint-limit
+violation and inter-sample violation counters are deferred to a later Phase-5
+pass because the current shield prevents those events but does not expose
+separate counters for them.  Path length, jerk/energy cost, and per-QP timing
+are likewise deferred; episode wall time is recorded now as a coarse solve-
+overhead proxy without changing godynur instrumentation.
+
+Usage: .venv/bin/python experiments/m6_kinodynamic_shield.py [--episodes 300]
+       [--seeds 2] [--arms no_shield,ape2_shield,kinodynamic_shield]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from collections import deque
+from pathlib import Path
+
+import numpy as np
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from godynur.ape2 import APE2Shield  # noqa: E402
+from godynur.env import DynArmEnv  # noqa: E402
+from godynur.td3 import TD3  # noqa: E402
+
+WARMUP_STEPS = 1500
+EVAL_EVERY = 200
+EVAL_EPISODES = 30
+STAGES = [(0, 0.0), (2, 0.10), (3, 0.25)]
+ADVANCE_WINDOW = 100
+ADVANCE_THRESHOLD = 0.7
+
+ARMS = ("no_shield", "ape2_shield", "kinodynamic_shield")
+# Stable disjoint ranges mean arms never share a raw seed value, including
+# when a subset is launched separately.  --seed-salt follows m5_grid.py's
+# deconfounding convention and shifts every range together.
+ARM_SEED_STRIDE = 1_000_000
+
+
+def make_selector(env, agent, seed: int) -> APE2Shield:
+    def base_fn(s):
+        return agent.act(s, explore=False)
+
+    @torch.no_grad()
+    def q_fn(s, a):
+        st = torch.from_numpy(s[None].astype(np.float32))
+        at = torch.from_numpy((a / agent.action_scale)[None].astype(np.float32))
+        sa = torch.cat([st, at], 1)
+        return float(torch.min(agent.q1(sa), agent.q2(sa)))
+
+    return APE2Shield(
+        env, base_fn, q_fn, shield=True, seed=seed, anneal_steps=150_000
+    )
+
+
+def shielded_actor_action(env, agent, sel, s):
+    """M4's deployment-time certification ladder, unchanged."""
+    a = agent.act(s, explore=False)
+    if env.peek_tau_star(a, sel._inflation(a)) is None:
+        return a
+    cands = sel._candidates(s)
+    certified = [
+        c for c in cands
+        if env.peek_tau_star(c, sel._inflation(c)) is None
+    ]
+    if certified:
+        sel.stats["scaled"] += 1
+        return max(certified, key=lambda c: env.peek_reward(c))
+    for alpha in (0.5, 0.25, 0.125, 0.0):
+        if env.peek_tau_star(alpha * a, sel._inflation(alpha * a)) is None:
+            return alpha * a
+    sel.stats["no_safe"] += 1
+    cands = sel._candidates(s)
+    taus = [
+        (env.peek_tau_star(c, sel._inflation(c)) or np.inf, k)
+    return history
+
+
+def _parse_arms(value: str) -> list[str]:
+    arms = [arm.strip() for arm in value.split(",") if arm.strip()]
+    invalid = [arm for arm in arms if arm not in ARMS]
+    if not arms or invalid or len(set(arms)) != len(arms):
+        choices = ",".join(ARMS)
+        raise argparse.ArgumentTypeError(
+            f"choose a unique comma-separated subset of {choices}"
+        )
+    return arms
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--episodes", type=int, default=300)
+    ap.add_argument("--seeds", type=int, default=2)
+    ap.add_argument(
+        "--seed-salt",
+        type=int,
+        default=0,
+        help="added to disjoint per-arm seed ranges (M5 seed-confound fix)",
+    )
+    ap.add_argument(
+        "--arms",
+        type=_parse_arms,
+        default=list(ARMS),
+        help="comma-separated subset of no_shield,ape2_shield,kinodynamic_shield",
+    )
+    ap.add_argument("--reward-mode", type=str, default="uoar")
+    ap.add_argument(
+        "--out", type=str, default="experiments/results/m6_kinodynamic"
+    )
+    args = ap.parse_args()
+    if args.episodes < 1 or args.seeds < 1:
+        ap.error("--episodes and --seeds must be positive")
+    if args.seeds >= ARM_SEED_STRIDE:
+        ap.error(f"--seeds must be less than {ARM_SEED_STRIDE}")
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for arm in args.arms:
+        results[arm] = {}
+        arm_offset = ARMS.index(arm) * ARM_SEED_STRIDE
+        for seed_index in range(args.seeds):
+            actual_seed = args.seed_salt + arm_offset + seed_index
+            results[arm][seed_index] = run_one(
+                arm, args.reward_mode, args.episodes, actual_seed, out_dir
+            )
+
+    arm_tag = "-".join(args.arms)
+    json_path = out_dir / f"m6_{args.reward_mode}_{arm_tag}_salt{args.seed_salt}.json"
+    config = vars(args).copy()
+    config["arms"] = args.arms
+    with open(json_path, "w") as f:
+        json.dump(
+            {"config": config, "stages": STAGES, "results": results},
+            f,
+            indent=2,
+        )
+
+    for arm in results:
+        fin = [results[arm][seed][-1] for seed in results[arm]]
+        print(
+            f"{arm:>19} final: succ "
+            f"{np.mean([record['success'] for record in fin]):.2f} "
+            f"| true-coll "
+            f"{np.mean([record['collision'] for record in fin]):.2f}"
+        )
+    print(f"results: {json_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+exec
+/bin/bash -lc "source .venv/bin/activate && PYTHONPATH=. python - <<'PY'
+import numpy as np
+from godynur.env import DynArmEnv
+from godynur.panda import Q_MIN,Q_MAX
+for value in (0.01,0.1,0.5,1.0):
+    env=DynArmEnv(action_mode='velocity',n_obstacles=0,obstacles_in_state=False,seed=11)
+    env.reset(); env.q=(Q_MIN+Q_MAX)/2
+    old=env.v.copy(); u=np.full(7,value); env.step(u)
+    print(value, 'accepted', env._last_terminal_membership, 'effective', (env.v-old)/env.dv_scale, 'v', env.v, 'dv_scale', env.dv_scale)
+PY" in /home/han/claude_project/papper-research/code
+ succeeded in 512ms:
+0.01 accepted True effective [0. 0. 0. 0. 0. 0. 0.] v [0. 0. 0. 0. 0. 0. 0.] dv_scale [0.10875 0.10875 0.10875 0.10875 0.1305  0.1305  0.1305 ]
+0.1 accepted True effective [0.00015601 0.00015601 0.00015601 0.00015601 0.00015601 0.00015601
+ 0.00015601] v [1.69656786e-05 1.69656786e-05 1.69656786e-05 1.69656786e-05
+ 2.03588144e-05 2.03588144e-05 2.03588144e-05] dv_scale [0.10875 0.10875 0.10875 0.10875 0.1305  0.1305  0.1305 ]
+0.5 accepted True effective [0.00078003 0.00078003 0.00078003 0.00078003 0.00078003 0.00078003
+ 0.00078003] v [8.48283931e-05 8.48283931e-05 8.48283931e-05 8.48283931e-05
+ 1.01794072e-04 1.01794072e-04 1.01794072e-04] dv_scale [0.10875 0.10875 0.10875 0.10875 0.1305  0.1305  0.1305 ]
+1.0 accepted True effective [0.00156006 0.00156006 0.00156006 0.00156006 0.00156006 0.00156006
+ 0.00156006] v [0.00016966 0.00016966 0.00016966 0.00016966 0.00020359 0.00020359
+ 0.00020359] dv_scale [0.10875 0.10875 0.10875 0.10875 0.1305  0.1305  0.1305 ]
+
+exec
+/bin/bash -lc "sed -n '392,431p' godynur/env.py && rg -n \"v_nom|objective|Minimize\" godynur/safety_qp.py && sed -n '120,230p' godynur/safety_qp.py" in /home/han/claude_project/papper-research/code
+ succeeded in 0ms:
+    def _kinodynamic_update(
+        self, jerks: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        next_states = np.array(
+            [
+                kinodynamics.discrete_update(
+                    np.array([self.q[i], self.v[i], self.a[i]]),
+                    jerks[i],
+                    self.dt,
+                )
+                for i in range(self.action_dim)
+            ]
+        )
+        return next_states[:, 0], next_states[:, 1], next_states[:, 2]
+
+    def _braking_witness_jerks(
+        self, q: np.ndarray, v: np.ndarray, a: np.ndarray
+    ) -> np.ndarray | None:
+        jerks = []
+        for i in range(self.action_dim):
+            jerk = kinodynamics.braking_witness_jerk(
+                q[i],
+                v[i],
+                a[i],
+                self.dt,
+                self.brake_check_n_steps,
+                Q_MIN[i],
+                Q_MAX[i],
+                -DQ_MAX[i],
+                DQ_MAX[i],
+                -self.brake_derate * panda.DDQ_MAX[i],
+                self.brake_derate * panda.DDQ_MAX[i],
+                -self.brake_derate * panda.DDDQ_MAX[i],
+                self.brake_derate * panda.DDDQ_MAX[i],
+            )
+            if jerk is None:
+                return None
+            jerks.append(jerk)
+        return np.asarray(jerks)
+
+175:    v_nom,
+195:    SLSQP solves a linearly constrained quadratic objective using evenly
+208:        "v_nom": _vector("v_nom", v_nom, m),
+220:    v_nom = vectors["v_nom"]
+290:    def objective(jerk_flat: np.ndarray) -> float:
+291:        velocity_error = v1_offset + v1_matrix @ jerk_flat - v_nom
+297:    def objective_jacobian(jerk_flat: np.ndarray) -> np.ndarray:
+298:        velocity_error = v1_offset + v1_matrix @ jerk_flat - v_nom
+354:            objective,
+357:            jac=objective_jacobian,
+            first_velocity,
+        )
+    )
+
+
+def _certify_candidate(
+    jerk_sequence: np.ndarray,
+    q0: np.ndarray,
+    v0: np.ndarray,
+    a0: np.ndarray,
+    h: float,
+    q_min: np.ndarray,
+    q_max: np.ndarray,
+    v_min: np.ndarray,
+    v_max: np.ndarray,
+    a_min: np.ndarray,
+    a_max: np.ndarray,
+    j_min: np.ndarray,
+    j_max: np.ndarray,
+    require_terminal_stop: bool,
+) -> tuple[bool, np.ndarray | None]:
+    """Replay and certify a candidate against the original hard limits."""
+    m, n_steps = jerk_sequence.shape
+    first_velocity = np.empty(m)
+    for joint in range(m):
+        state = np.array([q0[joint], v0[joint], a0[joint]], dtype=float)
+        bounds = (
+            q_min[joint],
+            q_max[joint],
+            v_min[joint],
+            v_max[joint],
+            a_min[joint],
+            a_max[joint],
+            j_min[joint],
+            j_max[joint],
+        )
+        for step in range(n_steps):
+            jerk = float(jerk_sequence[joint, step])
+            if not interval_within_limits(*state, jerk, h, *bounds):
+                return False, None
+            state = discrete_update(state, jerk, h)
+            if step == 0:
+                first_velocity[joint] = state[1]
+        if require_terminal_stop:
+            if abs(float(state[1])) > _TERMINAL_TOL:
+                return False, None
+            if abs(float(state[2])) > _TERMINAL_TOL:
+                return False, None
+    return True, first_velocity
+
+
+def solve_safety_qp(
+    q0,
+    v0,
+    a0,
+    v_nom,
+    h,
+    n_steps,
+    q_min,
+    q_max,
+    v_min,
+    v_max,
+    a_min,
+    a_max,
+    j_min,
+    j_max,
+    weights=None,
+    lambda_j=1e-3,
+    collocation_points=5,
+    margin_shrink_frac=0.02,
+    max_retries=3,
+    require_terminal_stop: bool = True,
+) -> SafetyQPResult:
+    """Solve and exactly certify an ``N``-step jerk sequence.
+
+    SLSQP solves a linearly constrained quadratic objective using evenly
+    spaced position/velocity collocation points.  If exact interval
+    certification rejects its candidate, the position and velocity boxes are
+    tightened on each retry.  Terminal stopping is enforced unless
+    ``require_terminal_stop`` is false. No uncertified sequence is ever
+    returned.
+    """
+    started = perf_counter()
+    q0 = _vector("q0", q0)
+    m = q0.size
+    vectors = {
+        "v0": _vector("v0", v0, m),
+        "a0": _vector("a0", a0, m),
+        "v_nom": _vector("v_nom", v_nom, m),
+        "q_min": _vector("q_min", q_min, m),
+        "q_max": _vector("q_max", q_max, m),
+        "v_min": _vector("v_min", v_min, m),
+        "v_max": _vector("v_max", v_max, m),
+        "a_min": _vector("a_min", a_min, m),
+        "a_max": _vector("a_max", a_max, m),
+        "j_min": _vector("j_min", j_min, m),
+        "j_max": _vector("j_max", j_max, m),
+    }
+    v0 = vectors["v0"]
+    a0 = vectors["a0"]
+    v_nom = vectors["v_nom"]
+    q_min, q_max = vectors["q_min"], vectors["q_max"]
+    v_min, v_max = vectors["v_min"], vectors["v_max"]
+    a_min, a_max = vectors["a_min"], vectors["a_max"]
+    j_min, j_max = vectors["j_min"], vectors["j_max"]
+
+    h = float(h)
+    if not np.isfinite(h) or h <= 0.0:
+        raise ValueError("h must be positive and finite")
+    n_steps = _positive_integer("n_steps", n_steps)
+    collocation_points = _positive_integer(
+
+exec
+/bin/bash -lc "sed -n '270,315p' godynur/safety_qp.py && sed -n '1,90p' godynur/kinodynamics.py" in /home/han/claude_project/papper-research/code
+ succeeded in 0ms:
+        return _trajectory_quantities(
+            jerk_flat, q0, v0, a0, h, n_steps, collocation_times
+        )
+
+    affine_offset, affine_matrix = _affine_map(quantities, n_variables)
+    box_offset = affine_offset[:box_count]
+    box_matrix = affine_matrix[:box_count]
+    terminal_offset = affine_offset[box_count : box_count + terminal_count]
+    terminal_matrix = affine_matrix[box_count : box_count + terminal_count]
+    v1_offset = affine_offset[-m:]
+    v1_matrix = affine_matrix[-m:]
+
+    jerk_lower = np.repeat(j_min, n_steps)
+    jerk_upper = np.repeat(j_max, n_steps)
+    optimizer_bounds = Bounds(jerk_lower, jerk_upper)
+    if require_terminal_stop:
+        terminal_constraint = LinearConstraint(
+            terminal_matrix, -terminal_offset, -terminal_offset
+        )
+
+    def objective(jerk_flat: np.ndarray) -> float:
+        velocity_error = v1_offset + v1_matrix @ jerk_flat - v_nom
+        return float(
+            np.dot(weights, velocity_error * velocity_error)
+            + lambda_j * np.dot(jerk_flat, jerk_flat)
+        )
+
+    def objective_jacobian(jerk_flat: np.ndarray) -> np.ndarray:
+        velocity_error = v1_offset + v1_matrix @ jerk_flat - v_nom
+        tracking_gradient = 2.0 * (
+            v1_matrix.T @ (weights * velocity_error)
+        )
+        return tracking_gradient + 2.0 * lambda_j * jerk_flat
+
+    # A terminal least-squares solution is a more useful start when a full
+    # stop is required. Otherwise zero jerk is neutral for the box-only QP.
+    if require_terminal_stop:
+        initial, *_ = np.linalg.lstsq(
+            terminal_matrix, -terminal_offset, rcond=None
+        )
+    else:
+        initial = np.zeros(n_variables)
+    initial = np.clip(initial, jerk_lower, jerk_upper)
+
+    q_range = q_max - q_min
+    v_range = v_max - v_min
+"""Single-joint jerk dynamics and continuous-interval limit checks.
+
+The control input is constant jerk over one control period.  Consequently,
+acceleration is linear, velocity is quadratic, and position is cubic in
+``tau``.  Position and velocity extrema are found from their analytic
+critical points; no time sampling is used.
+"""
+
+from __future__ import annotations
+
+from typing import NamedTuple
+
+import numpy as np
+
+_EPS = 1e-12
+
+
+class IntervalExtrema(NamedTuple):
+    """True position and velocity extrema over one closed interval."""
+
+    q_min: float
+    q_max: float
+    v_min: float
+    v_max: float
+
+
+def _positive_period(h: float) -> float:
+    h = float(h)
+    if h <= 0.0:
+        raise ValueError("control period h must be positive")
+    return h
+
+
+def discrete_matrices(h: float) -> tuple[np.ndarray, np.ndarray]:
+    """Return the exact one-step matrices ``A`` and ``B`` for period ``h``."""
+    h = _positive_period(h)
+    A = np.array(
+        [
+            [1.0, h, 0.5 * h**2],
+            [0.0, 1.0, h],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    B = np.array([h**3 / 6.0, 0.5 * h**2, h])
+    return A, B
+
+
+def discrete_update(state: np.ndarray, j: float, h: float) -> np.ndarray:
+    """Advance one exact jerk-controlled step from state ``(q, v, a)``."""
+    state = np.asarray(state, dtype=float)
+    if state.shape != (3,):
+        raise ValueError("state must have shape (3,) for (q, v, a)")
+    A, B = discrete_matrices(h)
+    return A @ state + B * float(j)
+
+
+def acceleration(a0: float, j: float, tau: float) -> float:
+    """Acceleration ``a(tau)`` under constant jerk ``j``."""
+    return float(a0) + float(j) * float(tau)
+
+
+def velocity(v0: float, a0: float, j: float, tau: float) -> float:
+    """Velocity ``v(tau)`` under constant jerk ``j``."""
+    tau = float(tau)
+    return float(v0) + float(a0) * tau + 0.5 * float(j) * tau**2
+
+
+def position(q0: float, v0: float, a0: float, j: float, tau: float) -> float:
+    """Position ``q(tau)`` under constant jerk ``j``."""
+    tau = float(tau)
+    return (
+        float(q0)
+        + float(v0) * tau
+        + 0.5 * float(a0) * tau**2
+        + float(j) * tau**3 / 6.0
+    )
+
+
+def chord_deviation_bound(
+    q0: float, v0: float, a0: float, j: float, h: float
+) -> float:
+    """Return the exact maximum joint deviation from its endpoint chord.
+
+    For ``lin(tau) = q0 + (q(h) - q0) * tau / h``, the difference
+    ``d(tau) = q(tau) - lin(tau)`` is cubic and is zero at both endpoints.
+    Its only possible nonzero extrema are therefore at the real roots of
+    the quadratic ``d'(tau)`` inside ``[0, h]``.
+    """
+    h = _positive_period(h)
+    q0, v0, a0, j = map(float, (q0, v0, a0, j))
+
+exec
+/bin/bash -lc "source .venv/bin/activate && PYTHONPATH=. python - <<'PY'
+import numpy as np
+from godynur.env import DynArmEnv
+from godynur.panda import Q_MIN,Q_MAX,DDQ_MAX
+for factor in (0.001,0.01,0.05):
+ env=DynArmEnv(action_mode='velocity',n_obstacles=0,obstacles_in_state=False,seed=11)
+ env.reset(); env.q=(Q_MIN+Q_MAX)/2; env.a=factor*DDQ_MAX
+ old=env.v.copy(); u=env.a*env.dt/env.dv_scale
+ env.step(u)
+ eff=(env.v-old)/env.dv_scale
+ print(factor,'u',u,'accepted',env._last_terminal_membership,'eff',eff,'diff',np.max(np.abs(eff-u)),'newa',env.a)
+PY" in /home/han/claude_project/papper-research/code
+ succeeded in 509ms:
+0.001 u [0.00229885 0.00229885 0.00229885 0.00229885 0.00287356 0.00287356
+ 0.00287356] accepted True eff [0.00229885 0.00229885 0.00229885 0.00229885 0.00287356 0.00287356
+ 0.00287356] diff 0.0 newa [0.005  0.005  0.005  0.005  0.0075 0.0075 0.0075]
+0.01 u [0.02298851 0.02298851 0.02298851 0.02298851 0.02873563 0.02873563
+ 0.02873563] accepted True eff [0.02298851 0.02298851 0.02298851 0.02298851 0.02873563 0.02873563
+ 0.02873563] diff 0.0 newa [0.05  0.05  0.05  0.05  0.075 0.075 0.075]
+0.05 u [0.11494253 0.11494253 0.11494253 0.11494253 0.14367816 0.14367816
+ 0.14367816] accepted True eff [0.11494253 0.11494253 0.11494253 0.11494253 0.14367816 0.14367816
+ 0.14367816] diff 0.0 newa [0.25  0.25  0.25  0.25  0.375 0.375 0.375]
+
+apply patch
+patch: completed
+/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py
+/home/han/claude_project/papper-research/code/godynur/env.py
+/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+exec
+/bin/bash -lc 'git diff -- code/godynur/env.py code/experiments/m6_kinodynamic_shield.py code/tests/test_env_velocity_mode.py && source .venv/bin/activate && PYTHONPATH=. python -m pytest tests/test_env_velocity_mode.py -q' in /home/han/claude_project/papper-research/code
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+ succeeded in 756ms:
+...........                                                              [100%]
+11 passed in 0.47s
+
+codex
+The focused velocity-mode tests pass, including a nonzero accepted command whose effective action exactly reconstructs the request and the existing near-limit fallback scenario whose label changes. I’m moving on to the full regression suite before spending time on the training probe.
+exec
+/bin/bash -lc 'git diff --check && git diff -- godynur/env.py experiments/m6_kinodynamic_shield.py tests/test_env_velocity_mode.py && source .venv/bin/activate && PYTHONPATH=. python -m pytest tests -q' in /home/han/claude_project/papper-research/code
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+ succeeded in 24040ms:
+........................................................................ [ 91%]
+.......                                                                  [100%]
+79 passed in 23.12s
+
+codex
+The full suite is clean: `79 passed in 23.12s` (78 existing tests plus the new regression). I’m now launching the one requested seed-salt-100, 400-episode kinodynamic-only probe into `/tmp/m6_fix_probe`; I’ll report its ep-400 success, stage, and intervention rate against the committed salt-0 seed-0 checkpoint.
+exec
+/bin/bash -lc 'cd code && source .venv/bin/activate && OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4 PYTHONPATH=. python experiments/m6_kinodynamic_shield.py --episodes 400 --seeds 1 --seed-salt 100 --arms kinodynamic_shield --out /tmp/m6_fix_probe' in /home/han/claude_project/papper-research
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+The probe is running normally and has not reached its first reporting checkpoint yet (the script logs only every 200 episodes). No tracked result files are being touched.
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+The run remains healthy after roughly two minutes; it is compute-bound as expected, with no errors or premature exit. I’m continuing only this prescribed probe and will stop after its ep-400 checkpoint.
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+At ep 200 the fixed probe is still at stage 0, with success `0.03` and intervention rate `0.193`. That is only an interim checkpoint; I’m waiting for ep 400 before judging it against the requested baseline.
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+The second 200-episode block is still running without errors. The interim numbers do not yet show an obvious curriculum breakthrough, but I’ll use the completed JSON rather than extrapolating.
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+ succeeded in 364300ms:
+[kinodynamic_shield seed2000100] ep  200 | stage 0 | succ 0.03 | true-coll 0.73 | no_safe 0 | intervene 0.193 | 178.6s
+[kinodynamic_shield seed2000100] ep  400 | stage 0 | succ 0.00 | true-coll 0.70 | no_safe 0 | intervene 0.214 | 361.8s
+ kinodynamic_shield final: succ 0.00 | true-coll 0.70
+results: /tmp/m6_fix_probe/m6_uoar_kinodynamic_shield_salt100.json
+
+codex
+The probe is around the expected runtime and still progressing. I’m waiting for the final checkpoint and artifact write, then I’ll extract both probe and baseline fields programmatically and add the required newest-first roadmap line.
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+exec
+/bin/bash -lc "python - <<'PY'
+import json
+from pathlib import Path
+paths = {
+    'fixed': Path('/tmp/m6_fix_probe/m6_uoar_kinodynamic_shield_salt100.json'),
+    'baseline': Path('code/experiments/results/m6_kinodynamic/m6_uoar_kinodynamic_shield_salt0.json'),
+}
+for label, path in paths.items():
+    data = json.loads(path.read_text())
+    record = next(
+        item for item in data['results']['kinodynamic_shield']['0']
+        if item['episode'] == 400
+    )
+    print(label, {key: record[key] for key in ('episode', 'success', 'stage', 'train_intervention_rate', 'collision', 'actual_seed')})
+PY" in /home/han/claude_project/papper-research
+ exited 127 in 0ms:
+/bin/bash: line 1: python: command not found
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+exec
+/bin/bash -lc "source code/.venv/bin/activate && python - <<'PY'
+import json
+from pathlib import Path
+paths = {
+    'fixed': Path('/tmp/m6_fix_probe/m6_uoar_kinodynamic_shield_salt100.json'),
+    'baseline': Path('code/experiments/results/m6_kinodynamic/m6_uoar_kinodynamic_shield_salt0.json'),
+}
+for label, path in paths.items():
+    data = json.loads(path.read_text())
+    record = next(
+        item for item in data['results']['kinodynamic_shield']['0']
+        if item['episode'] == 400
+    )
+    print(label, {key: record[key] for key in ('episode', 'success', 'stage', 'train_intervention_rate', 'collision', 'actual_seed')})
+PY" in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+fixed {'episode': 400, 'success': 0.0, 'stage': 0, 'train_intervention_rate': 0.214436301576147, 'collision': 0.7, 'actual_seed': 2000100}
+baseline {'episode': 400, 'success': 0.03333333333333333, 'stage': 0, 'train_intervention_rate': 0.20135474159558456, 'collision': 0.6666666666666666, 'actual_seed': 2000000}
+
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+The completed probe is plainly still stuck: at ep 400 it has success `0.00`, stage `0`, and intervention rate `0.214`, versus the committed pre-fix seed-0 checkpoint’s `0.033`, stage `0`, and `0.201`. I’m recording that negative result honestly: the relabeling fixes transition consistency, but this one-seed short probe shows no learning improvement and suggests another blocker remains.
+apply patch
+patch: completed
+/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md
+diff --git a/code/KINODYNAMIC_ROADMAP.md b/code/KINODYNAMIC_ROADMAP.md
+index aceee88927b77582c91d717836610578ff8cbfbc..489fe469c14ccdc40fc336b51a578f560d238659
+--- a/code/KINODYNAMIC_ROADMAP.md
++++ b/code/KINODYNAMIC_ROADMAP.md
+@@ -372,6 +372,14 @@
+ 
+ ## 6. Loop status log (append one line per iteration, newest first)
+ 
++- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
++  consistency bug by exposing the effective executed velocity action and
++  storing it for both warmup and learned transitions. The prescribed
++  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
++  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
++  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
++  integrity, but this short one-seed probe shows no learning improvement and
++  indicates another blocker likely remains.
+ - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+   5 seeds, independently verified (JSON structure + pytest 78/78).
+   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/KINODYNAMIC_ROADMAP.md b/code/KINODYNAMIC_ROADMAP.md
+index aceee88927b77582c91d717836610578ff8cbfbc..489fe469c14ccdc40fc336b51a578f560d238659
+--- a/code/KINODYNAMIC_ROADMAP.md
++++ b/code/KINODYNAMIC_ROADMAP.md
+@@ -372,6 +372,14 @@
+ 
+ ## 6. Loop status log (append one line per iteration, newest first)
+ 
++- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
++  consistency bug by exposing the effective executed velocity action and
++  storing it for both warmup and learned transitions. The prescribed
++  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
++  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
++  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
++  integrity, but this short one-seed probe shows no learning improvement and
++  indicates another blocker likely remains.
+ - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+   5 seeds, independently verified (JSON structure + pytest 78/78).
+   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+exec
+/bin/bash -lc 'git diff --check && git status --short && git diff --stat && git diff -- code/KINODYNAMIC_ROADMAP.md code/godynur/env.py code/experiments/m6_kinodynamic_shield.py code/tests/test_env_velocity_mode.py' in /home/han/claude_project/papper-research
+ succeeded in 0ms:
+ M code/KINODYNAMIC_ROADMAP.md
+ M code/experiments/m6_kinodynamic_shield.py
+ M code/godynur/env.py
+ M code/tests/test_env_velocity_mode.py
+?? code/experiments/logs/codex_phase5d.log
+ code/KINODYNAMIC_ROADMAP.md               |  8 +++++++
+ code/experiments/m6_kinodynamic_shield.py |  7 +++++-
+ code/godynur/env.py                       |  2 ++
+ code/tests/test_env_velocity_mode.py      | 37 +++++++++++++++++++++++++++++++
+ 4 files changed, 53 insertions(+), 1 deletion(-)
+diff --git a/code/KINODYNAMIC_ROADMAP.md b/code/KINODYNAMIC_ROADMAP.md
+index aceee88..489fe46 100644
+--- a/code/KINODYNAMIC_ROADMAP.md
++++ b/code/KINODYNAMIC_ROADMAP.md
+@@ -372,6 +372,14 @@ disclosure style for the original `eps_lin`).
+ 
+ ## 6. Loop status log (append one line per iteration, newest first)
+ 
++- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
++  consistency bug by exposing the effective executed velocity action and
++  storing it for both warmup and learned transitions. The prescribed
++  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
++  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
++  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
++  integrity, but this short one-seed probe shows no learning improvement and
++  indicates another blocker likely remains.
+ - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+   5 seeds, independently verified (JSON structure + pytest 78/78).
+   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca220..d6f1e6b 100644
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@ def run_one(
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0..fed244c 100644
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@ class DynArmEnv:
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e9..ed944c5 100644
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@ def test_velocity_collision_check_receives_cubic_linearization_inflation():
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+diff --git a/code/KINODYNAMIC_ROADMAP.md b/code/KINODYNAMIC_ROADMAP.md
+index aceee88927b77582c91d717836610578ff8cbfbc..489fe469c14ccdc40fc336b51a578f560d238659
+--- a/code/KINODYNAMIC_ROADMAP.md
++++ b/code/KINODYNAMIC_ROADMAP.md
+@@ -372,6 +372,14 @@
+ 
+ ## 6. Loop status log (append one line per iteration, newest first)
+ 
++- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
++  consistency bug by exposing the effective executed velocity action and
++  storing it for both warmup and learned transitions. The prescribed
++  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
++  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
++  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
++  integrity, but this short one-seed probe shows no learning improvement and
++  indicates another blocker likely remains.
+ - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+   5 seeds, independently verified (JSON structure + pytest 78/78).
+   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+codex
+Implemented the replay-buffer relabeling fix.
+
+Files changed:
+
+- [env.py](/home/han/claude_project/papper-research/code/godynur/env.py)
+- [m6_kinodynamic_shield.py](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py)
+- [test_env_velocity_mode.py](/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Pytest: `79 passed in 23.12s`
+
+Probe command:
+
+```bash
+cd code && source .venv/bin/activate && OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4 PYTHONPATH=. python experiments/m6_kinodynamic_shield.py --episodes 400 --seeds 1 --seed-salt 100 --arms kinodynamic_shield --out /tmp/m6_fix_probe
+```
+
+Ep-400 comparison:
+
+| Run | Success | Stage | Intervention rate |
+|---|---:|---:|---:|
+| Fixed, salt 100 | 0.000 | 0 | 0.214 |
+| Pre-fix baseline, salt 0 seed 0 | 0.033 | 0 | 0.201 |
+
+Assessment: the fix restores replay-buffer consistency, but this short probe showed no learning improvement. The arm remains stuck at stage 0, suggesting another learning blocker likely remains.
+diff --git a/code/KINODYNAMIC_ROADMAP.md b/code/KINODYNAMIC_ROADMAP.md
+index aceee88927b77582c91d717836610578ff8cbfbc..489fe469c14ccdc40fc336b51a578f560d238659
+--- a/code/KINODYNAMIC_ROADMAP.md
++++ b/code/KINODYNAMIC_ROADMAP.md
+@@ -372,6 +372,14 @@
+ 
+ ## 6. Loop status log (append one line per iteration, newest first)
+ 
++- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
++  consistency bug by exposing the effective executed velocity action and
++  storing it for both warmup and learned transitions. The prescribed
++  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
++  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
++  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
++  integrity, but this short one-seed probe shows no learning improvement and
++  indicates another blocker likely remains.
+ - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+   5 seeds, independently verified (JSON structure + pytest 78/78).
+   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+diff --git a/code/experiments/m6_kinodynamic_shield.py b/code/experiments/m6_kinodynamic_shield.py
+index f4ca2202a38e249795a86df18dc5348bfb6cd68a..d6f1e6bd82abb228d9480b22bb2ae565719e6a6f
+--- a/code/experiments/m6_kinodynamic_shield.py
++++ b/code/experiments/m6_kinodynamic_shield.py
+@@ -237,7 +237,12 @@
+                 a = agent.act(s, explore=True)
+ 
+             s2, r, done = env.step(a)
+-            agent.buffer.add(s, a, r, s2, float(done))
++            buffer_action = (
++                env._last_executed_action
++                if arm == "kinodynamic_shield"
++                else a
++            )
++            agent.buffer.add(s, buffer_action, r, s2, float(done))
+             agent.learn()
+             s = s2
+             total_steps += 1
+diff --git a/code/godynur/env.py b/code/godynur/env.py
+index 0fbb5c0b3ff2be5204928ad062d4cedeae27b40a..fed244c272d3835e5347a5d37b314bc8d76d6c4d
+--- a/code/godynur/env.py
++++ b/code/godynur/env.py
+@@ -258,6 +258,8 @@
+                     self.stats.get("shield_emergency", 0) + 1
+                 )
+ 
++        u_executed = (v_new - v_old) / self.dv_scale
++        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
+         eps_cubic = kinodynamics.cubic_linearization_bound(
+             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
+         )
+diff --git a/code/tests/test_env_velocity_mode.py b/code/tests/test_env_velocity_mode.py
+index f8246e98e56232e5bd4e0d63b212419c594d7c60..ed944c519ecaabcb773259951dfcf1ea93fb1023
+--- a/code/tests/test_env_velocity_mode.py
++++ b/code/tests/test_env_velocity_mode.py
+@@ -179,3 +179,40 @@
+ 
+     assert expected > 0.0
+     assert seen["inflation"] == pytest.approx(expected)
++
++
++def test_executed_action_tracks_accepted_request_and_relabels_fallback():
++    accepted_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=17,
++    )
++    accepted_env.reset()
++    accepted_env.q = (Q_MIN + Q_MAX) / 2.0
++    accepted_env.a = 0.01 * DDQ_MAX
++    requested = accepted_env.a * accepted_env.dt / accepted_env.dv_scale
++
++    accepted_env.step(requested)
++
++    assert accepted_env._last_terminal_membership
++    assert np.allclose(accepted_env._last_executed_action, requested)
++
++    fallback_env = DynArmEnv(
++        action_mode="velocity",
++        n_obstacles=0,
++        obstacles_in_state=False,
++        seed=18,
++    )
++    fallback_env.reset()
++    fallback_env.q = (Q_MIN + Q_MAX) / 2.0
++    fallback_env.q[0] = Q_MAX[0] - 0.01
++    fallback_env.v = np.zeros(7)
++    fallback_env.v[0] = 0.05 * DQ_MAX[0]
++    fallback_env.a = np.zeros(7)
++    requested = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++
++    fallback_env.step(requested)
++
++    assert fallback_env.stats["shield_fallback"] == 1
++    assert not np.allclose(fallback_env._last_executed_action, requested)
+
+tokens used
+118,151
+Implemented the replay-buffer relabeling fix.
+
+Files changed:
+
+- [env.py](/home/han/claude_project/papper-research/code/godynur/env.py)
+- [m6_kinodynamic_shield.py](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py)
+- [test_env_velocity_mode.py](/home/han/claude_project/papper-research/code/tests/test_env_velocity_mode.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Pytest: `79 passed in 23.12s`
+
+Probe command:
+
+```bash
+cd code && source .venv/bin/activate && OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4 PYTHONPATH=. python experiments/m6_kinodynamic_shield.py --episodes 400 --seeds 1 --seed-salt 100 --arms kinodynamic_shield --out /tmp/m6_fix_probe
+```
+
+Ep-400 comparison:
+
+| Run | Success | Stage | Intervention rate |
+|---|---:|---:|---:|
+| Fixed, salt 100 | 0.000 | 0 | 0.214 |
+| Pre-fix baseline, salt 0 seed 0 | 0.033 | 0 | 0.201 |
+
+Assessment: the fix restores replay-buffer consistency, but this short probe showed no learning improvement. The arm remains stuck at stage 0, suggesting another learning blocker likely remains.

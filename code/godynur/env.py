@@ -258,6 +258,8 @@ class DynArmEnv:
                     self.stats.get("shield_emergency", 0) + 1
                 )
 
+        u_executed = (v_new - v_old) / self.dv_scale
+        self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
         eps_cubic = kinodynamics.cubic_linearization_bound(
             q_old, v_old, a_old, executed_jerks, self.dt, self.kin
         )

@@ -237,7 +237,12 @@ def run_one(
                 a = agent.act(s, explore=True)
 
             s2, r, done = env.step(a)
-            agent.buffer.add(s, a, r, s2, float(done))
+            buffer_action = (
+                env._last_executed_action
+                if arm == "kinodynamic_shield"
+                else a
+            )
+            agent.buffer.add(s, buffer_action, r, s2, float(done))
             agent.learn()
             s = s2
             total_steps += 1

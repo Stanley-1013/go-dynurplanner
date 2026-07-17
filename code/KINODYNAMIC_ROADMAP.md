@@ -372,6 +372,41 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter21: independently verified iter20's fix (commander) —
+  diff is exactly the specified change (`env.py`: `_last_executed_action
+  = clip((v_new-v_old)/dv_scale, -1, 1)`, set unconditionally after all
+  three branches converge; `m6_kinodynamic_shield.py`: uses it in place
+  of raw `a` only for the `kinodynamic_shield` arm, placed once before
+  the shared buffer-add call so it covers both warmup and post-warmup
+  paths); reran pytest myself, 79/79. Codex's probe (n=1 seed, 400
+  episodes, pre- vs post-fix) was honestly reported as inconclusive —
+  the fix is real and necessary, but that tiny single-seed comparison
+  can't establish whether it's SUFFICIENT alone; correctly did not
+  overclaim.
+  **Additional hypothesis worth testing before concluding anything is
+  "broken"**: velocity-mode control is a strictly harder credit-
+  assignment problem than delta-q — the policy's action now influences
+  the task-relevant flange position through TWO integration steps
+  (u→v→q) instead of one (u→q directly), and `dv_scale`'s conservative
+  placeholder value means each step's achievable velocity change is
+  small, stretching the effective task horizon further. The historical
+  delta-q+shield baseline (`m4v2.log`) itself needed most of its
+  3000-episode budget to reach good performance — 800 episodes may
+  simply be too short for velocity mode to bootstrap at all, independent
+  of the (still worth having fixed) buffer bug. Testing this directly:
+  launching a single-seed, 3000-episode `kinodynamic_shield` run (with
+  the fix applied, matching the historical M4 episode budget) rather
+  than immediately re-running the full 5-seed comparison — cheaper way
+  to falsify/support the "just needs more time" hypothesis before
+  committing more compute to a possibly-still-broken setup.
+- 2026-07-18 iter20: fixed Phase 5c's kinodynamic replay-buffer action-
+  consistency bug by exposing the effective executed velocity action and
+  storing it for both warmup and learned transitions. The prescribed
+  400-episode salt100 probe was **still stuck** at stage 0: ep400 succ 0.00
+  and intervention rate 0.214, versus the pre-fix salt0 seed0 checkpoint's
+  succ 0.033, stage 0, and intervention rate 0.201. The fix restores data
+  integrity, but this short one-seed probe shows no learning improvement and
+  indicates another blocker likely remains.
 - 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
   5 seeds, independently verified (JSON structure + pytest 78/78).
   Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
