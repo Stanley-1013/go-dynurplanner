@@ -12,6 +12,7 @@ from godynur.kinodynamics import (
     interval_within_limits,
     position,
     velocity,
+    velocity_margin,
 )
 
 
@@ -186,3 +187,31 @@ def test_chord_deviation_bound_is_tiny_for_nearly_constant_monotonic_motion():
 
     assert bound == pytest.approx(a0 * h**2 / 8.0, rel=1e-12)
     assert bound / abs(endpoint_delta) < 1e-6
+
+
+def test_velocity_margin_is_large_in_both_directions_with_stopping_room():
+    limits = (-2.0, 2.0, -2.0, 2.0, -2.0, 2.0, -20.0, 20.0)
+
+    margin_plus = velocity_margin(
+        0.0, 0.0, 0.0, 1.0, 0.1, 20, *limits, upper_bound=2.0
+    )
+    margin_minus = velocity_margin(
+        0.0, 0.0, 0.0, -1.0, 0.1, 20, *limits, upper_bound=2.0
+    )
+
+    assert margin_plus > 1.9
+    assert margin_minus > 1.9
+
+
+def test_velocity_margin_is_asymmetric_near_position_limit():
+    limits = (-2.0, 2.0, -2.0, 2.0, -2.0, 2.0, -20.0, 20.0)
+
+    toward_limit = velocity_margin(
+        1.99, 0.0, 0.0, 1.0, 0.1, 20, *limits, upper_bound=2.0
+    )
+    away_from_limit = velocity_margin(
+        1.99, 0.0, 0.0, -1.0, 0.1, 20, *limits, upper_bound=2.0
+    )
+
+    assert toward_limit < 0.15
+    assert away_from_limit > 1.9

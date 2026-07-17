@@ -372,6 +372,25 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter30: independently verified Phase 5i (commander) — read
+  `velocity_margin`/`_velocity_margins` in full, confirmed correct
+  (bisection over `[0,upper_bound]` calling `braking_witness_jerk`,
+  called once per step on the PRE-step state, matches spec exactly);
+  reran pytest myself, 82/82. Given the confirmed ~16-17ms/step
+  overhead (nearly QP-scale) with NEITHER probe so far showing a clear
+  learning benefit, reduced the default `bisection_iters` 10→4 via a
+  new `margin_bisection_iters` constructor param (not a safety
+  parameter — only affects observation-signal resolution, the
+  underlying `braking_witness_jerk` safety checks are unaffected).
+  Independently measured: iters=10 → 15.7ms/call, iters=4 → 7.5ms/call,
+  iters=2 → 4.9ms/call (diminishing returns below 4, kept 4 as the
+  default — coarse 1/16 resolution is plenty for an observation signal
+  that isn't safety-critical). 82/82 still green after the change.
+  Committing this and checking on the still-running 3000-episode
+  decisive probe (v-fix only, no margin feature — that comparison is
+  unaffected by any of this iter's changes since it started before
+  they landed and Python doesn't hot-reload).
+- 2026-07-18 iter29: Phase 5i directional velocity-margin observation implemented with the existing closed-form braking witness (10-round bisection, same derated bounds/horizon, no new QP); full suite 82/82. Paired 100-step timing under the probe's 6-thread settings was 23.460ms/step with margins versus 6.551ms stubbed, **+16.909ms/step** (unexpectedly QP-scale). The salt200 800-episode probe remained stuck at ep800: succ 0.000, stage 0, intervention 0.212 (collision 0.733), versus the prior velocity-only salt0 probe's succ 0.033, stage 0, intervention 0.215 (collision 0.767); no learning improvement at this scale, plus a serious final-block mean-episode wall regression (7.55s versus 0.99s). Throwaway results remain under `/tmp/m6_margin_probe`.
 - 2026-07-18 iter28: user redirected me to re-read their ORIGINAL design
   message (start of this conversation, section 八 "你的構想") rather
   than just brute-forcing more compute — good call. That spec listed

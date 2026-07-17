@@ -445,3 +445,81 @@ def braking_witness_jerk(
         j_min,
         j_max,
     )
+
+
+def velocity_margin(
+    q0: float,
+    v0: float,
+    a0: float,
+    direction: float,
+    h: float,
+    n_steps: int,
+    q_min: float,
+    q_max: float,
+    v_min: float,
+    v_max: float,
+    a_min: float,
+    a_max: float,
+    j_min: float,
+    j_max: float,
+    upper_bound: float,
+    bisection_iters: int = 10,
+) -> float:
+    """Return velocity headroom in one direction with a braking witness.
+
+    The result is the largest tested ``Delta-v`` in ``[0, upper_bound]``
+    for which the existing conservative braking witness remains feasible at
+    ``v0 + direction * Delta-v``. ``direction`` must be exactly ``+1`` or
+    ``-1``. If the current state itself has no witness, the margin is zero.
+    """
+    direction = float(direction)
+    if direction not in (-1.0, 1.0):
+        raise ValueError("direction must be +1.0 or -1.0")
+    upper_bound = float(upper_bound)
+    if upper_bound < 0.0:
+        raise ValueError("upper_bound must be nonnegative")
+    if (
+        isinstance(bisection_iters, bool)
+        or int(bisection_iters) != bisection_iters
+        or bisection_iters < 0
+    ):
+        raise ValueError("bisection_iters must be a nonnegative integer")
+    bisection_iters = int(bisection_iters)
+
+    args = (
+        float(q0),
+        float(a0),
+        float(h),
+        n_steps,
+        float(q_min),
+        float(q_max),
+        float(v_min),
+        float(v_max),
+        float(a_min),
+        float(a_max),
+        float(j_min),
+        float(j_max),
+    )
+
+    def witness(delta_v: float) -> float | None:
+        q, a, period, steps, *bounds = args
+        return braking_witness_jerk(
+            q,
+            float(v0) + direction * delta_v,
+            a,
+            period,
+            steps,
+            *bounds,
+        )
+
+    if witness(0.0) is None:
+        return 0.0
+
+    lo, hi = 0.0, upper_bound
+    for _ in range(bisection_iters):
+        mid = (lo + hi) / 2.0
+        if witness(mid) is not None:
+            lo = mid
+        else:
+            hi = mid
+    return float(lo)

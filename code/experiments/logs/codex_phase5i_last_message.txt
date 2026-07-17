@@ -1,0 +1,9 @@
+Implemented Phase 5i.
+
+- Files changed: [kinodynamics.py](/home/han/claude_project/papper-research/code/godynur/kinodynamics.py), [env.py](/home/han/claude_project/papper-research/code/godynur/env.py), both test files, and [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md).
+- Pytest: `82 passed in 33.50s`
+- Timing over 100 steps: `23.460 ms` with margins vs `6.551 ms` stubbed; added overhead `16.909 ms/step`. This is unexpectedly QP-scale. Kept the specified 10 bisection rounds.
+- Probe command: exactly as requested with `--episodes 800 --seed-salt 200 --out /tmp/m6_margin_probe`.
+- Ep800: success `0.000`, stage `0`, intervention `0.212`; prior velocity-only baseline was `0.033`, stage `0`, intervention `0.215`.
+
+Honest read: no learning improvement at this scale, with a serious runtime regression—final-block mean episode time rose from `0.99s` to `7.55s`.

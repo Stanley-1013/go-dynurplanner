@@ -67,6 +67,7 @@ class DynArmEnv:
         brake_check_n_steps: int = 20,
         brake_derate: float = 0.85,
         lambda_intervention: float = 0.1,
+        margin_bisection_iters: int = 4,
     ):
         assert reward_mode in ("uoar", "ct")
         assert task in ("random", "tabletop")
@@ -98,6 +99,16 @@ class DynArmEnv:
             self.brake_check_n_steps = brake_check_n_steps
             self.brake_derate = brake_derate
             self.lambda_intervention = lambda_intervention
+            # Default lowered from velocity_margin()'s own default of 10:
+            # measured ~17ms/step at 10 iters (7 joints x 2 directions x 10
+            # calls to braking_witness_jerk), unexpectedly QP-scale
+            # overhead. 4 iters gives 1/16 of the search range's
+            # resolution -- coarse but this only feeds an observation
+            # signal, not a safety gate, so precision is not safety-
+            # critical here. Revisit if the margin signal proves to help
+            # learning and the extra cost is judged worth paying for
+            # finer resolution.
+            self.margin_bisection_iters = margin_bisection_iters
             self.action_bound = [-1.0, 1.0]
         # Fixed obstacle slots (zero-padded): curriculum can lower the LIVE
         # obstacle count without changing the network's input width.
@@ -107,7 +118,8 @@ class DynArmEnv:
             17
             + (6 * n_obstacles if obstacles_in_state else 0)
             + (7 if closest_point_in_state else 0)
-            + (16 if action_mode == "velocity" else 0)  # 7 v + 7 a + 2 shield flags
+            # 7 v + 7 a + 7 margin+ + 7 margin- + 2 shield flags
+            + (30 if action_mode == "velocity" else 0)
         )
         # Episode stats maintained for Figure-1-style instrumentation.
         self.last_tau_star: float | None = None
@@ -154,6 +166,8 @@ class DynArmEnv:
             self.a = np.zeros(self.action_dim)
             self._last_terminal_membership = False
             self._last_intervention_norm = 0.0
+            self._last_velocity_margin_plus = np.zeros(self.action_dim)
+            self._last_velocity_margin_minus = np.zeros(self.action_dim)
         margin = self.a_r + self.a_o
         for _ in range(100):
             self.scene: DynamicScene = sample_scene(
@@ -200,6 +214,10 @@ class DynArmEnv:
         return self._state(), float(r), bool(done)
 
     def _step_velocity(self, action: np.ndarray):
+        (
+            self._last_velocity_margin_plus,
+            self._last_velocity_margin_minus,
+        ) = self._velocity_margins(self.q, self.v, self.a)
         q_old = self.q.copy()
         v_old = self.v.copy()
         a_old = self.a.copy()
@@ -386,6 +404,8 @@ class DynArmEnv:
         if self.action_mode == "velocity":
             parts.append(self.v / DQ_MAX)
             parts.append(self.a / DDQ_MAX)
+            parts.append(self._last_velocity_margin_plus / DQ_MAX)
+            parts.append(self._last_velocity_margin_minus / DQ_MAX)
             parts.append([1.0 if self._last_terminal_membership else 0.0])
             parts.append([self._last_intervention_norm])
         return np.concatenate(parts).astype(np.float32)
@@ -431,6 +451,41 @@ class DynArmEnv:
                 return None
             jerks.append(jerk)
         return np.asarray(jerks)
+
+    def _velocity_margins(
+        self, q: np.ndarray, v: np.ndarray, a: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        margins = []
+        for direction in (1.0, -1.0):
+            directional = []
+            for i in range(self.action_dim):
+                upper_bound = (
+                    DQ_MAX[i] - v[i]
+                    if direction > 0.0
+                    else v[i] + DQ_MAX[i]
+                )
+                directional.append(
+                    kinodynamics.velocity_margin(
+                        q[i],
+                        v[i],
+                        a[i],
+                        direction,
+                        self.dt,
+                        self.brake_check_n_steps,
+                        Q_MIN[i],
+                        Q_MAX[i],
+                        -DQ_MAX[i],
+                        DQ_MAX[i],
+                        -self.brake_derate * panda.DDQ_MAX[i],
+                        self.brake_derate * panda.DDQ_MAX[i],
+                        -self.brake_derate * panda.DDDQ_MAX[i],
+                        self.brake_derate * panda.DDDQ_MAX[i],
+                        max(0.0, float(upper_bound)),
+                        bisection_iters=self.margin_bisection_iters,
+                    )
+                )
+            margins.append(np.asarray(directional))
+        return margins[0], margins[1]
 
     def _rasterize_now(self) -> np.ndarray:
         boxes = self.scene.static_aabbs(margin=0.0)

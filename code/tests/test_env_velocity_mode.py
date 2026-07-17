@@ -10,7 +10,7 @@ from godynur.panda import DDQ_MAX, DQ_MAX, Q_MAX, Q_MIN
     "obstacles_in_state,closest_point_in_state",
     [(False, False), (True, False), (False, True), (True, True)],
 )
-def test_velocity_reset_and_state_dim_add_exactly_sixteen_fields(
+def test_velocity_reset_and_state_dim_add_exactly_thirty_fields(
     obstacles_in_state, closest_point_in_state
 ):
     common = {
@@ -26,9 +26,9 @@ def test_velocity_reset_and_state_dim_add_exactly_sixteen_fields(
 
     assert np.array_equal(velocity_env.v, np.zeros(7))
     assert np.array_equal(velocity_env.a, np.zeros(7))
-    assert velocity_env.state_dim == delta_env.state_dim + 16
+    assert velocity_env.state_dim == delta_env.state_dim + 30
     assert state.shape == (velocity_env.state_dim,)
-    assert np.array_equal(state[-16:], np.zeros(16, dtype=np.float32))
+    assert np.array_equal(state[-30:], np.zeros(30, dtype=np.float32))
 
 
 def test_feasible_velocity_step_uses_normal_certified_path():
@@ -49,8 +49,17 @@ def test_feasible_velocity_step_uses_normal_certified_path():
     assert env._last_terminal_membership
     assert np.all(env.v > 0.0)
     assert np.linalg.norm(env.v - v_nom) < np.linalg.norm(v_nom)
-    assert np.allclose(state[-16:-9], env.v / DQ_MAX)
-    assert np.allclose(state[-9:-2], env.a / DDQ_MAX)
+    assert np.allclose(state[-30:-23], env.v / DQ_MAX)
+    assert np.allclose(state[-23:-16], env.a / DDQ_MAX)
+    assert np.allclose(
+        state[-16:-9], env._last_velocity_margin_plus / DQ_MAX
+    )
+    assert np.allclose(
+        state[-9:-2], env._last_velocity_margin_minus / DQ_MAX
+    )
+    margins = state[-16:-2]
+    assert np.all(np.isfinite(margins))
+    assert np.all((0.0 <= margins) & (margins <= 1.0))
     assert state[-2] == 1.0
     assert np.isclose(state[-1], env._last_intervention_norm)
     assert np.isfinite(reward)
@@ -79,6 +88,36 @@ def test_near_limit_velocity_request_executes_fresh_braking_fallback():
     assert state[-2] == 0.0
     assert np.all(env.q >= Q_MIN)
     assert np.all(env.q <= Q_MAX)
+
+
+def test_velocity_margin_shrinks_toward_a_nearby_position_limit():
+    common = {
+        "action_mode": "velocity",
+        "n_obstacles": 0,
+        "obstacles_in_state": False,
+        "seed": 19,
+    }
+    comfortable = DynArmEnv(**common)
+    constrained = DynArmEnv(**common)
+    comfortable.reset()
+    constrained.reset()
+    midpoint = (Q_MIN + Q_MAX) / 2.0
+    comfortable.q = midpoint.copy()
+    constrained.q = midpoint.copy()
+    constrained.q[0] = Q_MAX[0] - 0.01
+    constrained.v[0] = 0.05 * DQ_MAX[0]
+
+    comfortable_state, _, _ = comfortable.step(np.zeros(7))
+    constrained_state, _, _ = constrained.step(
+        np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    )
+    comfortable_margins = comfortable_state[-16:-2]
+    constrained_margins = constrained_state[-16:-2]
+
+    assert constrained.stats["shield_fallback"] == 1
+    assert np.all(np.isfinite(constrained_margins))
+    assert np.all((0.0 <= constrained_margins) & (constrained_margins <= 1.0))
+    assert constrained_margins[0] < comfortable_margins[0]
 
 
 def test_numerical_edge_state_uses_nonthrowing_emergency_path():
