@@ -372,6 +372,32 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter28: user redirected me to re-read their ORIGINAL design
+  message (start of this conversation, section 八 "你的構想") rather
+  than just brute-forcing more compute — good call. That spec listed
+  FOUR velocity-mode observation additions: current acceleration (have
+  it), safety-filter correction amount (have it), dynamic obstacle
+  prediction (separate, already-queued Phase 5 item), and **"正負方向的
+  安全速度裕度" (positive/negative direction safety velocity margin)**
+  — NEVER implemented. This is materially richer than raw `v` (which I
+  added in iter26 with no clear effect): it's a POSITION- and braking-
+  capability-aware "how much room before I can no longer guarantee
+  stopping," directly relevant to Opus's hypothesis #2 (anticipatory
+  braking is hard for a reactive policy without an explicit signal for
+  it). Launched three things in parallel per the user's "都實驗" (do
+  all of them) instruction: (1) the decisive 3000-episode WITH-v-fix
+  comparison probe (task `b22voj1q3`, still valuable regardless of the
+  margin work), (2) implementing the velocity-margin observation via a
+  cheap bisection over the existing `braking_witness_jerk` (no new QP
+  calls) — dispatched to Codex (task `bqgylx0j9`), includes its own
+  800-episode validation probe, (3) the Phase 5c-deferred safety-
+  guarantee audit (joint-limit/inter-sample violation rates on already-
+  trained checkpoints — doesn't need RL to have converged, validates
+  Phase 1-4's actual claim independent of task success) — **prompt
+  written but DELIBERATELY NOT YET DISPATCHED**, because it also needs
+  to touch `env.py` and dispatch (2) is concurrently editing that same
+  file; launching both at once risks a merge conflict or one clobbering
+  the other's changes. Queued for after (2) lands and commits.
 - 2026-07-18 iter27: independently verified the velocity-observation
   fix's 800-episode probe (commander) — **no meaningful improvement**:
   succ 0.000/0.033/0.000/0.033 at ep200/400/600/800, coll 0.667-0.767,
