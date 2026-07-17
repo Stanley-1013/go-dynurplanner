@@ -65,12 +65,27 @@ class TD3:
         noise_clip: float = 0.5,
         hidden: int = 256,
         seed: int = 0,
+        use_action_ste: bool = False,
     ):
         torch.manual_seed(seed)
         self.action_scale = action_scale
         self.gamma, self.tau, self.policy_delay = gamma, tau, policy_delay
         self.expl_noise, self.target_noise = expl_noise, target_noise
         self.noise_clip = noise_clip
+        # Straight-through actor update (default off, byte-identical to
+        # standard DPG otherwise): when a hard action filter/shield sits
+        # inside env.step() and the replay buffer stores the ACTUALLY
+        # EXECUTED action (not the raw policy proposal), the standard
+        # actor loss -Q(s, actor(s)) queries Q at raw actions the critic
+        # may have rarely or never seen executed in filter-heavy regions
+        # (extrapolation/OOD-action error, cf. Fujimoto et al. BCQ 2019).
+        # With this on, the actor loss is evaluated at the buffer's
+        # on-distribution executed action in the forward pass, while the
+        # gradient still flows to the raw actor output in the backward
+        # pass (classic straight-through estimator) -- the actor gets a
+        # locally-correct gradient computed where the critic is actually
+        # accurate, instead of extrapolating.
+        self.use_action_ste = use_action_ste
 
         self.actor = mlp([state_dim, hidden, hidden, action_dim], nn.Tanh())
         self.actor_t = mlp([state_dim, hidden, hidden, action_dim], nn.Tanh())
@@ -120,7 +135,15 @@ class TD3:
 
         self.it += 1
         if self.it % self.policy_delay == 0:
-            loss_a = -self.q1(torch.cat([s, self.actor(s)], 1)).mean()
+            raw_action = self.actor(s)
+            if self.use_action_ste:
+                # Forward value is exactly the buffered executed action
+                # (on-distribution for the critic); gradient flows to
+                # raw_action unchanged (the detached term contributes 0).
+                actor_action = raw_action + (a - raw_action).detach()
+            else:
+                actor_action = raw_action
+            loss_a = -self.q1(torch.cat([s, actor_action], 1)).mean()
             self.opt_a.zero_grad()
             loss_a.backward()
             self.opt_a.step()

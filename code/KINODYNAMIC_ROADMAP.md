@@ -390,6 +390,72 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter36: STE implementation complete and tested (commander).
+  Fixed a floating-point-precision test bug (`torch.equal` on
+  numerically-but-not-bit-identical STE arithmetic — switched to
+  `torch.allclose`) and a buffer-size bug (`learn()` silently no-ops
+  below `5*batch` transitions; my first test draft only filled 64 for a
+  batch of 32, needed >=160 — raised to 200) during test authoring;
+  both caught by the tests themselves failing, not shipped silently.
+  New `code/tests/test_td3.py` (first ever test file for this class):
+  confirms default (`use_action_ste=False`) feeds q1 the raw actor
+  output untouched by a deliberately-offset buffered action (hooked and
+  inspected directly, not inferred); confirms the STE construction's
+  forward/backward properties in isolation; confirms the flag produces
+  a genuinely different actor update when buffered and raw actions
+  differ; confirms it doesn't crash and actually updates parameters.
+  Full suite: 86/86 (82 + 4 new). Wired `use_action_ste=(arm ==
+  "kinodynamic_shield")` into `m6_kinodynamic_shield.py`'s `TD3(...)`
+  construction — the OTHER two arms are unaffected (flag stays False
+  for them, byte-identical to before). Smoke-tested (4 episodes, runs
+  cleanly). Committing now, then launching a probe with STE alone
+  (reverting `dv_scale_mult`/`expl_noise`/`gamma` to their ORIGINAL
+  defaults, not combined with iter35's failed sweep) — isolates whether
+  this specific, more structural fix has any effect, rather than
+  confounding it with already-falsified hyperparameter changes.
+- 2026-07-18 iter35: the combined hyperparameter sweep (`dv_scale_mult=8,
+  expl_noise=0.1, gamma=0.99`, task `b5og1nul4`) finished. **Result:
+  still stuck** — succ [0.0, 0.0, 0.0, 0.03] across the 4 checkpoints
+  (indistinguishable from noise), collision rate rose to 0.83 (worse
+  than baseline, expected given the more aggressive `dv_scale`).
+  Confirms Opus's ranked hypothesis list items 1-3 (action scale,
+  exploration noise, discount factor) do NOT explain the failure, even
+  combined. This is now the FOURTH negative result on this thread
+  (buffer bug, missing-v observation, missing-margin observation,
+  hyperparameter sweep) — strengthens the case that something more
+  structural is wrong, not a tuning issue.
+  Separately, the user raised a sharp, independent point mid-investigation
+  ("the safety layer can't just restrict, it needs to feed back into
+  learning") that turned out to name a real, literature-documented
+  mechanism: standard TD3's actor loss `-Q(s, actor(s))` always queries
+  Q at the actor's RAW proposed action, but the replay buffer stores the
+  ACTUALLY-EXECUTED (shield-corrected) action — in the ~20-30% of steps
+  where the shield intervenes, the critic may never have observed the
+  raw proposed action actually being executed, so `Q(s, actor(s))` can
+  be extrapolating/unreliable there (an "OOD action" problem, cf.
+  Fujimoto et al.'s BCQ 2019 framing). Escalated my first proposed fix
+  (an auxiliary imitation loss toward the executed action) to Opus
+  BEFORE implementing — correctly rejected: on intervened steps the
+  executed action IS the shield's generic conservative brake, so
+  imitating it risks teaching the actor to copy "safe but useless"
+  behavior exactly where task progress matters most. Opus's
+  recommendation instead: a **straight-through estimator** on the actor
+  loss — forward pass evaluates Q at the buffered executed action
+  (on-distribution, where the critic is accurate), backward pass routes
+  the gradient to the raw actor output unchanged, giving a locally
+  correct gradient without imitating the shield's specific choice.
+  Implemented directly (commander, given the precision of the spec and
+  that this is the first-ever change to `td3.py`, used across every
+  experiment in this project, not just m6): new `use_action_ste: bool =
+  False` constructor flag, default OFF (must be byte-identical to
+  existing behavior for every other arm/script using this class); when
+  True, `actor_action = raw_action + (a_batch - raw_action).detach()`
+  replaces the raw actor output in the actor loss only. `a_batch` is
+  the SAME buffer-sampled action already used for the critic loss — no
+  new data collection needed. Writing tests next (regression: default
+  behavior unchanged; gradient-flow: STE forward value exactly equals
+  the buffered action while gradients still reach actor parameters)
+  before any training probe.
 - 2026-07-18 iter34: user chose to systematically investigate the RL-
   convergence problem rather than stop at the shield-is-verified
   checkpoint. Got a prioritized, evidence-linked sweep design from

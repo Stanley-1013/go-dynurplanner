@@ -197,6 +197,7 @@ def run_one(
         expl_noise=expl_noise,
         gamma=gamma,
         seed=seed,
+        use_action_ste=(arm == "kinodynamic_shield"),
     )
     sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
     stage_idx = 0
