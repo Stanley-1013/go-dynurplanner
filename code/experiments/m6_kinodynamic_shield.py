@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from godynur.ape2 import APE2Shield  # noqa: E402
 from godynur.env import DynArmEnv  # noqa: E402
+from godynur.panda import DQ_MAX  # noqa: E402
 from godynur.td3 import TD3  # noqa: E402
 
 WARMUP_STEPS = 1500
@@ -174,27 +175,27 @@ def run_one(
     episodes: int,
     seed: int,
     out_dir: Path,
+    dv_scale_mult: float = 1.0,
+    expl_noise: float = 0.25,
+    gamma: float = 0.98,
 ):
     action_mode = "velocity" if arm == "kinodynamic_shield" else "delta_q"
-    env = DynArmEnv(
+    env_kwargs = dict(
         task="tabletop",
         n_obstacles=3,
         reward_mode=reward_mode,
-        seed=seed,
         action_mode=action_mode,
     )
-    eval_env = DynArmEnv(
-        task="tabletop",
-        n_obstacles=3,
-        reward_mode=reward_mode,
-        seed=10_000 + seed,
-        action_mode=action_mode,
-    )
+    if action_mode == "velocity" and dv_scale_mult != 1.0:
+        env_kwargs["dv_scale"] = DQ_MAX * DynArmEnv.dt * dv_scale_mult
+    env = DynArmEnv(seed=seed, **env_kwargs)
+    eval_env = DynArmEnv(seed=10_000 + seed, **env_kwargs)
     agent = TD3(
         env.state_dim,
         env.action_dim,
         action_scale=env.action_bound[1],
-        expl_noise=0.25,
+        expl_noise=expl_noise,
+        gamma=gamma,
         seed=seed,
     )
     sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
@@ -366,6 +367,25 @@ def main():
     ap.add_argument(
         "--out", type=str, default="experiments/results/m6_kinodynamic"
     )
+    ap.add_argument(
+        "--dv-scale-mult",
+        type=float,
+        default=1.0,
+        help="multiplier on kinodynamic_shield's default dv_scale "
+        "(DQ_MAX*dt); Phase 5-track RL-convergence sweep knob",
+    )
+    ap.add_argument(
+        "--expl-noise",
+        type=float,
+        default=0.25,
+        help="TD3 Gaussian exploration noise stddev",
+    )
+    ap.add_argument(
+        "--gamma",
+        type=float,
+        default=0.98,
+        help="TD3 discount factor",
+    )
     args = ap.parse_args()
     if args.episodes < 1 or args.seeds < 1:
         ap.error("--episodes and --seeds must be positive")
@@ -381,7 +401,14 @@ def main():
         for seed_index in range(args.seeds):
             actual_seed = args.seed_salt + arm_offset + seed_index
             results[arm][seed_index] = run_one(
-                arm, args.reward_mode, args.episodes, actual_seed, out_dir
+                arm,
+                args.reward_mode,
+                args.episodes,
+                actual_seed,
+                out_dir,
+                dv_scale_mult=args.dv_scale_mult,
+                expl_noise=args.expl_noise,
+                gamma=args.gamma,
             )
 
     arm_tag = "-".join(args.arms)

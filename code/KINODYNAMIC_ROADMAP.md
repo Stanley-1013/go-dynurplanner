@@ -390,6 +390,33 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter34: user chose to systematically investigate the RL-
+  convergence problem rather than stop at the shield-is-verified
+  checkpoint. Got a prioritized, evidence-linked sweep design from
+  Opus (given all iter18-33 evidence, not generic RL folklore) — ranked
+  candidates: (1) `dv_scale` — the ONE untuned placeholder the code
+  itself flags, directly governs reach-vs-brake authority, top suspect
+  given "moves substantially, never settles" is a classic mis-scaled-
+  authority signature; (2) `expl_noise=0.25` — carried over unchanged
+  from delta-q mode, likely miscalibrated for a rate/velocity action
+  interface; (3) `gamma=0.98` — under a ~100-step episode with a
+  dwell bonus only paid at the very end, the effective ~50-step horizon
+  may undervalue late goal arrival; (4) dwell/goal-radius reward
+  reweighting (lowest priority, not in the first combined test). Opus
+  recommended ONE combined best-guess run first (not one-at-a-time —
+  these are coupled through the same action interface, and isolating
+  already-failed single fixes wastes runs at ~15-20min/run), and
+  explicitly advised against introducing SAC or another algorithm yet
+  (symptom pattern points at action-interface conditioning, not an
+  exploration/entropy problem SAC would fix).
+  Exposed `dv_scale_mult`/`expl_noise`/`gamma` as new CLI args on
+  `m6_kinodynamic_shield.py` (previously hardcoded — `expl_noise=0.25`
+  inline, `dv_scale`/`gamma` not exposed at all), threaded through
+  `run_one` and recorded in the saved JSON `config`. Smoke-tested (4
+  episodes, `--seed-salt 999`, `/tmp` output, not committed) — runs
+  cleanly, config confirmed correctly recorded. Launching the real
+  combined-config run next: `--dv-scale-mult 8 --expl-noise 0.1
+  --gamma 0.99`, 800 episodes, kinodynamic_shield only.
 - 2026-07-18 iter33: independently verified Phase 5j (commander) —
   reran pytest myself (82/82); read the full `env.py` instrumentation
   diff: `endpoint_violation` correctly checks RAW pre-clip `q_new`/`v_new`
