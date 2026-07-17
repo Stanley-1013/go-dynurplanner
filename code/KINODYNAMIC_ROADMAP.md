@@ -265,8 +265,26 @@ disclosure style for the original `eps_lin`).
       experiment work, not required to land with the module itself)
 
 ### Phase 5 — occupancy forecasting + TD3/APE2 integration, full experiments, **seed scale-up**
+
+**STATUS SUMMARY (2026-07-18, all iter18-33 threads concluded)**: the
+safety shield itself (Phase 1-4) is verified END-TO-END, including at
+scale — Phase 5j's audit found zero violations across 18,000 steps with
+genuine (19-21%) shield engagement. The OPEN item is RL training
+convergence for `kinodynamic_shield` specifically — three fixes tried
+(replay-buffer consistency, missing velocity observation, missing
+safety-margin observation), none alone resolved it, tested up to a
+decisive 3000-episode single-seed run. This is now a genuine open
+research question (see `ANALYSIS.md`'s top-of-file update), not a
+quick-fix target. Items below are checked/unchecked accordingly —
+**do not scale to n=8-10 or attempt another quick fix without a
+deliberate decision on how much further to invest in the RL-convergence
+question specifically** (systematic hyperparameter sweep, different
+algorithm, or accept the shield as the standalone contribution).
+
 - [ ] wire `grid_td3.py`/`forecast.py` obstacle prediction into the N-step
-      safety horizon
+      safety horizon (not started — blocked behind the RL-convergence
+      question in practice, low value to add prediction to a policy
+      that isn't learning the base task yet)
 - [x] **Phase 5a**: `experiments/m6_kinodynamic_shield.py` — three-arm
       comparison (`no_shield`/`ape2_shield`/`kinodynamic_shield`), disjoint
       per-arm seed ranges (`ARM_SEED_STRIDE=1e6`, avoids the Loop 9

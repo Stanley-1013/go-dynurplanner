@@ -1,5 +1,60 @@
 # Phase 5c — M6 three-arm comparison, first-pass analysis
 
+> **2026-07-18 UPDATE — read this first.** Everything below this notice
+> was written during the investigation and is kept for the full trail,
+> but here is where things actually stand after Phase 5c through 5j:
+>
+> **Phase 1-4 (the kinodynamic certified safety shield itself) is DONE,
+> independently verified at every step, and now empirically validated
+> at scale.** Phase 5j's safety audit rolled out all 6
+> `kinodynamic_shield` checkpoints for 18,000 total steps and found
+> **zero joint-limit endpoint violations, zero inter-sample violations,
+> zero no-feasible-brake emergencies** — while the certified
+> fallback/braking path genuinely fired on 19-21% of steps (not a
+> trivial always-pass result). This is the actual claim Phase 1-4 make,
+> and it holds. Two real design bugs were caught and fixed BEFORE they
+> shipped (a soundness bug in an early collision-bound proposal, an
+> over-conservative terminal-braking-set design) — both via Opus second
+> opinions before dispatch, not after something broke in production.
+>
+> **What is NOT done: getting TD3 to learn the task well while using
+> velocity-mode actions.** Three well-motivated interventions were
+> tried in sequence, each backed by real evidence or a design-spec gap,
+> none alone resolved it:
+> 1. Fixed a genuine replay-buffer action-consistency bug (the buffer
+>    stored the RL's nominal action instead of what the shield actually
+>    executed) — real bug, real fix, no measurable learning change.
+> 2. Added raw velocity to the observation (it was missing entirely —
+>    a real POMDP gap) — tested at 800 AND a decisive 3000 episodes
+>    (matching the historical training budget): max success ever seen
+>    across all 15 checkpoints of the 3000-episode run was 6.7%, one
+>    lucky episode, never sustained. Confirmed insufficient alone.
+> 3. Added the "positive/negative safety velocity margin" observation
+>    from the user's own original design spec (also missing entirely) —
+>    tested at 800 episodes, no clear improvement, plus a real
+>    ~16ms/step cost (mitigated to ~7.5ms via a tuned bisection budget,
+>    still non-trivial).
+>
+> The task IS physically achievable at the step budget used (a scripted
+> non-learning policy succeeds 38% of the time), obstacle-avoidance is
+> ruled out as the blocker (the stuck stage has zero obstacles), and the
+> trained policy is not stationary (it moves, sometimes faster than the
+> scripted policy) — it just never learns to arrive and stop. This
+> looks like a genuine, still-open RL research question (credit
+> assignment / exploration statistics / reward shaping specific to a
+> double-integrator action space), not a bug waiting to be found. See
+> the iter18-33 entries in `KINODYNAMIC_ROADMAP.md`'s status log for the
+> full evidence trail before proposing a fourth quick fix — three
+> reasonably strong hypotheses are now spent.
+>
+> **Recommendation**: treat the shield (Phase 1-4) as a complete,
+> verified contribution independent of this open RL question. Whether
+> and how much further to invest in the RL-convergence problem is a
+> scope decision for the user, not something to keep guessing at via
+> single-seed probes — it likely needs either a systematic
+> hyperparameter/architecture sweep or a different RL algorithm choice,
+> which is a different KIND of work than what this loop has been doing.
+
 **Run config**: 800 episodes × 5 seeds per arm, `--seed-salt 0`, tabletop
 task, `n_obstacles=3`, `reward_mode=uoar`. Source JSONs:
 `m6_uoar_no_shield_salt0.json`, `m6_uoar_ape2_shield_salt0.json`,
