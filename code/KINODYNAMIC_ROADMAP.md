@@ -372,6 +372,23 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter32: the decisive 3000-episode WITH-v-fix comparison
+  probe (task `b22voj1q3`) finished. **Definitive result**: independently
+  checked all 15 checkpoints — max success EVER seen across the entire
+  3000-episode run was 6.7% (one lucky episode out of 30 at ep1000,
+  never sustained), final succ=0.00, never advanced past curriculum
+  stage 0. This closes the question the iter27 checkpoint raised: the
+  raw-velocity-observation fix alone is confirmed NOT sufficient, with
+  the strongest possible evidence (full historical training budget,
+  single seed, completely flat). Combined with iter29-30's inconclusive
+  margin-feature probes, three interventions now tried
+  (buffer-consistency fix, raw-v observation, velocity-margin
+  observation) without resolving the RL convergence problem — this is
+  a genuinely unresolved open question, not something a fourth quick
+  guess is likely to crack. Committing this result now; Phase 5j's
+  safety-guarantee audit (separate, more encouraging finding — see next
+  entry) is still finishing.
+- 2026-07-18 iter31: Phase 5j safety-guarantee audit measured all 6 committed kinodynamic checkpoints over 30 evaluation episodes each (18,000 stage-0 steps total): zero raw endpoint violations, zero exact inter-sample violations, and zero no-feasible-brake emergencies on every checkpoint; certified fallback remained meaningfully exercised at 19.00%-21.37%, and the full suite stayed green at 82/82.
 - 2026-07-18 iter30: independently verified Phase 5i (commander) — read
   `velocity_margin`/`_velocity_margins` in full, confirmed correct
   (bisection over `[0,upper_bound]` calling `braking_witness_jerk`,
