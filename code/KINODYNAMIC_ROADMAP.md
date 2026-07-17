@@ -301,10 +301,28 @@ disclosure style for the original `eps_lin`).
     the historical 3000-episode budget, n=8-10) once these results are
     sane-checked, per the roadmap's own n≥5-minimum/n=8-10-for-paper
     two-tier target.
-- [ ] intervention-rate-over-training metric — does the policy learn to
-      self-limit, or does it permanently lean on the shield? (data will
-      exist once Phase 5b's per-block `train_intervention_rate` history
-      is analyzed — not yet analyzed as of this entry)
+- [x] intervention-rate-over-training metric — does the policy learn to
+      self-limit, or does it permanently lean on the shield? **Answer at
+      this scale: no** — flat 0.19-0.22 across all 4 training checkpoints,
+      all 5 seeds, no downward trend. See Phase 5c analysis below for why
+      this is confounded and shouldn't be over-interpreted yet.
+- [x] **Phase 5c analysis** — full writeup:
+      `experiments/results/m6_kinodynamic/ANALYSIS.md`. **Critical
+      finding**: `kinodynamic_shield` never advanced past curriculum
+      stage 0 in any of 5 seeds (succ 0.00-0.07 throughout), while
+      `no_shield`/`ape2_shield` both learned normally. Root cause
+      identified (not just speculated — verified by reading the code):
+      `m6_kinodynamic_shield.py` stores the RL actor's raw NOMINAL action
+      in the replay buffer, but `env.py`'s `_step_velocity` can silently
+      substitute a different actually-executed jerk sequence when the
+      shield intervenes (~20% of steps, measured) — corrupting ~1/5 of
+      stored transitions with an action label that doesn't match the
+      real dynamics outcome. `ape2_shield` doesn't have this problem
+      (its shield certifies the action BEFORE `env.step()`, so the
+      stored action is always what was actually executed).
+      **Do not scale up seeds further until this is fixed** — see the
+      analysis doc's "Recommended next steps" for the fix and re-
+      validation order.
 
 ## 4. Evaluation metrics (apply from Phase 4 onward)
 
@@ -354,6 +372,20 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter19: `kinodynamic_shield` (task `bqd7hcxt1`) finished, all
+  5 seeds, independently verified (JSON structure + pytest 78/78).
+  Confirmed consistently across ALL 5 seeds (not seed0-specific noise):
+  succ 0.00-0.07, collision 0.47-0.73, stuck at curriculum stage 0 the
+  entire run. Committed. All three Phase 5b arms now complete — wrote
+  the full Phase 5c analysis (`experiments/results/m6_kinodynamic/ANALYSIS.md`),
+  organized per §4's four metric categories, with real numbers pulled
+  from all three result JSONs. **Found and verified (by reading the
+  actual code, not guessing) a real replay-buffer action-consistency bug**
+  specific to the `kinodynamic_shield` arm — see the Phase 5 checklist
+  entry above and the analysis doc for full detail. This is very likely
+  why that arm failed to learn at all, and it should be fixed and
+  re-validated before any further seed scale-up (n=8-10 would just burn
+  compute on a confounded setup otherwise). Next: dispatch the fix.
 - 2026-07-17 iter18: `no_shield` (task `bd0iqcpc3`) finished, independently
   verified — 5 seeds, all 800 episodes, succ range 0.17-0.53 / coll
   0.37-0.63; seed2 never advanced past curriculum stage 0 (legitimate
