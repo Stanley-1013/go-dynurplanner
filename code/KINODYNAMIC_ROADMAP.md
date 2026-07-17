@@ -390,6 +390,29 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter37: STE probe (task `bnm6hrzus`) finished. **Fifth
+  consecutive negative result**: succ [0.0, 0.0, 0.0, 0.03], intervention
+  rate flat ~0.20-0.22, isolated from the failed hyperparameter sweep
+  (config confirms `dv_scale_mult=1.0, expl_noise=0.25, gamma=0.98` —
+  original defaults). Independently verified (commander) directly from
+  the JSON, not the training log's summary line.
+  Ran one more diagnostic before stopping to reassess: a fresh 3000-step
+  mini-run checking for basic brokenness (NaN/Inf in rewards, Q-value
+  sanity) rather than another targeted fix. Reward stream is finite and
+  in a plausible range (mean -0.30, [-0.61, 0.07], no NaN/Inf). Q(s,a)
+  values are also finite but MONOTONICALLY DECREASING over the 3000
+  steps sampled (-0.58 → -3.03 mean, still moving at the last sample,
+  not plateaued) — not obviously pathological (a fresh critic learning
+  a genuinely negative value scale under consistently negative reward
+  looks like this too), but also not a clean bill of health; genuinely
+  ambiguous from this short a probe.
+  **Five well-motivated, Opus-validated or evidence-grounded
+  interventions tried in sequence (replay-buffer consistency fix,
+  missing-velocity observation, missing-margin observation,
+  hyperparameter sweep, straight-through actor gradient), none resolved
+  the convergence failure.** This is now a genuine research-scope
+  decision, not a remaining-bug hunt — flagging for the user rather
+  than proposing a sixth guess unprompted.
 - 2026-07-18 iter36: STE implementation complete and tested (commander).
   Fixed a floating-point-precision test bug (`torch.equal` on
   numerically-but-not-bit-identical STE arithmetic — switched to
