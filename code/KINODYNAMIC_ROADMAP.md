@@ -372,6 +372,34 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter27: independently verified the velocity-observation
+  fix's 800-episode probe (commander) — **no meaningful improvement**:
+  succ 0.000/0.033/0.000/0.033 at ep200/400/600/800, coll 0.667-0.767,
+  intervention rate still 0.195-0.216, stage still stuck at 0. This is
+  statistically indistinguishable from the pre-fix pattern at this
+  sample size (30 eval episodes/checkpoint). The fix (adding `v` to the
+  observation) is still objectively correct and worth keeping — a
+  policy that cannot perceive its own velocity is a real deficiency
+  regardless of whether it turns out to be THE bottleneck — but it does
+  not appear to be sufficient alone to unblock learning, at least not
+  within 800 episodes. Important caveat before concluding "the fix
+  failed": the earlier 3000-episode NO-fix run (iter23) is the strongest
+  evidence of a truly flat, non-improving trend — this probe is only
+  800 episodes WITH the fix, so it can't yet distinguish "the fix
+  doesn't help" from "the fix helps convergence RATE but 800 episodes
+  still isn't enough to see it," since the pre-fix 800-episode run
+  ALSO looked statistically similar to its own pre-fix 3000-episode
+  run's early checkpoints. A fair test needs a 3000-episode WITH-fix
+  run to compare against the 3000-episode NO-fix baseline's flat trend.
+  **This is now the third hypothesis round (needs-more-time: refuted;
+  missing-velocity-observation: inconclusive/likely-insufficient-alone)
+  on a debugging thread that has consumed substantial time.** Flagging
+  this as a natural checkpoint to consult the user on how much further
+  to invest before either running the decisive 3000-episode comparison
+  or stepping back to document this as an open limitation and moving to
+  other Phase 5 work (the deferred safety metrics from Phase 5c, which
+  don't require RL convergence to measure and more directly validate
+  Phase 1-4's actual claims).
 - 2026-07-18 iter26: implemented the fix directly (commander, small and
   well-understood — no Codex round-trip needed). `env.py`: added
   `self.v / DQ_MAX` (7 floats) to the velocity-mode observation,

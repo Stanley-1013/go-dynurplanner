@@ -1,0 +1,6 @@
+[kinodynamic_shield seed2000000] ep  200 | stage 0 | succ 0.00 | true-coll 0.67 | no_safe 0 | intervene 0.195 | 204.7s
+[kinodynamic_shield seed2000000] ep  400 | stage 0 | succ 0.03 | true-coll 0.67 | no_safe 0 | intervene 0.215 | 412.9s
+[kinodynamic_shield seed2000000] ep  600 | stage 0 | succ 0.00 | true-coll 0.67 | no_safe 0 | intervene 0.216 | 616.2s
+[kinodynamic_shield seed2000000] ep  800 | stage 0 | succ 0.03 | true-coll 0.77 | no_safe 0 | intervene 0.215 | 827.8s
+ kinodynamic_shield final: succ 0.03 | true-coll 0.77
+results: experiments/results/m6_kinodynamic_vfix_probe/m6_uoar_kinodynamic_shield_salt0.json
