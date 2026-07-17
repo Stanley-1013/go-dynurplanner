@@ -354,6 +354,34 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter16: user checked in ~4h49m after the iter15 relaunch.
+  Found the three parallel processes were badly CPU-oversubscribed —
+  `load average 28` on a 16-core machine, each process using ~38 threads
+  / 450-620% CPU simultaneously (numpy/scipy/torch each spawning their
+  own BLAS/intra-op thread pools with no cap, ×3 concurrent processes).
+  Measured real throughput was ~38.7s/episode for `kinodynamic_shield`
+  under this contention — ~7x slower than the smoke-tested 5.6s/ep,
+  which would have meant ~43h total instead of the planned ~6.2h.
+  Progress at kill time: `no_shield` ~48% through (seed 2/5, ep400),
+  `ape2_shield` ~65% (seed 3/5, ep200), `kinodynamic_shield` only ~10%
+  (seed 0/5, ep400/800) — none had reached a seed boundary with results
+  flushed to disk (the script only assembles/writes its JSON after ALL
+  seeds of a run finish), so killing lost that in-progress compute, but
+  nothing corrupted or silently wrong was ever written. **Lesson: launching
+  N heavy ML training processes in parallel without capping each one's
+  thread count is a real trap — always set `OMP_NUM_THREADS`/
+  `MKL_NUM_THREADS`/`OPENBLAS_NUM_THREADS` (and check `uptime`/`top`
+  shortly after launch) when running more than one such job
+  concurrently on a shared machine.** Relaunched all three arms with
+  `OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4
+  NUMEXPR_NUM_THREADS=4` (3×4=12 of 16 cores, leaving headroom); 1-min
+  load average dropped from 28 to 16 within 30s of relaunch, per-process
+  CPU% dropped modestly (~1645%→~1262% combined) — a real but partial
+  fix (torch's own intra-op pool doesn't fully respect these env vars in
+  every build); will re-measure actual throughput at the next check-in
+  before deciding whether further tuning or an episode-count reduction
+  is needed. New task ids: `no_shield` `bd0iqcpc3`, `ape2_shield`
+  `bzvrh4qk7`, `kinodynamic_shield` `bqd7hcxt1`.
 - 2026-07-17 iter15: session was interrupted mid-launch of Phase 5b.
   Root cause: the `no_shield` run had been started with manual
   `nohup ... & disown` inside a Bash call instead of the harness's own
