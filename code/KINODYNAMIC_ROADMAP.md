@@ -372,6 +372,34 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter33: independently verified Phase 5j (commander) —
+  reran pytest myself (82/82); read the full `env.py` instrumentation
+  diff: `endpoint_violation` correctly checks RAW pre-clip `q_new`/`v_new`
+  on all three paths (accept/fallback/emergency each now capture
+  `raw_q_new`/`raw_v_new` before any clipping), `inter_sample_violation`
+  correctly uses `kinodynamics.interval_within_limits` with the TRUE
+  hard bounds (not the derated ones used internally for the safety
+  margin) — the right, strict choice for an audit. Read
+  `m6_safety_audit.py` in full: handles the observation-dimension
+  mismatch between old checkpoints (pre-v-fix, pre-margin-fix) and the
+  current env correctly by recovering each actor's expected `state_dim`
+  from its own saved weights and projecting the current (larger)
+  observation down to match — the SHIELD and DYNAMICS executing each
+  audited step are the CURRENT, fully-fixed code; only the frozen
+  actor's input is backward-projected. This is the right design (audits
+  today's safety guarantee, not a stale one). **Result confirmed
+  genuine and important**: zero endpoint violations, zero inter-sample
+  violations, zero no-feasible-brake emergencies across all 6
+  checkpoints and 18,000 evaluated steps, while the certified
+  fallback/braking path was genuinely exercised on 19-21% of steps (not
+  a trivial always-accept result) — Phase 1-4's core safety claim holds
+  empirically at this scale, completely independent of whether the RL
+  policy learned the task. This is the positive counterpart to the
+  unresolved RL-convergence problem: **the shield works; getting TD3 to
+  learn well while using it is the open problem, not the shield's
+  soundness**. All three parallel Phase 5 threads (3000ep decisive
+  probe, margin feature, safety audit) are now complete — writing a
+  full Phase 5 synthesis next.
 - 2026-07-18 iter32: the decisive 3000-episode WITH-v-fix comparison
   probe (task `b22voj1q3`) finished. **Definitive result**: independently
   checked all 15 checkpoints — max success EVER seen across the entire

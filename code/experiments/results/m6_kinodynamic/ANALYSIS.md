@@ -166,3 +166,34 @@ holds regardless of RL training outcome).
    the actual claims Phase 1-4 make and aren't measured yet.
 4. Only after 1-3: scale to the roadmap's n=8-10 target for paper-grade
    numbers, with Wilson CIs per the existing C1 convention.
+
+## Phase 5j — safety-guarantee audit (measured, not deferred)
+
+This audit evaluates the safety guarantee independently of task learning.
+Each frozen actor was rolled out without exploration for 30 episodes at the
+final curriculum stage recorded in its own training JSON. All six runs had
+reached only stage 0 (`n_obstacles=0`, `speed=0.0`), so every checkpoint
+contributed exactly 3,000 evaluated steps (18,000 steps total). The saved
+actors use the historical 44-value velocity observation; the audit projects
+the current observation back to that exact saved layout while leaving the
+current environment, shield, dynamics, and hard limits unchanged.
+
+| Checkpoint | Endpoint-violation rate | Inter-sample-violation rate | `shield_emergency` rate | `shield_fallback` rate |
+|---|---:|---:|---:|---:|
+| 800 ep, seed 2000000 | 0.000000 | 0.000000 | 0.000000 | 0.210333 |
+| 800 ep, seed 2000001 | 0.000000 | 0.000000 | 0.000000 | 0.190000 |
+| 800 ep, seed 2000002 | 0.000000 | 0.000000 | 0.000000 | 0.208667 |
+| 800 ep, seed 2000003 | 0.000000 | 0.000000 | 0.000000 | 0.209000 |
+| 800 ep, seed 2000004 | 0.000000 | 0.000000 | 0.000000 | 0.213667 |
+| 3000 ep, seed 2000000 | 0.000000 | 0.000000 | 0.000000 | 0.208667 |
+
+The endpoint counter audits raw `q_new` and `v_new` before defensive clipping;
+the inter-sample counter independently replays the jerk actually executed and
+uses the exact continuous-interval `(q,v,a,j)` limit check per joint. Both
+violation counters were **zero on every checkpoint**, as was the no-feasible-
+brake emergency counter. The certified fallback/braking path was exercised
+often (19.00%-21.37% of steps), so the zero-violation result is not merely a
+test of nominal accept steps. Phase 1-4's certification claim therefore held
+across all measured rollouts; this is direct empirical validation over the
+audited 18,000 steps, not a claim of exhaustive proof over every possible
+state.

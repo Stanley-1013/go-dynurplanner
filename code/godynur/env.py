@@ -249,6 +249,8 @@ class DynArmEnv:
                 q_new, v_new, a_new = candidate
                 q_trajectory_end = q_new.copy()
                 executed_jerks = candidate_jerks
+                raw_q_new = q_new.copy()
+                raw_v_new = v_new.copy()
                 accepted = True
 
         if not accepted:
@@ -261,6 +263,8 @@ class DynArmEnv:
                 q_new, v_new, a_new = self._kinodynamic_update(brake_jerks)
                 q_trajectory_end = q_new.copy()
                 executed_jerks = brake_jerks
+                raw_q_new = q_new.copy()
+                raw_v_new = v_new.copy()
                 self.stats["shield_fallback"] = (
                     self.stats.get("shield_fallback", 0) + 1
                 )
@@ -270,11 +274,50 @@ class DynArmEnv:
                 executed_jerks = np.zeros(self.action_dim)
                 q_new, v_new, a_new = self._kinodynamic_update(executed_jerks)
                 q_trajectory_end = q_new.copy()
+                raw_q_new = q_new.copy()
+                raw_v_new = v_new.copy()
                 q_new = np.clip(q_new, Q_MIN, Q_MAX)
                 v_new = np.clip(v_new, -DQ_MAX, DQ_MAX)
                 self.stats["shield_emergency"] = (
                     self.stats.get("shield_emergency", 0) + 1
                 )
+
+        # Post-hoc safety audit of the transition that will actually execute.
+        # Keep this strictly observational: the existing clips below remain
+        # the defensive last resort, while these counters record the raw
+        # pre-clip endpoint and exact continuous-interval verdicts.
+        if (
+            np.any(raw_q_new < Q_MIN)
+            or np.any(raw_q_new > Q_MAX)
+            or np.any(raw_v_new < -DQ_MAX)
+            or np.any(raw_v_new > DQ_MAX)
+        ):
+            self.stats["endpoint_violation"] = (
+                self.stats.get("endpoint_violation", 0) + 1
+            )
+
+        interval_safe = all(
+            kinodynamics.interval_within_limits(
+                q_old[i],
+                v_old[i],
+                a_old[i],
+                executed_jerks[i],
+                self.dt,
+                Q_MIN[i],
+                Q_MAX[i],
+                -DQ_MAX[i],
+                DQ_MAX[i],
+                -panda.DDQ_MAX[i],
+                panda.DDQ_MAX[i],
+                -panda.DDDQ_MAX[i],
+                panda.DDDQ_MAX[i],
+            )
+            for i in range(self.action_dim)
+        )
+        if not interval_safe:
+            self.stats["inter_sample_violation"] = (
+                self.stats.get("inter_sample_violation", 0) + 1
+            )
 
         u_executed = (v_new - v_old) / self.dv_scale
         self._last_executed_action = np.clip(u_executed, -1.0, 1.0)
