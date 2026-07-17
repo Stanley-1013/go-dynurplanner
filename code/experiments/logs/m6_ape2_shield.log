@@ -1,0 +1,32 @@
+[ape2_shield seed1000000] ep 108: ADVANCE to stage 1 (2, 0.1)
+[ape2_shield seed1000000] ep  200 | stage 1 | succ 0.23 | true-coll 0.47 | no_safe 4 | 50.0s
+[ape2_shield seed1000000] ep 208: ADVANCE to stage 2 (3, 0.25)
+[ape2_shield seed1000000] ep  400 | stage 2 | succ 0.30 | true-coll 0.47 | no_safe 75 | 111.8s
+[ape2_shield seed1000000] ep  600 | stage 2 | succ 0.27 | true-coll 0.50 | no_safe 110 | 162.4s
+[ape2_shield seed1000000] ep  800 | stage 2 | succ 0.33 | true-coll 0.27 | no_safe 149 | 217.3s
+[ape2_shield seed1000001] ep 100: ADVANCE to stage 1 (2, 0.1)
+[ape2_shield seed1000001] ep 200: ADVANCE to stage 2 (3, 0.25)
+[ape2_shield seed1000001] ep  200 | stage 2 | succ 0.17 | true-coll 0.50 | no_safe 7 | 67.0s
+[ape2_shield seed1000001] ep  400 | stage 2 | succ 0.20 | true-coll 0.50 | no_safe 90 | 130.5s
+[ape2_shield seed1000001] ep  600 | stage 2 | succ 0.23 | true-coll 0.50 | no_safe 154 | 185.5s
+[ape2_shield seed1000001] ep  800 | stage 2 | succ 0.30 | true-coll 0.50 | no_safe 212 | 240.6s
+[ape2_shield seed1000002] ep 102: ADVANCE to stage 1 (2, 0.1)
+[ape2_shield seed1000002] ep  200 | stage 1 | succ 0.17 | true-coll 0.63 | no_safe 25 | 62.6s
+[ape2_shield seed1000002] ep 202: ADVANCE to stage 2 (3, 0.25)
+[ape2_shield seed1000002] ep  400 | stage 2 | succ 0.27 | true-coll 0.50 | no_safe 87 | 110.8s
+[ape2_shield seed1000002] ep  600 | stage 2 | succ 0.17 | true-coll 0.50 | no_safe 175 | 164.6s
+[ape2_shield seed1000002] ep  800 | stage 2 | succ 0.20 | true-coll 0.50 | no_safe 235 | 214.5s
+[ape2_shield seed1000003] ep 100: ADVANCE to stage 1 (2, 0.1)
+[ape2_shield seed1000003] ep 200: ADVANCE to stage 2 (3, 0.25)
+[ape2_shield seed1000003] ep  200 | stage 2 | succ 0.20 | true-coll 0.43 | no_safe 5 | 42.6s
+[ape2_shield seed1000003] ep  400 | stage 2 | succ 0.30 | true-coll 0.37 | no_safe 34 | 85.7s
+[ape2_shield seed1000003] ep  600 | stage 2 | succ 0.23 | true-coll 0.60 | no_safe 84 | 134.2s
+[ape2_shield seed1000003] ep  800 | stage 2 | succ 0.23 | true-coll 0.50 | no_safe 144 | 184.8s
+[ape2_shield seed1000004] ep 100: ADVANCE to stage 1 (2, 0.1)
+[ape2_shield seed1000004] ep 200: ADVANCE to stage 2 (3, 0.25)
+[ape2_shield seed1000004] ep  200 | stage 2 | succ 0.20 | true-coll 0.60 | no_safe 1 | 53.7s
+[ape2_shield seed1000004] ep  400 | stage 2 | succ 0.27 | true-coll 0.60 | no_safe 63 | 103.6s
+[ape2_shield seed1000004] ep  600 | stage 2 | succ 0.23 | true-coll 0.63 | no_safe 133 | 166.0s
+[ape2_shield seed1000004] ep  800 | stage 2 | succ 0.23 | true-coll 0.53 | no_safe 222 | 223.6s
+        ape2_shield final: succ 0.26 | true-coll 0.46
+results: experiments/results/m6_kinodynamic/m6_uoar_ape2_shield_salt0.json

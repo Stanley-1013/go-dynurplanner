@@ -354,6 +354,18 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter17: thread-limiting fix confirmed working well.
+  `ape2_shield` (task `bzvrh4qk7`) finished cleanly — ~220s/seed (vs.
+  thousands of seconds/seed under the earlier oversubscription),
+  independently verified (commander): all 5 seeds present, each reached
+  final curriculum stage (stage 2), final succ/coll range 0.20-0.33 /
+  0.27-0.53 across seeds — meaningful cross-seed variance, exactly the
+  kind of spread n=2 would have risked missing. Committed
+  `m6_uoar_ape2_shield_salt0.json`. `no_shield` ~90% done (seed 4/5).
+  `kinodynamic_shield` now measuring ~1.39s/episode (600 eps in 831.3s)
+  — better than even the original smoke-test estimate, ~1.5h projected
+  total for all 5 seeds. Both remaining arms progressing normally,
+  continuing to monitor.
 - 2026-07-17 iter16: user checked in ~4h49m after the iter15 relaunch.
   Found the three parallel processes were badly CPU-oversubscribed —
   `load average 28` on a 16-core machine, each process using ~38 threads
