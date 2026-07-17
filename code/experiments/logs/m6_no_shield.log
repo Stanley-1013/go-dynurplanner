@@ -1,0 +1,26 @@
+[no_shield seed0] ep  200 | stage 0 | succ 0.20 | true-coll 0.67 | no_safe 0 | 64.3s
+[no_shield seed0] ep  400 | stage 0 | succ 0.30 | true-coll 0.53 | no_safe 0 | 124.4s
+[no_shield seed0] ep  600 | stage 0 | succ 0.40 | true-coll 0.47 | no_safe 0 | 189.3s
+[no_shield seed0] ep 782: ADVANCE to stage 1 (2, 0.1)
+[no_shield seed0] ep  800 | stage 1 | succ 0.53 | true-coll 0.37 | no_safe 0 | 247.8s
+[no_shield seed1] ep  200 | stage 0 | succ 0.30 | true-coll 0.53 | no_safe 0 | 55.9s
+[no_shield seed1] ep  400 | stage 0 | succ 0.40 | true-coll 0.37 | no_safe 0 | 114.9s
+[no_shield seed1] ep 453: ADVANCE to stage 1 (2, 0.1)
+[no_shield seed1] ep  600 | stage 1 | succ 0.33 | true-coll 0.47 | no_safe 0 | 175.4s
+[no_shield seed1] ep  800 | stage 1 | succ 0.30 | true-coll 0.57 | no_safe 0 | 236.3s
+[no_shield seed2] ep  200 | stage 0 | succ 0.30 | true-coll 0.53 | no_safe 0 | 60.4s
+[no_shield seed2] ep  400 | stage 0 | succ 0.40 | true-coll 0.47 | no_safe 0 | 109.0s
+[no_shield seed2] ep  600 | stage 0 | succ 0.27 | true-coll 0.40 | no_safe 0 | 167.0s
+[no_shield seed2] ep  800 | stage 0 | succ 0.47 | true-coll 0.40 | no_safe 0 | 216.6s
+[no_shield seed3] ep  200 | stage 0 | succ 0.20 | true-coll 0.67 | no_safe 0 | 55.3s
+[no_shield seed3] ep  400 | stage 0 | succ 0.43 | true-coll 0.47 | no_safe 0 | 116.8s
+[no_shield seed3] ep  600 | stage 0 | succ 0.53 | true-coll 0.33 | no_safe 0 | 166.0s
+[no_shield seed3] ep 710: ADVANCE to stage 1 (2, 0.1)
+[no_shield seed3] ep  800 | stage 1 | succ 0.20 | true-coll 0.50 | no_safe 0 | 220.1s
+[no_shield seed4] ep  200 | stage 0 | succ 0.27 | true-coll 0.53 | no_safe 0 | 67.4s
+[no_shield seed4] ep 236: ADVANCE to stage 1 (2, 0.1)
+[no_shield seed4] ep  400 | stage 1 | succ 0.30 | true-coll 0.53 | no_safe 0 | 130.6s
+[no_shield seed4] ep  600 | stage 1 | succ 0.27 | true-coll 0.63 | no_safe 0 | 188.3s
+[no_shield seed4] ep  800 | stage 1 | succ 0.17 | true-coll 0.63 | no_safe 0 | 243.4s
+          no_shield final: succ 0.33 | true-coll 0.49
+results: experiments/results/m6_kinodynamic/m6_uoar_no_shield_salt0.json

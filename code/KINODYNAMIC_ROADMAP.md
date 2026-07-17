@@ -354,6 +354,23 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter18: `no_shield` (task `bd0iqcpc3`) finished, independently
+  verified — 5 seeds, all 800 episodes, succ range 0.17-0.53 / coll
+  0.37-0.63; seed2 never advanced past curriculum stage 0 (legitimate
+  training variance, rolling success never hit the 70% advance
+  threshold). Committed. `kinodynamic_shield` seed0 finished 800
+  episodes in 1099.7s (~1.37s/ep, matches the post-fix estimate) but its
+  success rate stayed near 0 (0.00-0.07) and it NEVER advanced past
+  curriculum stage 0, unlike `no_shield`/`ape2_shield` which both
+  reached stage 1-2 — worth flagging honestly in the Phase 5c writeup as
+  a real finding (possibly the velocity-action interface/hyperparameters
+  need their own tuning pass, not a like-for-like drop-in with delta-q's
+  tuned settings) rather than glossing over it. Collision rate stayed
+  high (63-77%) — expected, since the shield only guards joint-limit/
+  kinematic safety, not obstacle avoidance, which is still the policy's
+  job to learn. `load average` back down to ~11-17, no new
+  oversubscription. Continuing to monitor `kinodynamic_shield`'s
+  remaining 4 seeds.
 - 2026-07-17 iter17: thread-limiting fix confirmed working well.
   `ape2_shield` (task `bzvrh4qk7`) finished cleanly — ~220s/seed (vs.
   thousands of seconds/seed under the earlier oversubscription),
