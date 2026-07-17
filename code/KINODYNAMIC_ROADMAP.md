@@ -354,6 +354,27 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-17 iter15: session was interrupted mid-launch of Phase 5b.
+  Root cause: the `no_shield` run had been started with manual
+  `nohup ... & disown` inside a Bash call instead of the harness's own
+  `run_in_background` tool parameter — it silently died partway through
+  (seed3 incomplete, seeds 4 never started, no final JSON) once that
+  tool call's session was torn down, despite `nohup`/`disown`. **Lesson:
+  always launch long background jobs via the Bash tool's
+  `run_in_background: true`, never manual `nohup`/`&`/`disown` — the
+  latter does not reliably survive in this sandboxed environment.**
+  Confirmed no partial/misleading results were committed (the script
+  only writes its final JSON after all arms/seeds finish, so the
+  incomplete run left no corrupt tracked artifact — only a stray log
+  file and 3 orphaned `.pt` checkpoints, both harmless, both about to be
+  overwritten). Relaunched all three arms cleanly, properly
+  harness-tracked this time: `no_shield` (task `bwucb5kv0`),
+  `ape2_shield` (task `b8jjoyv2z`), `kinodynamic_shield` (task
+  `bf7w395o8`), same `--episodes 800 --seeds 5 --seed-salt 0` sizing as
+  before, logs at `experiments/logs/m6_no_shield.log`,
+  `m6_ape2_shield.log`, `m6_kinodynamic_shield_run.log`. Next iteration:
+  wait for completion notifications (or check log tails on a long
+  fallback wakeup), then move to Phase 5c analysis.
 - 2026-07-17 iter14: verified Phase 5a's `m6_kinodynamic_shield.py`
   (commander) — full read-through, correct per-arm mechanism separation
   (no_shield: plain TD3; ape2_shield: faithful port of m4_shield.py's
