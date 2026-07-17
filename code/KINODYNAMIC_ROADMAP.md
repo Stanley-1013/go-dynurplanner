@@ -372,6 +372,28 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter23: the 3000-episode probe (task `b7bq24gs9`) finished.
+  **Credit-assignment/"just needs more time" hypothesis REFUTED**: 14
+  checkpoints from ep200 to ep3000 all show succ 0.00-0.03, curriculum
+  stuck at stage 0 the entire run, intervention rate flat-to-rising
+  (0.195→0.216, never declining). This is NOT a training-budget problem
+  — something else is genuinely blocking learning, independent of the
+  Phase 5d buffer fix (which is confirmed correct but evidently
+  insufficient alone) and independent of episode count. Verified
+  (commander): read the full log, confirmed the final checkpoint
+  (succ=0.00, ep3000) and the flat trend across all 14 points myself,
+  not just the summary line. Committed the result under
+  `experiments/results/m6_kinodynamic_longrun/` (kept separate from the
+  tracked 800×5 comparison set — this is a diagnostic probe, not a
+  result to average into the paper-grade numbers).
+  Dispatched a DIAGNOSTIC investigation (not a fix attempt) to
+  disambiguate remaining hypotheses: is the task physically achievable
+  at all under the current placeholder `DDQ_MAX`/`DDDQ_MAX`/`dv_scale`
+  within `max_steps` (test via a scripted, non-learning policy), is the
+  trained policy exhibiting a degenerate "don't move" local optimum
+  (check actual velocity magnitudes reached), or is obstacle-avoidance
+  specifically the bottleneck (termination-cause breakdown: collision vs
+  timeout vs success).
 - 2026-07-18 iter22: launched the credit-assignment-hypothesis probe —
   `kinodynamic_shield`, fixed replay buffer, single seed (`--seed-salt 0`,
   same seed 0 as the earlier runs, now with the fix), **3000 episodes**

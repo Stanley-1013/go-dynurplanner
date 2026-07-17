@@ -1,0 +1,17 @@
+[kinodynamic_shield seed2000000] ep  200 | stage 0 | succ 0.00 | true-coll 0.70 | no_safe 0 | intervene 0.195 | 206.8s
+[kinodynamic_shield seed2000000] ep  400 | stage 0 | succ 0.00 | true-coll 0.67 | no_safe 0 | intervene 0.213 | 415.4s
+[kinodynamic_shield seed2000000] ep  600 | stage 0 | succ 0.00 | true-coll 0.67 | no_safe 0 | intervene 0.211 | 617.8s
+[kinodynamic_shield seed2000000] ep  800 | stage 0 | succ 0.03 | true-coll 0.73 | no_safe 0 | intervene 0.210 | 826.8s
+[kinodynamic_shield seed2000000] ep 1000 | stage 0 | succ 0.00 | true-coll 0.63 | no_safe 0 | intervene 0.213 | 1037.6s
+[kinodynamic_shield seed2000000] ep 1200 | stage 0 | succ 0.00 | true-coll 0.77 | no_safe 0 | intervene 0.213 | 1247.0s
+[kinodynamic_shield seed2000000] ep 1400 | stage 0 | succ 0.03 | true-coll 0.77 | no_safe 0 | intervene 0.214 | 1468.6s
+[kinodynamic_shield seed2000000] ep 1600 | stage 0 | succ 0.00 | true-coll 0.70 | no_safe 0 | intervene 0.216 | 1681.7s
+[kinodynamic_shield seed2000000] ep 1800 | stage 0 | succ 0.03 | true-coll 0.67 | no_safe 0 | intervene 0.215 | 1895.9s
+[kinodynamic_shield seed2000000] ep 2000 | stage 0 | succ 0.00 | true-coll 0.63 | no_safe 0 | intervene 0.216 | 2109.4s
+[kinodynamic_shield seed2000000] ep 2200 | stage 0 | succ 0.00 | true-coll 0.77 | no_safe 0 | intervene 0.215 | 2323.3s
+[kinodynamic_shield seed2000000] ep 2400 | stage 0 | succ 0.00 | true-coll 0.70 | no_safe 0 | intervene 0.215 | 2537.5s
+[kinodynamic_shield seed2000000] ep 2600 | stage 0 | succ 0.03 | true-coll 0.67 | no_safe 0 | intervene 0.215 | 2750.0s
+[kinodynamic_shield seed2000000] ep 2800 | stage 0 | succ 0.00 | true-coll 0.57 | no_safe 0 | intervene 0.213 | 2965.9s
+[kinodynamic_shield seed2000000] ep 3000 | stage 0 | succ 0.00 | true-coll 0.67 | no_safe 0 | intervene 0.216 | 3186.0s
+ kinodynamic_shield final: succ 0.00 | true-coll 0.67
+results: experiments/results/m6_kinodynamic_longrun/m6_uoar_kinodynamic_shield_salt0.json
