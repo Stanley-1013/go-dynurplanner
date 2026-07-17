@@ -10,7 +10,7 @@ from godynur.panda import DDQ_MAX, DQ_MAX, Q_MAX, Q_MIN
     "obstacles_in_state,closest_point_in_state",
     [(False, False), (True, False), (False, True), (True, True)],
 )
-def test_velocity_reset_and_state_dim_add_exactly_nine_fields(
+def test_velocity_reset_and_state_dim_add_exactly_sixteen_fields(
     obstacles_in_state, closest_point_in_state
 ):
     common = {
@@ -26,9 +26,9 @@ def test_velocity_reset_and_state_dim_add_exactly_nine_fields(
 
     assert np.array_equal(velocity_env.v, np.zeros(7))
     assert np.array_equal(velocity_env.a, np.zeros(7))
-    assert velocity_env.state_dim == delta_env.state_dim + 9
+    assert velocity_env.state_dim == delta_env.state_dim + 16
     assert state.shape == (velocity_env.state_dim,)
-    assert np.array_equal(state[-9:], np.zeros(9, dtype=np.float32))
+    assert np.array_equal(state[-16:], np.zeros(16, dtype=np.float32))
 
 
 def test_feasible_velocity_step_uses_normal_certified_path():
@@ -49,6 +49,7 @@ def test_feasible_velocity_step_uses_normal_certified_path():
     assert env._last_terminal_membership
     assert np.all(env.v > 0.0)
     assert np.linalg.norm(env.v - v_nom) < np.linalg.norm(v_nom)
+    assert np.allclose(state[-16:-9], env.v / DQ_MAX)
     assert np.allclose(state[-9:-2], env.a / DDQ_MAX)
     assert state[-2] == 1.0
     assert np.isclose(state[-1], env._last_intervention_norm)

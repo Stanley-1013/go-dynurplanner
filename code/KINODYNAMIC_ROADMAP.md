@@ -372,6 +372,22 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter26: implemented the fix directly (commander, small and
+  well-understood — no Codex round-trip needed). `env.py`: added
+  `self.v / DQ_MAX` (7 floats) to the velocity-mode observation,
+  inserted before the existing `self.a` term; `state_dim`'s velocity-mode
+  addition is now `16` (was `9`), commented `7 v + 7 a + 2 shield flags`.
+  Updated `test_env_velocity_mode.py`'s two affected assertions
+  (state_dim delta, zero-state check) to `16`, and added a direct
+  assertion that `state[-16:-9] == env.v/DQ_MAX` after a real step — the
+  test that actually proves this fix does what it's supposed to, not
+  just that the dimension count changed. Full suite: 79/79 green (same
+  count, two tests renamed/updated in place rather than duplicated).
+  Committing, then launching an 800-episode single-seed validation
+  probe (same seed 0, same everything else) — if velocity really was
+  the missing piece, this should show CLEAR improvement over the
+  pre-fix baseline at the same checkpoint (succ was 0.00-0.03 throughout
+  both prior runs), not just "still stuck, marginally different."
 - 2026-07-18 iter25: escalated the diagnostic findings to Opus for a
   ranked root-cause call before spending more compute guessing. Opus's
   read of the evidence (moves substantially, 0% collision, ALWAYS times

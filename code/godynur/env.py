@@ -107,7 +107,7 @@ class DynArmEnv:
             17
             + (6 * n_obstacles if obstacles_in_state else 0)
             + (7 if closest_point_in_state else 0)
-            + (9 if action_mode == "velocity" else 0)
+            + (16 if action_mode == "velocity" else 0)  # 7 v + 7 a + 2 shield flags
         )
         # Episode stats maintained for Figure-1-style instrumentation.
         self.last_tau_star: float | None = None
@@ -384,6 +384,7 @@ class DynArmEnv:
             parts.append(direction)
             parts.append(p_box - flange)
         if self.action_mode == "velocity":
+            parts.append(self.v / DQ_MAX)
             parts.append(self.a / DDQ_MAX)
             parts.append([1.0 if self._last_terminal_membership else 0.0])
             parts.append([self._last_intervention_norm])
