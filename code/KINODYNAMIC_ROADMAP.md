@@ -372,6 +372,19 @@ disclosure style for the original `eps_lin`).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter22: launched the credit-assignment-hypothesis probe —
+  `kinodynamic_shield`, fixed replay buffer, single seed (`--seed-salt 0`,
+  same seed 0 as the earlier runs, now with the fix), **3000 episodes**
+  matching the historical M4 budget, `--out
+  experiments/results/m6_kinodynamic_longrun` (separate dir, not mixed
+  with the committed 800-episode 5-seed results), only process running
+  so no oversubscription risk this time (6 threads, machine otherwise
+  idle). Task id `b7bq24gs9`, log
+  `experiments/logs/m6_kinodynamic_longrun.log`. Projected ~60-70min at
+  the post-fix ~1.37s/ep rate. Next: check whether curriculum ever
+  advances past stage 0 and whether intervention rate trends down given
+  enough training time — this is the actual test of "needs more budget"
+  vs. "still broken."
 - 2026-07-18 iter21: independently verified iter20's fix (commander) —
   diff is exactly the specified change (`env.py`: `_last_executed_action
   = clip((v_new-v_old)/dv_scale, -1, 1)`, set unconditionally after all
