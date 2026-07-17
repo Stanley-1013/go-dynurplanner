@@ -390,6 +390,36 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter38: user chose Opus's "better-established alternative"
+  (from the iter36 consult) — a differentiable QP layer, replacing the
+  STE approximation with the real thing: backpropagate the actor
+  gradient through the actual safety QP via implicit differentiation of
+  its KKT conditions, rather than approximating with STE.
+  Installed `cvxpy`+`cvxpylayers` (new deps, network access confirmed
+  working, `cvxpylayers==1.2.0`). Built a standalone feasibility
+  prototype (commander, `/tmp` scratchpad, not yet in the tracked repo)
+  reusing the EXISTING, already-verified `_affine_map`/
+  `_trajectory_quantities` from `safety_qp.py` (no second, independently
+  -fallible re-derivation of the trajectory math) to construct the same
+  box-only QP (`require_terminal_stop=False`, matching the real-time
+  live-control config) in CVXPY, with `v_nom` as the differentiable
+  `cp.Parameter`. **Feasibility confirmed**: forward solution matches
+  the existing scipy solver to ~2e-7; backward analytic gradient
+  matches a finite-difference check to ~4.6e-5. Timing: ~5.9ms per
+  single forward+backward call — actually FASTER than the scipy solve.
+  **Found a bigger complication than the initial timing test showed**:
+  `box_matrix`/`box_offset`/`v1_matrix`/`v1_offset` depend on each
+  transition's own `(q,v,a)` state (via the affine map's closure over
+  q0,v0,a0), not just on `v_nom` — a real training batch (64 transitions,
+  64 different states) needs PER-TRANSITION-varying constraint matrices
+  passed as batched `cp.Parameter`s, not a single fixed structure with
+  only `v_nom` varying (which is what the quick timing test actually
+  measured — an unrealistic best case). `cvxpylayers` supports this via
+  matrix-shaped batched parameters, but it's a materially bigger build
+  than the initial prototype suggested. Dispatching the production
+  module + integration to Codex next with a precise spec, since the
+  hard feasibility question (is this even correct/differentiable) is
+  now answered yes — what remains is real but well-scoped engineering.
 - 2026-07-18 iter37: STE probe (task `bnm6hrzus`) finished. **Fifth
   consecutive negative result**: succ [0.0, 0.0, 0.0, 0.03], intervention
   rate flat ~0.20-0.22, isolated from the failed hyperparameter sweep
