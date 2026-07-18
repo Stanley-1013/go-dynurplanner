@@ -183,7 +183,7 @@ that WILL need a value/decision from the lab.
   (`tests/test_panda.py`), but **cross-check numerically against the lab's
   FK or CoppeliaSim model when available**.
 
-## 7. Pose reward phi_aux — APPROXIMATED
+## 7. Pose reward phi_aux — APPROXIMATED (superseded by exact numbers below)
 - URPlanner Eq.(11): r_pose = -(e_p + e_o) + phi_aux + phi_G. phi_aux's
   exact form is in their ref [9] Eqs.(12-13) (not obtained). Implemented as
   0.5*exp(-err/0.08); phi_G = 1 inside tolerance; orientation error e_o
@@ -191,6 +191,37 @@ that WILL need a value/decision from the lab.
   goes from unlearnable (0.2 rolling success @1600 eps with bare -err +
   dwell-5) to 0.73 @500 eps. **Swap in the exact phi_aux when [9]/lab code
   arrives.**
+- **2026-07-18: exact real formula extracted directly from
+  `advisor_code/0801pretrain/Franka_Env_Scene2.py::step()` (source code,
+  not a paraphrase) — supersedes the "APPROXIMATED" framing above.** The
+  real phi_aux-equivalent is NOT the exponential decay guessed above; it
+  is (their code, `step()`, ~line 90-125):
+  ```
+  delta_pos   = ||(goal_xyz - tcp_xyz) / dist_norm||   # dist_norm = 3
+  delta_orient = sum(|goal_rpy - tcp_rpy|) / (3*orient_norm)  # orient_norm=180
+  r = -delta_pos - delta_orient                         # base pose term
+  r += 0.05 if distance_to_goal decreased this step else -0.05
+  r += 0.03 if orientation_error decreased this step else -0.03
+  r -= total_intersection_length / total_link_length     # total_link_length=0.9101, no separate zeta weight
+  if within tolerance (pe=0.02m position, oe=6deg orientation, ALL axes):
+      on_goal += 1; r += 1                                # +1 EVERY STEP while in tolerance
+      if on_goal >= 50: done = True                        # goal_dwell = 50, not 1
+  ```
+  Episode budget: `main.py`'s actual training loop uses
+  `MAX_EPISODES_STEPS = 300` (NOT the unrelated `MAX_EPISODES_STEPS=100`
+  inside `Franka_Env_Scene2.py`'s own `if __name__=='__main__':` 5-episode
+  smoke-test block at the bottom of that file — don't confuse the two,
+  the smoke-test constant is not the training convention).
+  **Key structural difference from our current `godynur/env.py` default**:
+  `goal_dwell=1` here means the episode ends the instant tolerance is
+  entered — there is no reward for staying. The real recipe's
+  `goal_dwell=50` + sustained `+1`/step while in tolerance creates a
+  large, direct incentive to decelerate and remain near the goal that our
+  default reward structurally lacks. See `KINODYNAMIC_ROADMAP.md` iter42
+  for why this may be central to the Phase 5 kinodynamic_shield RL-
+  convergence investigation, and the plan to test an aligned configuration
+  before further hypothesis-testing on the current (known-divergent)
+  recipe.
 
 ## 8. Training hyperparameters (Table I, for later APE2 reproduction)
 - lr 1e-3, memory 6e4, soft update 0.01, batch 64, ξ=0.98, ζ=1,

@@ -390,6 +390,57 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter42: **user redirected again, correctly**: before running
+  Codex's proposed A/B experiment, do proper academic grounding — align
+  with URPlanner/the advisor's real recipe wherever alignment should
+  happen, rather than keep experimenting in an internally-consistent
+  bubble with nothing external to verify against. Went back to the
+  advisor's REAL SOURCE CODE directly (`advisor_code/0801pretrain/
+  Franka_Env_Scene2.py`, `main.py` — not just the `ASSUMPTIONS.md`
+  summary, which is accurate but less precise than the source) and
+  extracted the EXACT reward formula and constants, superseding item 7's
+  "APPROXIMATED" framing:
+  - `r = -delta_pos - delta_orient` (base pose term, using goal/TCP
+    distances normalized by `dist_norm=3`, `orient_norm=180`) + step-
+    improvement PBRS (`+0.05`/`-0.05` if normalized distance
+    decreased/increased this step, `+0.03`/`-0.03` for orientation) +
+    collision term (`-total_intersection_length/total_link_length`,
+    `total_link_length=0.9101`, confirmed no separate ζ weighting,
+    matching our default `zeta_c=1.0` numerically) + **`+1` reward EVERY
+    STEP while fully within tolerance** (position AND orientation).
+  - Position/orientation tolerance: `pe=0.02` (2cm — tighter than our
+    `goal_tol=0.05`), `oe=6°`.
+  - **`goal_dwell=50`, and — found by checking `main.py`'s actual
+    training loop, not just the env file's own unrelated 5-episode
+    smoke-test block which has an unrelated `MAX_EPISODES_STEPS=100` —
+    the REAL per-episode budget is `MAX_EPISODES_STEPS=300`**, not our
+    100. Their 50-step dwell requirement costs ~17% of a 300-step
+    episode; naively importing `goal_dwell=50` into our 100-step budget
+    without also scaling the episode length would cost 50% of the
+    episode and be a mismatched, unbalanced transplant.
+  **Why this matters for the RL-convergence question specifically**:
+  with `goal_dwell=1` (ours), the episode ends the INSTANT tolerance is
+  entered — there is no reward mechanism that specifically rewards
+  DECELERATING AND STAYING near the goal, only reaching it once,
+  momentarily. With `goal_dwell=50` + the sustained `+1`/step-while-
+  in-tolerance term (real recipe), arriving and stopping is directly
+  rewarded for up to 50 consecutive steps — a large, structural
+  incentive our current reward completely lacks. This is a genuinely
+  plausible, previously-unidentified structural explanation for "moves
+  substantially, never learns to settle" that neither the commander's
+  six attempts nor Codex's review surfaced — found only by going back to
+  the actual reference implementation as the user directed.
+  **Decision**: implement an aligned configuration (new opt-in mode —
+  existing `reward_mode='uoar'`/`goal_dwell=1`/`max_steps=100` stay the
+  untouched default, per this project's established "never silently
+  retroactively change existing results" convention) matching the real
+  formula/tolerances/dwell/episode-length as closely as sensible for our
+  broader (non-static) goal region, test it with a modest episode count
+  first (not committing to the full Codex-proposed 3000-episode/5-seed
+  scale until this shows at least a preliminary positive signal), THEN
+  proceed to Codex's nominal-vs-executed-action A/B on top of this
+  aligned base rather than on the current, known-divergent-from-ground-
+  truth reward.
 - 2026-07-18 iter41: **the user, correctly skeptical of the commander's
   "stop this thread" recommendation, asked for an independent critical
   review by Codex (GPT-5.6) rather than accepting it — this caught real
