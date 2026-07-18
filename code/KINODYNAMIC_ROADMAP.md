@@ -390,6 +390,89 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter41: **the user, correctly skeptical of the commander's
+  "stop this thread" recommendation, asked for an independent critical
+  review by Codex (GPT-5.6) rather than accepting it — this caught real
+  gaps the commander missed.** Wrote a full, rigorous report
+  (`RL_CONVERGENCE_FULL_REPORT.md`) with the complete reasoning chain,
+  a chart, and an explicit statistical-weakness section, then dispatched
+  it to Codex for read-only, skeptical review (not implementation).
+  Codex's verdict: **does NOT agree stopping is justified yet**, and
+  found two real issues the commander's six-attempt investigation
+  missed, both verified directly against the code (not taken on faith):
+  1. **The `evaluate()` function hardcodes `env.set_difficulty(*STAGES[-1])`
+     unconditionally** (`m6_kinodynamic_shield.py:172`) — every
+     checkpoint's success/collision numbers across ALL SIX attempts were
+     measured at the HARDEST curriculum stage (3 obstacles, 0.25 m/s),
+     even though training never left stage 0 (0 obstacles). This is an
+     inherited convention from `m4_shield.py`/`m3_curriculum.py`
+     (deliberate there, for arms that DO progress through stages), but
+     for `kinodynamic_shield` specifically it means most of the
+     "success stuck near 0%" and "collision rate rose to 0.83" readings
+     are confounded with obstacle-avoidance failure against dynamics the
+     policy never trained on — NOT clean evidence about base-reaching
+     capability. (The one exception: Phase 5f's standalone scripted-vs-
+     trained diagnostic used its own separate, correctly-stage-0
+     evaluation logic — that finding, trained policy 0% success/100%
+     timeout even with no obstacles, stands independent of this bug.)
+  2. **Attempt 1 (the "replay-buffer action-consistency fix," iter19-20)
+     may not have been a fix at all.** Codex's argument, verified against
+     `env.py`/`td3.py`/`m6_kinodynamic_shield.py` directly: under the
+     standard RL framing where the safety shield is PART OF THE
+     ENVIRONMENT'S TRANSITION FUNCTION (analogous to actuator
+     saturation — a well-established pattern, you don't relabel actions
+     post-hoc for a saturating actuator, you let the critic learn
+     `Q(s, a_nominal)` and let it absorb the nonlinearity), storing the
+     actor's raw NOMINAL action was arguably already correct, and
+     relabeling to `u_executed` (clipped, lossy — many different nominal
+     proposals collapse to the same executed label when the shield
+     saturates) introduced a genuine NEW inconsistency: TD3's target
+     computation (`td3.py`'s `a2 = self.actor_t(s2) + noise`) still
+     produces NOMINAL actions for bootstrapping, while the critic is
+     simultaneously trained on EXECUTED-action labels for the current
+     transition — mixing two different action-coordinate systems within
+     the same Bellman residual. **Because attempt 1 was applied before
+     every subsequent attempt (2-6), no experiment in the whole
+     investigation ever tested the simplest, most standard formulation:
+     nominal-action replay + velocity observation present, together.**
+  3. Reinforced the single-seed weakness with a sharper framing: "these
+     are not six independent Bernoulli failures; most are correlated
+     runs on one seed, with additive changes and a shared replay-action
+     assumption" — they prove several configurations fail for THAT SEED,
+     not population-level falsification. Recommended ≥5 seeds for any
+     screening-level negative verdict.
+  4. Rated the user's two flagged hypotheses: reward-shaping mismatch
+     (§7.2, advisor's real PBRS vs. our continuous exponential bonus) —
+     "credible secondary bottleneck," worked through actual numbers
+     (median initial goal distance ≈0.28m, exponential term ≈0.015 there
+     vs. base -0.282 — confirms it's small but the `-err` term stays
+     dense, so "negligible signal" is too strong a claim); observation
+     normalization (§7.1) — "plausible contributor but unlikely primary
+     cause," noting the raw Cartesian features are already mostly within
+     ~[-0.35,0.70], not orders-of-magnitude mismatched, and the same
+     representation works fine for the other (working) arms. Also
+     flagged an UNLISTED hypothesis: no remaining-time feature in the
+     observation despite `max_steps=100` truncation being treated as a
+     terminal state, which "could also encourage rushing."
+  5. **Concrete recommended experiment** before accepting any stop
+     decision: a paired A/B (nominal- vs executed-action replay
+     labeling), 5 seeds each, 3000 episodes, stage-0-only training AND
+     evaluation (fixing bug #1), richer diagnostics (minimum goal
+     distance reached, radial velocity at closest approach, overshoot
+     count — not just binary success), with an explicit, falsifiable
+     pre-registered success criterion (≥15pp mean success advantage for
+     nominal-action arm across most seeds to confirm; all 5 nominal-
+     action seeds staying ≤5% through 3000 episodes to refute).
+  All of Codex's code citations were independently verified by the
+  commander directly (not accepted on faith) — every one checked out.
+  **Commander's revised position: Codex's review is correct and
+  identifies a genuine, previously-unnoticed gap. Withdrawing the "stop
+  this thread" recommendation.** This is exactly the outcome the user's
+  insistence on independent review was for. Next: fix the eval-protocol
+  bug (cheap, unambiguously correct regardless of the larger question),
+  then plan a scoped version of Codex's proposed experiment before
+  committing to its full 5-seed/3000-episode/2-arm scale (~10+ hours of
+  compute) — check with the user given the size of that commitment.
 - 2026-07-18 iter40: independently verified Phase 5m thoroughly (commander
   — this was the largest single dispatch of the session). Reran pytest
   myself: 98/98 (warnings are benign third-party `diffcp` NumPy

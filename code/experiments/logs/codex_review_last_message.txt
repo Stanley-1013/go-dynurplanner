@@ -1,0 +1,198 @@
+# Independent skeptical review
+
+## Bottom line
+
+I do **not** think the evidence yet justifies closing the RL-convergence investigation as a technical conclusion.
+
+Stopping the expensive differentiable-QP branch is justified. Stopping the entire velocity-policy thread is premature because the reasoning chain after attempt 0 rests on a questionable—and likely incorrect—definition of the TD3 action. No experiment appears to have combined:
+
+1. the necessary Markov observation containing velocity, and  
+2. replay/critic actions defined in the same nominal-action coordinates produced by the actor.
+
+That missing combination is more consequential than either observation normalization or reward shaping. I recommend one properly powered experiment on it before stopping.
+
+## 1. The central problem: attempt 1 may not be a valid “fix”
+
+The report treats storing the actor’s nominal action as a replay-buffer consistency bug. I disagree.
+
+The actor produces nominal \(u_t\); the training loop passes that exact value to `env.step(a)` ([m6_kinodynamic_shield.py:309](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py:309)); and the environment defines its transition by mapping that action to `v_nom` and then applying the shield ([env.py:216](/home/han/claude_project/papper-research/code/godynur/env.py:216)). Therefore the natural shielded MDP is:
+
+\[
+a_{\rm agent}=u_{\rm nominal},\qquad
+s' = F_{\rm shield}(s,u_{\rm nominal}).
+\]
+
+Under that definition, the shield is part of the transition function. A transformed or saturated action is not automatically a mislabeled transition—no more than motor saturation or nonlinear actuator dynamics makes the commanded action an invalid replay label. The critic should learn \(Q(s,u_{\rm nominal})\), including the consequences of shield intervention.
+
+Instead, attempt 1 replaces the actor’s action with a post-transition quantity,
+
+\[
+u_{\rm executed}=(v_{t+1}-v_t)/dv_{\rm scale},
+\]
+
+computed at [env.py:322](/home/han/claude_project/papper-research/code/godynur/env.py:322) and stored at [m6_kinodynamic_shield.py:311](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py:311). But TD3’s target actor still produces nominal/raw actions at [td3.py:126](/home/han/claude_project/papper-research/code/godynur/td3.py:126). Thus the replay critic is trained in executed-action coordinates while its Bellman targets are queried in nominal-action coordinates. That is a genuine semantic mismatch.
+
+There are additional problems with the derived executed action:
+
+- It is clipped to `[-1,1]`, potentially aliasing physically different transitions.
+- It is not the quantity the deployed actor directly selects.
+- Multiple nominal requests can collapse to the same shielded action, so the critic loses information about which proposals cause intervention.
+- The environment’s shield includes terminal-braking acceptance and fallback logic beyond merely achieving \(v_{t+1}\).
+
+This reverses the report’s conclusion: storing the raw nominal action was not demonstrably a bug; storing the executed action may have introduced the more serious inconsistency.
+
+The experiment sequence is therefore confounded:
+
+- Attempt 0: nominal replay semantics, but velocity was missing from the observation.
+- Attempt 1: executed replay semantics, still without velocity.
+- Attempts 2–6: velocity is present, but the questionable executed-action semantics are retained.
+
+No run tested “nominal replay + velocity observation,” the most basic fully observed formulation.
+
+## 2. Attempts 5 and 6 do not repair that mismatch completely
+
+The STE actor update evaluates the critic at the replay buffer’s historical executed action ([td3.py:145](/home/han/claude_project/papper-research/code/godynur/td3.py:145)). That is not the same as projecting the current actor output through the shield and using an identity backward derivative. It computes a gradient at a behavior action drawn from the sampled transition.
+
+More importantly, neither STE nor the differentiable actor projection is applied to TD3’s Bellman target. Target actions remain:
+
+```text
+actor_t(s2) + smoothing noise
+```
+
+and are passed directly to the target critics at [td3.py:126](/home/han/claude_project/papper-research/code/godynur/td3.py:126). Thus the critic-target coordinate mismatch persists even when the actor-loss query is modified.
+
+Attempt 6 is also differentiating through the box-constrained QP subproblem, not the complete deployed shield. The actual environment accepts the QP proposal only if a terminal-braking witness exists, otherwise it executes a fallback brake ([env.py:244](/home/han/claude_project/papper-research/code/godynur/env.py:244)). The differentiable projection ends after `differentiable_v_exec` ([m6_kinodynamic_shield.py:100](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py:100)); it does not reproduce that discrete acceptance/fallback branch.
+
+Consequently, attempt 6 demonstrates a correct differentiable implementation of one QP, but its ep200 result is very weak evidence against differentiating the full shield—and even weaker evidence against velocity-mode learning generally.
+
+## 3. Statistical assessment
+
+The single-seed weakness is disqualifying for claims that attempts 1–5 “do not help” across seeds. Attempt 6’s one ep200 checkpoint is not a meaningful convergence test at all.
+
+I would require:
+
+- **At least five independent seeds** for a screening-level negative verdict.
+- Eight to ten for a paper-grade quantitative claim, consistent with the roadmap’s own standard ([KINODYNAMIC_ROADMAP.md:298](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md:298)).
+
+The repeated use of essentially the same seed makes the “six consecutive negative results” framing especially misleading. These are not six independent Bernoulli failures; most are correlated runs on one seed, with additive changes and a shared replay-action assumption. They prove that several configurations fail for that seed, not that each hypothesis has been population-level falsified.
+
+Attempt 0’s five seeds do convincingly establish that the original velocity configuration fails. They do not test the corrected Markov formulation because velocity was absent.
+
+## 4. Evaluation-protocol issue
+
+The main evaluation routine always switches the evaluation environment to the hardest stage:
+
+```text
+env.set_difficulty(*STAGES[-1])
+```
+
+at [m6_kinodynamic_shield.py:171](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py:171), even when the training curriculum remains at stage 0. Therefore the plotted 0–7% checkpoint success and 0.6–0.8 collision rates are hard-stage evaluations, not stage-0 evaluations.
+
+The separate stage-0 scripted/trained diagnostic and the logged training rolling success do still establish a real base-task failure. So this does not erase the central finding. But it means:
+
+- Hard-stage collision changes cannot diagnose stage-0 reach learning.
+- The report sometimes juxtaposes “stuck at stage 0” with success/collision figures measured at stage 2.
+- The proposed `dv_scale×8` explanation for increased collision is less informative about base reaching than presented.
+
+Future diagnostic evaluation should explicitly remain at stage 0.
+
+## 5. Observation normalization
+
+The relevant state construction is at [env.py:425](/home/han/claude_project/papper-research/code/godynur/env.py:425). Joint state and velocity-mode features are normalized, while flange, goal and relative Cartesian vectors are in meters.
+
+I rate this as a **plausible contributor but an unlikely primary cause**.
+
+A concrete mechanism is possible: typical trained joint speeds are small relative to `DQ_MAX`, so `v/DQ_MAX` can often be around \(0.05\)–\(0.1\), while Cartesian errors are around \(0.2\)–\(0.4\). Early first-layer learning can therefore emphasize position and joint configuration more than velocity. A policy could learn which direction to move while learning a weak speed-dependent braking rule, producing substantial motion and repeated overshoot.
+
+But the evidence for that mechanism is limited:
+
+- The raw Cartesian features are already mostly within `[-1,1]`; there is no orders-of-magnitude scale problem.
+- `goal-flange` directly supplies the task-relevant Cartesian error.
+- The same raw Cartesian representation works for the delta-q arms.
+- A 256-unit MLP can readily learn constant rescalings.
+- The advisor’s actual state is not uniformly standardized either: TCP and goal are divided by 3, while the reported delta-position treatment differs ([ASSUMPTIONS.md:60](/home/han/claude_project/papper-research/code/ASSUMPTIONS.md:60)).
+
+Also, “moves but never settles” has not actually been demonstrated as overshoot. With `goal_dwell=1` ([env.py:44](/home/han/claude_project/papper-research/code/godynur/env.py:44)), the policy succeeds upon one entry into the 5 cm sphere; it does not need to settle. Minimum distance, radial velocity at closest approach, and overshoot counts were not reported. The actor may simply wander in the wrong directions.
+
+If normalization is tested later, empirical feature standardization is more informative than merely mapping workspace meters to `[-1,1]`.
+
+## 6. Reward-shaping mismatch
+
+The report is numerically correct that the exponential term is small over much of the initial state distribution, but “negligible reward signal” is too strong because `-err` remains dense.
+
+Using the actual goal sampler, I find an initial distance distribution of approximately:
+
+- Median: 0.282 m
+- 75th percentile: 0.351 m
+- 90th percentile: 0.405 m
+
+The exponential bonus is:
+
+| Error | \(0.5e^{-err/0.08}\) |
+|---:|---:|
+| 0.15 m | 0.0767 |
+| 0.20 m | 0.0410 |
+| 0.25 m | 0.0220 |
+| 0.30 m | 0.0118 |
+| 0.40 m | 0.00337 |
+
+At the median initial distance it is about 0.015, versus a base reward of about -0.282. Thus it is indeed a small component for most early states. But the complete reward at [env.py:619](/home/han/claude_project/papper-research/code/godynur/env.py:619) still changes continuously with distance.
+
+The advisor’s `+0.05/-0.05` step-improvement term ([ASSUMPTIONS.md:66](/home/han/claude_project/papper-research/code/ASSUMPTIONS.md:66)) could nevertheless matter substantially:
+
+- One-step Cartesian changes under jerk-limited velocity control can be only millimetres, so differences in `-err` between candidate actions are initially tiny.
+- The discrete term converts any progress/regression into a 0.1 reward separation, making immediate action discrimination much easier.
+- Because it rewards the sign rather than magnitude of progress, a slowly approaching, decelerating action can receive the same shaping bonus as a fast approach. The current cumulative `-err` objective more strongly prefers getting close quickly, which can promote excessive approach velocity.
+- After overshoot, increasing distance immediately flips the shaping term negative.
+
+It is not a complete deceleration reward: braking before the closest approach may reduce progress but still gives `+0.05`, and it does not explicitly reward low radial velocity. With dwell 1, only momentary entry is required. Still, I rate the reward mismatch as a credible secondary bottleneck and more plausible than network capacity.
+
+## 7. Ranking the report’s open hypotheses
+
+| Rank | Report hypothesis | Likelihood | Test cost | Assessment |
+|---:|---|---|---|---|
+| 1 | §7.5 clean re-check / interaction isolation | High | Moderate | Especially important because nominal replay and velocity observation were never combined. |
+| 2 | §7.2 step-improvement reward | Medium–high | Low implementation, moderate training | Could greatly amplify transition-level credit and weaken the incentive for maximum approach speed. |
+| 3 | §7.4 proper `dv_scale` study | Medium | High | The ×8 combined run rules out only one aggressive setting. Given trained speed already exceeds scripted speed, smaller scales may be more relevant than still larger ones. |
+| 4 | §7.1 observation scaling | Low–medium | Low | Mechanistically possible through underweighted velocity, but the raw ranges are modest and shared with successful arms. |
+| 5 | §7.3 larger network | Low | Low–moderate | A 256×256 MLP is ample for a 50–65 dimensional Markov vector. Double-integrator control does not inherently require recurrence once \(q,v,a\) are observed. |
+
+## 8. Additional unlisted hypothesis: time-limit handling
+
+Timeout is included in `done` ([env.py:360](/home/han/claude_project/papper-research/code/godynur/env.py:360)) and stored directly as TD3’s terminal flag ([m6_kinodynamic_shield.py:317](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py:317)). The observation contains no remaining-time feature.
+
+That creates two related issues:
+
+- The same physical state can have different value depending on whether five or eighty steps remain, but the critic cannot distinguish them.
+- Treating a time-limit truncation as an absorbing terminal state suppresses bootstrapping at step 100.
+
+This affects all arms, but it can hurt the slower double-integrator interface more. It could also encourage rushing and high-speed approaches. I would not test it before action semantics, but it should remain on the list.
+
+## 9. One recommended experiment before stopping
+
+Run a paired, stage-0-only A/B experiment testing the replay-action definition.
+
+Configuration:
+
+- Start from the attempt-2 formulation: velocity included; default `dv_scale`, noise, gamma and existing reward.
+- Disable STE and differentiable-QP actor updates; use standard TD3.
+- Do not add/remove reward shaping or normalization.
+- Arm A stores the actor’s nominal action passed to `env.step`.
+- Arm B stores the derived executed action, as attempt 2 did.
+- Use five paired independent seeds, 3,000 episodes each.
+- Train and evaluate at stage 0; use at least 100 fixed, common evaluation goals per checkpoint.
+
+Measure:
+
+- Stage-0 success.
+- Minimum goal distance per episode and fractions reaching 0.20/0.10/0.05 m.
+- Radial flange velocity and joint speed at closest approach.
+- Overshoot count.
+- Shield fallback/intervention rate.
+- Learning curves per seed, not just pooled final means.
+
+A result would support the nominal-action hypothesis if Arm A shows a clear learning trend in most seeds—for example, at least a 15 percentage-point mean success advantage, with several seeds reaching substantial success or curriculum-quality performance—while Arm B remains near zero.
+
+It would refute the hypothesis if all five nominal-action seeds remain near the present ≤5% level through 3,000 episodes and show no improvement in minimum-distance distributions. If that happens, I would accept stopping this thread and document reward shaping, time-limit handling, normalization and scale tuning as unresolved alternatives rather than claiming they were ruled out.
+
+**Recommendation: run this one experiment before stopping.** The current six-attempt chain does not yet test the most coherent fully observed nominal-action MDP, so accepting the commander’s conclusion now would be premature.
