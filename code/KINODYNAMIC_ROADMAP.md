@@ -390,6 +390,22 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter46: caught and fixed an important oversight before
+  launching the alignment probe (commander) — Phase 5m's wiring made the
+  EXPENSIVE differentiable-QP actor update the automatic default for
+  every `kinodynamic_shield` run since then (it replaced Phase 5l's STE
+  wiring outright), so a first smoke test of the new advisor-aligned
+  config was still paying ~15-20x overhead for a mechanism ALREADY shown
+  ineffective (iter40) — testing two unrelated variables (reward
+  alignment + actor-gradient mechanism) at once, and wasting most of the
+  wall-clock on the wrong one. Added `--actor-mode {plain,ste,diffqp}`
+  (default `plain`), added a runtime guard rejecting `actor_mode!=
+  "plain"` for non-`kinodynamic_shield` arms. Killed the slow smoke test,
+  reran with `--actor-mode plain`: 133.5s for 6 episodes at
+  `max_steps=300` (~22.25s/episode) — dramatically faster, confirms the
+  fix. 102/102 pytest still green. This keeps the upcoming reward-
+  alignment probe isolated to testing ONE new variable at a time, per
+  the same discipline Opus recommended back in iter34-35.
 - 2026-07-18 iter45: two small, self-implemented additions before the
   next probe (commander, direct — small and well-understood, no Codex
   round-trip): (1) `m6_kinodynamic_shield.py` now exposes

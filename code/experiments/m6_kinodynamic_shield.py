@@ -261,6 +261,7 @@ def run_one(
     goal_dwell: int = 1,
     max_steps: int = 100,
     eval_at_current_stage: bool = False,
+    actor_mode: str = "plain",
 ):
     action_mode = "velocity" if arm == "kinodynamic_shield" else "delta_q"
     env_kwargs = dict(
@@ -276,8 +277,20 @@ def run_one(
         env_kwargs["dv_scale"] = DQ_MAX * DynArmEnv.dt * dv_scale_mult
     env = DynArmEnv(seed=seed, **env_kwargs)
     eval_env = DynArmEnv(seed=10_000 + seed, **env_kwargs)
+    if arm != "kinodynamic_shield" and actor_mode != "plain":
+        raise ValueError("actor_mode only applies to the kinodynamic_shield arm")
+    if actor_mode not in ("plain", "ste", "diffqp"):
+        raise ValueError(f"unknown actor_mode {actor_mode!r}")
+    # Phase 5m wired diffqp as the only mechanism tested at that point, but
+    # both ste and diffqp were later shown ineffective at 15-20x (diffqp) or
+    # comparable (ste) cost with no measurable benefit (KINODYNAMIC_ROADMAP.md
+    # iter37/iter40) -- default to plain TD3 so new experiments testing a
+    # DIFFERENT variable (e.g. reward alignment) aren't paying that overhead
+    # for a mechanism already shown not to help this arm.
     differentiable_projection = (
-        build_diffqp_projection(env) if arm == "kinodynamic_shield" else None
+        build_diffqp_projection(env)
+        if arm == "kinodynamic_shield" and actor_mode == "diffqp"
+        else None
     )
     agent = TD3(
         env.state_dim,
@@ -286,6 +299,7 @@ def run_one(
         expl_noise=expl_noise,
         gamma=gamma,
         seed=seed,
+        use_action_ste=(arm == "kinodynamic_shield" and actor_mode == "ste"),
         differentiable_projection=differentiable_projection,
     )
     sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
@@ -492,6 +506,16 @@ def main():
         "--max-steps", type=int, default=100, help="DynArmEnv max_steps override"
     )
     ap.add_argument(
+        "--actor-mode",
+        type=str,
+        default="plain",
+        choices=("plain", "ste", "diffqp"),
+        help="kinodynamic_shield actor-update mechanism: plain TD3 "
+        "(default -- both ste and diffqp were shown ineffective, see "
+        "KINODYNAMIC_ROADMAP.md iter37/iter40), straight-through estimator, "
+        "or the differentiable QP layer",
+    )
+    ap.add_argument(
         "--eval-at-current-stage",
         action="store_true",
         help="evaluate at the stage training actually reached, instead of "
@@ -526,6 +550,7 @@ def main():
                 goal_dwell=args.goal_dwell,
                 max_steps=args.max_steps,
                 eval_at_current_stage=args.eval_at_current_stage,
+                actor_mode=args.actor_mode,
             )
 
     arm_tag = "-".join(args.arms)
