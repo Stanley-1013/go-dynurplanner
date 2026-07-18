@@ -168,8 +168,20 @@ def _kinodynamic_counts(env: DynArmEnv) -> dict[str, int]:
     }
 
 
-def evaluate(env: DynArmEnv, agent: TD3, arm: str, seed: int):
-    env.set_difficulty(*STAGES[-1])
+def evaluate(
+    env: DynArmEnv, agent: TD3, arm: str, seed: int, eval_stage_idx: int | None = None
+):
+    # Default (None) preserves the existing m3/m4 convention: always
+    # evaluate at the hardest stage, a deliberate worst-case-generalization
+    # measure for arms that DO advance the training curriculum. For arms
+    # stuck at an earlier stage (kinodynamic_shield has never left stage 0
+    # in this track), that convention silently conflates "hasn't learned
+    # the base task" with "hasn't generalized to unseen obstacle density" --
+    # pass an explicit eval_stage_idx to evaluate at the stage training
+    # actually reached instead (found by an independent Codex review,
+    # KINODYNAMIC_ROADMAP.md iter41).
+    stage = STAGES[-1] if eval_stage_idx is None else STAGES[eval_stage_idx]
+    env.set_difficulty(*stage)
     sel = (
         make_selector(env, agent, seed=90_000 + seed)
         if arm == "ape2_shield"
@@ -245,6 +257,10 @@ def run_one(
     dv_scale_mult: float = 1.0,
     expl_noise: float = 0.25,
     gamma: float = 0.98,
+    goal_tol: float = 0.05,
+    goal_dwell: int = 1,
+    max_steps: int = 100,
+    eval_at_current_stage: bool = False,
 ):
     action_mode = "velocity" if arm == "kinodynamic_shield" else "delta_q"
     env_kwargs = dict(
@@ -252,6 +268,9 @@ def run_one(
         n_obstacles=3,
         reward_mode=reward_mode,
         action_mode=action_mode,
+        goal_tol=goal_tol,
+        goal_dwell=goal_dwell,
+        max_steps=max_steps,
     )
     if action_mode == "velocity" and dv_scale_mult != 1.0:
         env_kwargs["dv_scale"] = DQ_MAX * DynArmEnv.dt * dv_scale_mult
@@ -341,7 +360,13 @@ def run_one(
             )
 
         if ep % EVAL_EVERY == 0 or ep == episodes:
-            ev = evaluate(eval_env, agent, arm, seed)
+            ev = evaluate(
+                eval_env,
+                agent,
+                arm,
+                seed,
+                eval_stage_idx=stage_idx if eval_at_current_stage else None,
+            )
             ev.update(
                 {
                     "episode": ep,
@@ -457,6 +482,23 @@ def main():
         default=0.98,
         help="TD3 discount factor",
     )
+    ap.add_argument(
+        "--goal-tol", type=float, default=0.05, help="DynArmEnv goal_tol override"
+    )
+    ap.add_argument(
+        "--goal-dwell", type=int, default=1, help="DynArmEnv goal_dwell override"
+    )
+    ap.add_argument(
+        "--max-steps", type=int, default=100, help="DynArmEnv max_steps override"
+    )
+    ap.add_argument(
+        "--eval-at-current-stage",
+        action="store_true",
+        help="evaluate at the stage training actually reached, instead of "
+        "the m3/m4 default of always evaluating at the hardest stage "
+        "(see KINODYNAMIC_ROADMAP.md iter41 for why this matters for arms "
+        "stuck at an early curriculum stage)",
+    )
     args = ap.parse_args()
     if args.episodes < 1 or args.seeds < 1:
         ap.error("--episodes and --seeds must be positive")
@@ -480,6 +522,10 @@ def main():
                 dv_scale_mult=args.dv_scale_mult,
                 expl_noise=args.expl_noise,
                 gamma=args.gamma,
+                goal_tol=args.goal_tol,
+                goal_dwell=args.goal_dwell,
+                max_steps=args.max_steps,
+                eval_at_current_stage=args.eval_at_current_stage,
             )
 
     arm_tag = "-".join(args.arms)

@@ -390,6 +390,26 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter45: two small, self-implemented additions before the
+  next probe (commander, direct — small and well-understood, no Codex
+  round-trip): (1) `m6_kinodynamic_shield.py` now exposes
+  `--goal-tol`/`--goal-dwell`/`--max-steps` CLI args threading through to
+  `DynArmEnv`'s new Phase 5n constructor params (defaults unchanged:
+  0.05/1/100). (2) **Fixed the eval-protocol issue Codex's review found**
+  (iter41) — `evaluate()` now takes an optional `eval_stage_idx` param;
+  default `None` preserves the EXISTING m3/m4 convention exactly
+  (always evaluate at the hardest stage — a deliberate design there,
+  not touched, so no historical comparability is broken for
+  `no_shield`/`ape2_shield`), but a new `--eval-at-current-stage` CLI
+  flag lets a run opt into evaluating at whatever stage training
+  actually reached instead — the fix is additive/opt-in, not a silent
+  behavior change to existing scripts/results. 102/102 pytest still
+  green; syntax-checked; smoke-tested the new CLI wiring (took over
+  120s even at 4 episodes, given `max_steps=300` triples episode length
+  — expected, moved to background automatically). Next: a modest-scale
+  probe with `reward_mode=uoar_advisor`, `goal_tol=0.02`,
+  `goal_dwell=50`, `max_steps=300`, `--eval-at-current-stage` — the
+  first-ever run of the advisor-aligned configuration.
 - 2026-07-18 iter44: independently verified Phase 5n (commander). Reran
   pytest myself: 102/102. Read the full `env.py` diff: `goal_tol`/
   `goal_dwell`/`max_steps` correctly promoted to constructor params,
