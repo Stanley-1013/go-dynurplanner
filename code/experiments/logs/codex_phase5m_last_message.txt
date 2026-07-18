@@ -1,0 +1,23 @@
+Implemented Phase 5m.
+
+Files changed:
+
+- [differentiable_qp.py](/home/han/claude_project/papper-research/code/godynur/differentiable_qp.py)
+- [td3.py](/home/han/claude_project/papper-research/code/godynur/td3.py)
+- [m6_kinodynamic_shield.py](/home/han/claude_project/papper-research/code/experiments/m6_kinodynamic_shield.py)
+- [test_differentiable_qp.py](/home/han/claude_project/papper-research/code/tests/test_differentiable_qp.py)
+- [test_td3.py](/home/han/claude_project/papper-research/code/tests/test_td3.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+- [m6_kinodynamic_diffqp.log](/home/han/claude_project/papper-research/code/experiments/logs/m6_kinodynamic_diffqp.log)
+
+Final pytest result: `98 passed, 314 warnings in 24.42s`. Warnings are third-party diffcp NumPy deprecations.
+
+True native batching worked: one `CvxpyLayer` call receives leading-batch, per-transition-varying matrices. No loop over individual QP solves; only affine-parameter assembly loops over states.
+
+Training probe logged:
+
+- ep200: success `0.00`, stage `0`, intervention `0.198`, collision `0.70`, checkpoint wall `4362.7s` (72m43s).
+
+The run was stopped after ~77m48s because completion projected to ~2.4 hours versus ~12–13 minutes for STE. Therefore no ep400 checkpoint or JSON exists.
+
+Assessment: numerically and architecturally successful, but no learning improvement is visible over STE at ep200—success and stage remain stuck while intervention stays ~0.20—and training cost regressed severely.

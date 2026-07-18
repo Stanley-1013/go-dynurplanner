@@ -390,6 +390,65 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter40: independently verified Phase 5m thoroughly (commander
+  — this was the largest single dispatch of the session). Reran pytest
+  myself: 98/98 (warnings are benign third-party `diffcp` NumPy
+  deprecations). Read `differentiable_qp.py` in full: `v1 =
+  v1_offset_param + v1_matrix_param@jerk`, objective/constraints exactly
+  mirror `solve_safety_qp`'s box-only path including the
+  `box_lower - box_offset` shift; `problem.is_dpp()` gated; per-transition
+  `_affine_map`/`_trajectory_quantities` loop is correctly necessary
+  (these genuinely depend on each transition's own q,v,a — not something
+  to vectorize away without touching Phase 2's verified core, which
+  wasn't touched); the FINAL solve is a single `compiled.layer(...)` call
+  with every parameter batched on the leading axis — genuinely native
+  batching, confirmed by reading the call site, not a disguised loop.
+  Read the batching-correctness test: uses 4+ genuinely different states
+  (not one repeated), compares against individually-solved results —
+  this is the test that would catch an indexing bug, and it's real.
+  Read the `test_m6_projection_extracts_physical_state_from_actual_layout`
+  test (Codex's own addition, beyond what I asked): monkeypatches
+  `differentiable_v_exec` to capture what q/v/a get extracted from the
+  REAL `env._state()` output (not a hand-built fake) across both
+  `obstacles_in_state`/`closest_point_in_state` configs, asserting the
+  extraction matches the env's true internal state — directly tests the
+  exact risk I flagged (getting the observation slice indices right).
+  Confirmed the training log: exactly one checkpoint, ep200, succ=0.00,
+  stage=0, intervene=0.198, **wall time 4362.7s (72m43s) for 200
+  episodes alone** — the timing smoke test's per-call bound (<2s, which
+  passed) is consistent with this: ~7000 actor updates over 200 episodes
+  × ~0.6s/call ≈ 4200s, matching the observed total almost exactly, so
+  the slowdown is understood, not a mystery regression.
+  **Verdict: Phase 5m is a genuine engineering success (correct,
+  natively batched, well-tested differentiable QP) but a research
+  dead-end for THIS problem** — the one checkpoint obtained shows the
+  identical stuck pattern as every other attempt, at ~15-20x the
+  computational cost of STE, making further iteration on this specific
+  approach impractical without a substantial separate optimization
+  effort with no evidence yet that it would help even if made fast.
+  **This is the sixth consecutive negative result on the RL-convergence
+  thread** (buffer bug, missing-v observation, missing-margin
+  observation, hyperparameter sweep, STE, differentiable QP) — including
+  the theoretically most-principled fix. Recommending to the user that
+  this specific thread be closed for now.
+- 2026-07-18 iter39: Phase 5m production differentiable-QP integration is
+  complete. Added a cached DPP-compliant `CvxpyLayer` for the exact box-only
+  safety QP, with native leading-batch parameters for every transition's
+  distinct `box_matrix`/shifted bounds/`v1_matrix`/`v1_offset` (no Python
+  loop of individual QP solves), and wired its physical-state-aware action
+  projection into TD3 through a generic callback that takes precedence over
+  the retained STE option. Forward, finite-difference-gradient, distinct-
+  state batching, float32 backward, observation-layout, and TD3 default-path
+  regressions pass; full suite **98/98** (314 third-party diffcp NumPy
+  deprecation warnings). Repeated batch-64 forward+backward costs
+  **0.41-0.44s**, despite the single-item prototype's ~5.9ms. The requested
+  400-episode probe was stopped after its first checkpoint because its
+  measured cost projected to ~2.4h versus ~12-13min for STE: ep200 was
+  **succ 0.00, stage 0, intervention 0.198, collision 0.70**, with checkpoint
+  `wall_s=4362.7` (72m43s); total foreground time before stopping about
+  **77m48s**, so no ep400 checkpoint/JSON exists. This gives no evidence of
+  improvement over STE at ep200 and exposes a severe training-cost regression,
+  while the numerical and true-batching integration itself is verified.
 - 2026-07-18 iter38: user chose Opus's "better-established alternative"
   (from the iter36 consult) — a differentiable QP layer, replacing the
   STE approximation with the real thing: backpropagate the actor

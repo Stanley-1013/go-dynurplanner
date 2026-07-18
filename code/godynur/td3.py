@@ -9,6 +9,8 @@ URPlanner layers APE2 on deterministic-PG algorithms.
 
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -66,6 +68,10 @@ class TD3:
         hidden: int = 256,
         seed: int = 0,
         use_action_ste: bool = False,
+        differentiable_projection: Callable[
+            [torch.Tensor, torch.Tensor], torch.Tensor
+        ]
+        | None = None,
     ):
         torch.manual_seed(seed)
         self.action_scale = action_scale
@@ -86,6 +92,7 @@ class TD3:
         # locally-correct gradient computed where the critic is actually
         # accurate, instead of extrapolating.
         self.use_action_ste = use_action_ste
+        self.differentiable_projection = differentiable_projection
 
         self.actor = mlp([state_dim, hidden, hidden, action_dim], nn.Tanh())
         self.actor_t = mlp([state_dim, hidden, hidden, action_dim], nn.Tanh())
@@ -136,7 +143,11 @@ class TD3:
         self.it += 1
         if self.it % self.policy_delay == 0:
             raw_action = self.actor(s)
-            if self.use_action_ste:
+            if self.differentiable_projection is not None:
+                # A real differentiable projection takes precedence over the
+                # approximate STE if both are accidentally enabled.
+                actor_action = self.differentiable_projection(raw_action, s)
+            elif self.use_action_ste:
                 # Forward value is exactly the buffered executed action
                 # (on-distribution for the critic); gradient flows to
                 # raw_action unchanged (the detached term contributes 0).

@@ -128,3 +128,47 @@ def test_action_ste_does_not_crash_and_actor_parameters_change():
         for b, a in zip(before, agent.actor.parameters())
     )
     assert changed
+
+
+def test_explicit_default_projection_none_uses_raw_actor_output_exactly():
+    agent = _make_agent(differentiable_projection=None)
+    assert agent.differentiable_projection is None
+    _seed_and_fill_buffer(agent, n=200, action_offset=5.0)
+
+    actor_output = {}
+
+    def capture_actor(module, inputs, output):
+        actor_output["raw"] = output.detach().clone()
+
+    actor_handle = agent.actor.register_forward_hook(capture_actor)
+    captured, q1_handle = _capture_q1_action_input(agent)
+    for _ in range(agent.policy_delay):
+        agent.learn(batch=32)
+    actor_handle.remove()
+    q1_handle.remove()
+
+    assert "raw" in actor_output
+    assert "action" in captured
+    assert torch.equal(captured["action"], actor_output["raw"])
+
+
+def test_differentiable_projection_takes_precedence_over_action_ste():
+    projected = {}
+
+    def projection(raw_action, state_batch):
+        projected["raw"] = raw_action.detach().clone()
+        projected["state"] = state_batch.detach().clone()
+        return raw_action + 0.25
+
+    agent = _make_agent(
+        use_action_ste=True, differentiable_projection=projection
+    )
+    _seed_and_fill_buffer(agent, n=200, action_offset=5.0)
+    captured, handle = _capture_q1_action_input(agent)
+    for _ in range(agent.policy_delay):
+        agent.learn(batch=32)
+    handle.remove()
+
+    assert projected["state"].shape == (32, 4)
+    assert torch.equal(captured["action"], projected["raw"] + 0.25)
+    assert captured["action"].max().item() < 1.25 + 1e-5

@@ -35,8 +35,15 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from godynur.ape2 import APE2Shield  # noqa: E402
+from godynur.differentiable_qp import differentiable_v_exec  # noqa: E402
 from godynur.env import DynArmEnv  # noqa: E402
-from godynur.panda import DQ_MAX  # noqa: E402
+from godynur.panda import (  # noqa: E402
+    DDQ_MAX,
+    DDDQ_MAX,
+    DQ_MAX,
+    Q_MAX,
+    Q_MIN,
+)
 from godynur.td3 import TD3  # noqa: E402
 
 WARMUP_STEPS = 1500
@@ -51,6 +58,66 @@ ARMS = ("no_shield", "ape2_shield", "kinodynamic_shield")
 # when a subset is launched separately.  --seed-salt follows m5_grid.py's
 # deconfounding convention and shifts every range together.
 ARM_SEED_STRIDE = 1_000_000
+
+
+def build_diffqp_projection(env: DynArmEnv):
+    """Build the velocity arm's observation-aware differentiable shield."""
+    if env.action_mode != "velocity":
+        raise ValueError("differentiable QP projection requires velocity mode")
+
+    # Keep this in lockstep with DynArmEnv._state(): the fixed 17-value base
+    # is followed by padded obstacle slots and then the optional closest-point
+    # block before the velocity-mode fields begin.
+    velocity_offset = 17
+    if env.obstacles_in_state:
+        velocity_offset += 6 * env.n_obstacles_max
+    if env.closest_point_in_state:
+        velocity_offset += 7
+    velocity_slice = slice(velocity_offset, velocity_offset + env.action_dim)
+    acceleration_slice = slice(
+        velocity_offset + env.action_dim,
+        velocity_offset + 2 * env.action_dim,
+    )
+
+    dv_scale_numpy = env.dv_scale.copy()
+    safety_n_steps = env.safety_n_steps
+
+    def differentiable_projection(raw_action_batch, state_batch):
+        tensor_options = {
+            "dtype": state_batch.dtype,
+            "device": state_batch.device,
+        }
+        q_min = torch.as_tensor(Q_MIN, **tensor_options)
+        q_max = torch.as_tensor(Q_MAX, **tensor_options)
+        dq_max = torch.as_tensor(DQ_MAX, **tensor_options)
+        ddq_max = torch.as_tensor(DDQ_MAX, **tensor_options)
+        dv_scale = torch.as_tensor(dv_scale_numpy, **tensor_options)
+
+        q_norm = state_batch[:, : env.action_dim]
+        q_batch = (q_norm + 1.0) * 0.5 * (q_max - q_min) + q_min
+        v_batch = state_batch[:, velocity_slice] * dq_max
+        a_batch = state_batch[:, acceleration_slice] * ddq_max
+        v_nom_batch = v_batch + dv_scale * raw_action_batch
+
+        v_exec = differentiable_v_exec(
+            q_batch.detach().cpu().numpy(),
+            v_batch.detach().cpu().numpy(),
+            a_batch.detach().cpu().numpy(),
+            v_nom_batch,
+            h=env.dt,
+            n_steps=safety_n_steps,
+            q_min=Q_MIN,
+            q_max=Q_MAX,
+            v_min=-DQ_MAX,
+            v_max=DQ_MAX,
+            a_min=-DDQ_MAX,
+            a_max=DDQ_MAX,
+            j_min=-DDDQ_MAX,
+            j_max=DDDQ_MAX,
+        )
+        return ((v_exec - v_batch) / dv_scale).clamp(-1.0, 1.0)
+
+    return differentiable_projection
 
 
 def make_selector(env, agent, seed: int) -> APE2Shield:
@@ -190,6 +257,9 @@ def run_one(
         env_kwargs["dv_scale"] = DQ_MAX * DynArmEnv.dt * dv_scale_mult
     env = DynArmEnv(seed=seed, **env_kwargs)
     eval_env = DynArmEnv(seed=10_000 + seed, **env_kwargs)
+    differentiable_projection = (
+        build_diffqp_projection(env) if arm == "kinodynamic_shield" else None
+    )
     agent = TD3(
         env.state_dim,
         env.action_dim,
@@ -197,7 +267,7 @@ def run_one(
         expl_noise=expl_noise,
         gamma=gamma,
         seed=seed,
-        use_action_ste=(arm == "kinodynamic_shield"),
+        differentiable_projection=differentiable_projection,
     )
     sel = make_selector(env, agent, seed) if arm == "ape2_shield" else None
     stage_idx = 0

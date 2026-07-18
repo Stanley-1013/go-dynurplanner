@@ -1,8 +1,53 @@
 # Phase 5c — M6 three-arm comparison, first-pass analysis
 
-> **2026-07-18 UPDATE — read this first.** Everything below this notice
+> **2026-07-18 SECOND UPDATE — read this first, supersedes the update
+> below it.** After the first update (through Phase 5j) was written, the
+> user asked to systematically pursue the RL-convergence question rather
+> than stop. Six interventions in total were tried, each with real
+> justification, each independently verified, in this order:
+> 1. Replay-buffer action-consistency fix (real bug, real fix)
+> 2. Missing raw-velocity observation (real POMDP gap) — tested up to a
+>    decisive 3000-episode run: max success ever seen was 6.7%, once,
+>    never sustained
+> 3. Missing safety-velocity-margin observation (from the user's own
+>    original design spec) — no improvement, added real per-step cost
+> 4. A prioritized, Opus-designed hyperparameter sweep (action scale,
+>    exploration noise, discount factor, combined) — no improvement,
+>    collision rate got worse
+> 5. A straight-through estimator on the actor's gradient (addressing a
+>    real, literature-documented extrapolation-error mechanism the user
+>    identified: TD3's actor loss queries Q at raw actions the critic may
+>    never have seen executed in shield-heavy regions) — no improvement
+> 6. **A real differentiable QP layer** (`cvxpylayers`, KKT-based implicit
+>    differentiation through the actual safety QP, not an approximation)
+>    — the theoretically most-principled fix available, explicitly
+>    endorsed by Opus over the imitation-loss alternative. Verified
+>    mathematically correct (forward matches the scipy solver to ~2e-7,
+>    gradient matches finite-difference to ~4.6e-5) and correctly
+>    natively-batched in production. **Still no improvement** at the one
+>    training checkpoint obtained (succ=0.00, ep200, identical pattern to
+>    every prior attempt) — and ~15-20x more expensive per training step
+>    than the STE alternative (72m43s for 200 episodes vs. ~3-6 min),
+>    making further iteration on this specific approach impractical
+>    without a separate, substantial optimization effort that has no
+>    evidence yet of paying off even if completed.
+>
+> **This is six consecutive negative results, including the most
+> theoretically sound one.** The commander's recommendation: close this
+> specific thread. The shield (Phase 1-4, Phase 5j) remains a complete,
+> independently verified, empirically-validated-at-scale contribution
+> regardless of this outcome — the RL-convergence question is real,
+> interesting, and unresolved, but has now had a thorough, good-faith,
+> expert-informed attempt and should be documented as an honest open
+> limitation (matching this project's existing C4-style precedent for
+> honest negative results) rather than pursued further via more targeted
+> guesses. See `KINODYNAMIC_ROADMAP.md` iter18-40 for the complete
+> evidence trail.
+
+> **2026-07-18 FIRST UPDATE.** Everything below this notice
 > was written during the investigation and is kept for the full trail,
-> but here is where things actually stand after Phase 5c through 5j:
+> but here is where things actually stood after Phase 5c through 5j
+> (superseded by the update above, kept for the historical record):
 >
 > **Phase 1-4 (the kinodynamic certified safety shield itself) is DONE,
 > independently verified at every step, and now empirically validated
