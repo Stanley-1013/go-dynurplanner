@@ -390,6 +390,28 @@ algorithm, or accept the shield as the standalone contribution).
 
 ## 6. Loop status log (append one line per iteration, newest first)
 
+- 2026-07-18 iter44: independently verified Phase 5n (commander). Reran
+  pytest myself: 102/102. Read the full `env.py` diff: `goal_tol`/
+  `goal_dwell`/`max_steps` correctly promoted to constructor params,
+  defaults unchanged (0.05/1/100); `_prev_pos_err` correctly initialized
+  in `reset()` from the ACTUAL initial flange-goal distance (not `None`),
+  matching the advisor's `distance_old` pattern; new `uoar_advisor`
+  branch placed as an early return BEFORE the existing `uoar`/`ct` checks
+  — doesn't touch their code paths at all. Formula hand-verified against
+  `Franka_Env_Scene2.py`: `r_pose=-err/3.0` (exact `dist_norm=3`), step
+  bonus `+0.05`/`-0.05`/`0.0` with correct `elif` tie-breaking (equal
+  distance → neither), `in_tolerance=1.0` gated on `goal_tol`, reuses the
+  existing `r_current`/UOAR computation unchanged. Read the 5 new tests:
+  genuinely substantive — one test cleverly exercises the tie-breaking
+  branch via two consecutive same-position `_reward()` calls (first call
+  updates `_prev_pos_err` to match, second call then sees equal distance),
+  another runs a full 299-steps-not-done + 300th-step-done timeout check
+  proving `max_steps=300` genuinely takes effect, not just stored.
+  Committing. Next: a modest-scale training probe (single seed, reduced
+  episode count relative to Codex's proposed full 3000×5-seed scale) to
+  check for an early positive signal before committing to the full
+  experiment scale.
+- 2026-07-18 iter43: Phase 5n advisor-aligned reward/tolerance/dwell/episode configuration landed additively; full pytest **102 passed**; requested velocity-mode smoke completed all 300 steps (`done at step 299, on_goal=0`; total reward `-69.00603005481373`, final `on_goal=0`).
 - 2026-07-18 iter42: **user redirected again, correctly**: before running
   Codex's proposed A/B experiment, do proper academic grounding — align
   with URPlanner/the advisor's real recipe wherever alignment should

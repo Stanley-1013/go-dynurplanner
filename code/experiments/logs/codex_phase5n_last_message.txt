@@ -1,0 +1,22 @@
+Implemented Phase 5n additively.
+
+Files changed:
+
+- [env.py](/home/han/claude_project/papper-research/code/godynur/env.py)
+- [test_env.py](/home/han/claude_project/papper-research/code/tests/test_env.py)
+- [KINODYNAMIC_ROADMAP.md](/home/han/claude_project/papper-research/code/KINODYNAMIC_ROADMAP.md)
+
+Pytest:
+
+```text
+102 passed, 314 warnings in 26.49s
+```
+
+Smoke output:
+
+```text
+done at step 299, on_goal=0
+ran 300 steps, total reward -69.00603005481373 final on_goal 0
+```
+
+No hidden `max_steps`/`goal_dwell`/`goal_tol` coupling found. Advisor formula was unambiguous; UOAR retains this environment’s self-consistent segment-length normalization.

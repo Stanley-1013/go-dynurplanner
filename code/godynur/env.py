@@ -12,9 +12,10 @@ training stack unchanged, while upgrading the internals:
   - collision/termination accounting is CONTINUOUS-TIME EXACT (tau* via
     godynur.continuous) — to our knowledge the first manipulator RL env
     whose safety bookkeeping cannot tunnel;
-  - reward is switchable: 'uoar' (URPlanner Eq.12, discrete) vs 'ct'
-    (D-UOAR-CT: pose + current overlap + swept integral + continuous TTC)
-    — the M3 ablation axis;
+  - reward is switchable: 'uoar' (URPlanner Eq.12, discrete),
+    'uoar_advisor' (advisor-aligned position reward), or 'ct' (D-UOAR-CT:
+    pose + current overlap + swept integral + continuous TTC) — the M3
+    ablation axis;
   - occupancy-grid observation (k-frame history) is available via
     `grid_history()` for the M2 encoder; the flat vector state stays
     Morvan-compatible for existing DDPG/TD3/APE2 code.
@@ -48,7 +49,7 @@ class DynArmEnv:
         self,
         speed: float = 0.5,
         n_obstacles: int = 3,
-        reward_mode: str = "ct",  # 'uoar' | 'ct'
+        reward_mode: str = "ct",  # 'uoar' | 'uoar_advisor' | 'ct'
         obstacles_in_state: bool = True,
         a_r: float = 0.06,
         a_o: float = 0.05,
@@ -68,8 +69,11 @@ class DynArmEnv:
         brake_derate: float = 0.85,
         lambda_intervention: float = 0.1,
         margin_bisection_iters: int = 4,
+        goal_tol: float = 0.05,
+        goal_dwell: int = 1,
+        max_steps: int = 100,
     ):
-        assert reward_mode in ("uoar", "ct")
+        assert reward_mode in ("uoar", "uoar_advisor", "ct")
         assert task in ("random", "tabletop")
         assert grid_mode in ("binary", "sdf")
         assert action_mode in ("delta_q", "velocity")
@@ -81,6 +85,9 @@ class DynArmEnv:
         self.speed = speed
         self.n_obstacles = n_obstacles
         self.reward_mode = reward_mode
+        self.goal_tol = goal_tol
+        self.goal_dwell = goal_dwell
+        self.max_steps = max_steps
         self.obstacles_in_state = obstacles_in_state
         self.a_r, self.a_o = a_r, a_o
         self.zeta_c, self.zeta_s, self.zeta_t = zeta_c, zeta_s, zeta_t
@@ -161,6 +168,9 @@ class DynArmEnv:
 
     def reset(self) -> np.ndarray:
         self.q, self.goal = self._sample_start_goal()
+        self._prev_pos_err = float(
+            np.linalg.norm(self.kin.flange(self.q) - self.goal)
+        )
         if self.action_mode == "velocity":
             self.v = np.zeros(self.action_dim)
             self.a = np.zeros(self.action_dim)
@@ -629,6 +639,21 @@ class DynArmEnv:
         margin = self.a_r + self.a_o
         segs_now = self.kin.segments(self.q + dq)
         r_current = uoar(segs_now, self._boxes(margin))  # <= 0
+        if self.reward_mode == "uoar_advisor":
+            # Position-only by design; this environment has no orientation goal.
+            r_pose = -err / 3.0  # advisor's exact dist_norm
+            if err < self._prev_pos_err:
+                step_bonus = 0.05
+            elif err > self._prev_pos_err:
+                step_bonus = -0.05
+            else:
+                step_bonus = 0.0
+            in_tolerance = 1.0 if err < self.goal_tol else 0.0
+            # Same normalization concept as the advisor, using our segments'
+            # actual summed length rather than its Franka-specific 0.9101.
+            r = r_pose + step_bonus + self.zeta_c * r_current + in_tolerance
+            self._prev_pos_err = float(err)
+            return r
         if self.reward_mode == "uoar":
             return r_pose + self.zeta_c * r_current
 

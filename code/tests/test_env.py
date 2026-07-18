@@ -50,11 +50,84 @@ def test_grid_history_shape_and_dynamics():
 def test_reward_modes_run_and_ct_penalizes_approach():
     """Both reward modes produce finite rewards; CT reward is <= UOAR-style
     reward when a contact is imminent (extra anticipatory penalty terms)."""
-    for mode in ("uoar", "ct"):
+    for mode in ("uoar", "uoar_advisor", "ct"):
         env = DynArmEnv(reward_mode=mode, seed=3)
         traj = rollout(env, n=20)
         rewards = [t[1] for t in traj[1:]]
         assert all(np.isfinite(r) for r in rewards)
+
+
+def test_advisor_reward_improving_equal_and_in_tolerance_formula():
+    env = DynArmEnv(
+        reward_mode="uoar_advisor", n_obstacles=0,
+        obstacles_in_state=False, goal_tol=0.02, seed=31,
+    )
+    env.reset()
+    dq = np.zeros(7)
+    dq[0] = 0.01
+    initial_flange = env.kin.flange(env.q)
+    candidate_flange = env.kin.flange(env.q + dq)
+    env.goal = candidate_flange.copy()
+    env._prev_pos_err = float(np.linalg.norm(initial_flange - env.goal))
+
+    improving_reward = env._reward(dq)
+    assert np.isclose(improving_reward, 0.0 + 0.05 + 0.0 + 1.0)
+
+    # The same candidate has exactly the same computed error on the next call,
+    # exercising the advisor's elif tie-breaking (neither bonus nor penalty).
+    equal_reward = env._reward(dq)
+    assert np.isclose(equal_reward, 0.0 + 0.0 + 0.0 + 1.0)
+
+
+def test_advisor_reward_worsening_formula():
+    env = DynArmEnv(
+        reward_mode="uoar_advisor", n_obstacles=0,
+        obstacles_in_state=False, goal_tol=1e-12, seed=32,
+    )
+    env.reset()
+    dq = np.zeros(7)
+    dq[0] = 0.01
+    env.goal = env.kin.flange(env.q).copy()
+    env._prev_pos_err = 0.0
+    err = float(np.linalg.norm(env.kin.flange(env.q + dq) - env.goal))
+
+    reward = env._reward(dq)
+    assert np.isclose(reward, -err / 3.0 - 0.05)
+
+
+def test_advisor_reset_initializes_previous_distance_for_first_step():
+    env = DynArmEnv(
+        reward_mode="uoar_advisor", n_obstacles=0,
+        obstacles_in_state=False, goal_tol=1e-12, seed=33,
+    )
+    env.reset()
+    initial_err = float(np.linalg.norm(env.kin.flange(env.q) - env.goal))
+    assert np.isclose(env._prev_pos_err, initial_err)
+
+    _, reward, done = env.step(np.zeros(7))
+    assert np.isclose(reward, -initial_err / 3.0)
+    assert not done
+
+
+def test_episode_configuration_overrides_and_300_step_timeout():
+    env = DynArmEnv(
+        reward_mode="uoar_advisor", n_obstacles=0,
+        obstacles_in_state=False, goal_tol=0.02, goal_dwell=50,
+        max_steps=300, seed=34,
+    )
+    env.reset()
+    env.goal = env.kin.flange(env.q) + np.array([10.0, 0.0, 0.0])
+    env._prev_pos_err = 10.0
+    assert env.goal_tol == 0.02
+    assert env.goal_dwell == 50
+    assert env.max_steps == 300
+
+    for _ in range(299):
+        _, _, done = env.step(np.zeros(7))
+        assert not done
+    _, _, done = env.step(np.zeros(7))
+    assert done
+    assert env.t == 300
 
 
 def test_collision_terminates_and_instruments():
